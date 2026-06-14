@@ -1,0 +1,95 @@
+import { useContext } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { AuthContext } from '../context/AuthContext';
+import { apiClient } from '../api/client';
+
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
+
+export const useRegister = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/register', data);
+      return res.data;
+    }
+  });
+};
+
+export const useLogin = () => {
+  const { loginUser } = useAuth();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/login', data);
+      await loginUser(res.data.data.token, res.data.data.user);
+      return res.data;
+    }
+  });
+};
+
+export const useVerifyEmail = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/verify-email', data);
+      return res.data;
+    }
+  });
+};
+
+export const useResendOtp = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/resend-otp', data);
+      return res.data;
+    }
+  });
+};
+
+export const useAddPhone = () => {
+  const { refreshUser } = useAuth();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/add-phone', data);
+      await refreshUser();
+      return res.data;
+    }
+  });
+};
+
+export const useVerifyPhone = () => {
+  const { refreshUser } = useAuth();
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/verify-phone', data);
+      await refreshUser();
+      return res.data;
+    }
+  });
+};
+
+export const useEmergencyContacts = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/emergency-contacts', data);
+      return res.data;
+    }
+  });
+};
+
+export const useForgotPassword = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/forgot-password', data);
+      return res.data;
+    }
+  });
+};
+
+export const useResetPassword = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.post('/auth/reset-password', data);
+      return res.data;
+    }
+  });
+};

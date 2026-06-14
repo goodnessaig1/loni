@@ -17,6 +17,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Button } from '../../components/Button';
+import { useRegister } from '../../hooks/useAuth';
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required('Name is required'),
@@ -48,16 +49,30 @@ const getWeeksForTrimester = (trimester: string) => {
 };
 
 export default function RegisterScreen() {
+  const { mutateAsync: registerUser } = useRegister();
+
   return (
     <Formik
       initialValues={{ name: '', email: '', password: '', status: '', trimester: '', pregnancyWeek: '', babyAge: '' }}
       validationSchema={validationSchema}
-      onSubmit={(values, { setSubmitting }) => {
-        console.log('Form Submitted:', values);
-        setTimeout(() => {
-          setSubmitting(false);
+      onSubmit={async (values, { setSubmitting, setFieldError }) => {
+        try {
+          await registerUser({
+            name: values.name,
+            email: values.email,
+            password: values.password,
+            status: values.status,
+            trimester: values.trimester || undefined,
+            pregnancyWeek: values.pregnancyWeek || undefined,
+            babyAge: values.babyAge || undefined,
+          });
           router.push({ pathname: '/(auth)/verify', params: { email: values.email } } as any);
-        }, 1500);
+        } catch (error: any) {
+          console.error('Registration failed:', error.response?.data || error.message);
+          setFieldError('email', error.response?.data?.error || 'Registration failed');
+        } finally {
+          setSubmitting(false);
+        }
       }}
     >
       {({ handleChange, handleBlur, handleSubmit, setFieldValue, values, errors, touched, isValid, dirty, isSubmitting }) => (

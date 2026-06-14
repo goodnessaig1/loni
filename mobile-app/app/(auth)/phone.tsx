@@ -16,6 +16,7 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useAddPhone } from '../../hooks/useAuth';
 
 const PhoneSchema = Yup.object().shape({
   phone: Yup.string()
@@ -28,11 +29,18 @@ const PhoneSchema = Yup.object().shape({
 });
 
 export default function PhoneScreen() {
-  const handlePhoneSubmit = (values: any, { setSubmitting }: any) => {
-    setTimeout(() => {
-      setSubmitting(false);
+  const { mutateAsync: addPhone } = useAddPhone();
+
+  const handlePhoneSubmit = async (values: any, { setSubmitting, setFieldError }: any) => {
+    try {
+      await addPhone({ phone: values.phone });
       router.push({ pathname: '/(auth)/verify-phone', params: { phone: values.phone } } as any);
-    }, 1500);
+    } catch (error: any) {
+      console.error('Adding phone failed:', error.response?.data || error.message);
+      setFieldError('phone', error.response?.data?.error || 'Failed to add phone');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
