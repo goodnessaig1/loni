@@ -28,9 +28,13 @@ export const useLogin = () => {
 };
 
 export const useVerifyEmail = () => {
+  const { loginUser } = useAuth();
   return useMutation({
     mutationFn: async (data: any) => {
       const res = await apiClient.post('/auth/verify-email', data);
+      if (res.data.data?.token) {
+        await loginUser(res.data.data.token, res.data.data.user);
+      }
       return res.data;
     }
   });

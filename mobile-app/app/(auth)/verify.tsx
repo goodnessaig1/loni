@@ -18,7 +18,7 @@ import { useVerifyEmail, useResendOtp } from '../../hooks/useAuth';
 
 export default function VerifyScreen() {
   const { email, nextRoute } = useLocalSearchParams<{ email?: string, nextRoute?: string }>();
-  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [code, setCode] = useState(['', '', '', '']);
   const { mutateAsync: verifyEmail, isPending: isVerifying } = useVerifyEmail();
   const { mutateAsync: resendOtp } = useResendOtp();
   const inputs = useRef<Array<TextInput | null>>([]);
@@ -32,7 +32,7 @@ export default function VerifyScreen() {
     setCode(newCode);
 
     // Auto-advance to next input
-    if (newText && index < 5) {
+    if (newText && index < 3) {
       inputs.current[index + 1]?.focus();
     }
   };

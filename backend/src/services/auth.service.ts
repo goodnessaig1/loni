@@ -98,6 +98,13 @@ export class AuthService {
 
     if (type === 'email_verification') {
       await db.update(users).set({ isEmailVerified: true }).where(eq(users.email, email));
+      
+      // Return user data and token so the user is logged in automatically
+      const user = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      const token = signToken({ userId: user[0].id });
+      const { password, ...userWithoutPassword } = user[0];
+      
+      return { token, user: userWithoutPassword };
     } else if (type === 'phone_verification') {
       await db.update(users).set({ isPhoneVerified: true }).where(eq(users.email, email));
     }

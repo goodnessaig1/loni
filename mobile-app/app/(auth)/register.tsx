@@ -69,7 +69,16 @@ export default function RegisterScreen() {
           router.push({ pathname: '/(auth)/verify', params: { email: values.email } } as any);
         } catch (error: any) {
           console.error('Registration failed:', error.response?.data || error.message);
-          setFieldError('email', error.response?.data?.error || 'Registration failed');
+          const errData = error.response?.data;
+          if (errData?.errors && Array.isArray(errData.errors)) {
+            errData.errors.forEach((err: any) => {
+              if (err.path) {
+                setFieldError(err.path, err.message);
+              }
+            });
+          } else {
+            setFieldError('email', errData?.message || errData?.error || 'Registration failed');
+          }
         } finally {
           setSubmitting(false);
         }
