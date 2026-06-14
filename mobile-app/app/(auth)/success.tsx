@@ -1,13 +1,14 @@
 import React from 'react';
-import { 
-  View, 
-  Pressable, 
-  StyleSheet, 
+import {
+  View,
+  Pressable,
+  StyleSheet,
   ScrollView,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import LottieView from 'lottie-react-native';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 
@@ -15,10 +16,15 @@ export default function SuccessScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        
+
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <Feather name="heart" size={40} color="#D62D88" />
+            <LottieView
+              source={require('../../assets/pregnant-woman.json')}
+              autoPlay
+              loop={true}
+              style={styles.lottieIcon}
+            />
           </View>
           <CalText style={styles.heading}>You're all set!</CalText>
           <HelixaText style={styles.subtext}>
@@ -68,7 +74,7 @@ export default function SuccessScreen() {
         </View>
 
         <View style={styles.footer}>
-          <Pressable 
+          <Pressable
             style={styles.startButton}
             onPress={() => router.replace('/(tabs)')}
           >
@@ -88,7 +94,7 @@ export default function SuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB', // Light gray background in success state usually or white
+    backgroundColor: '#FFF', // Light gray background in success state usually or white
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -104,6 +110,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  lottieIcon: {
+    width: 80,
+    height: 80,
   },
   heading: {
     fontSize: 28,
@@ -121,18 +131,21 @@ const styles = StyleSheet.create({
   },
   cardsContainer: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#E5E5E5',
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FAFAFA',
     marginBottom: 40,
-    overflow: 'hidden',
+    padding: 12,
+    gap: 12,
   },
   card: {
     flexDirection: 'row',
     padding: 16,
     alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF'
   },
   cardIconBox: {
     width: 44,
