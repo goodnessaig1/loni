@@ -121,7 +121,7 @@ export default function OnboardingScreen() {
 
             {/* Top Button */}
             <View style={styles.topButtonContainer}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 activeOpacity={0.8}
                 style={styles.topButton}
                 onPress={() => router.push('/(auth)/register')}

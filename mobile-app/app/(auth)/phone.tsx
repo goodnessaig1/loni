@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Pressable, 
-  TextInput, 
-  StyleSheet, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Pressable,
+  TextInput,
+  StyleSheet,
+  KeyboardAvoidingView,
   Platform,
   ScrollView
 } from 'react-native';
@@ -16,6 +16,9 @@ import { HelixaText } from '../../components/HelixaText';
 
 export default function PhoneScreen() {
   const [phone, setPhone] = useState('');
+
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const isValidPhone = cleanPhone.length === 10 || cleanPhone.length === 11;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -32,19 +35,34 @@ export default function PhoneScreen() {
 
           <View style={styles.inputContainer}>
             <HelixaText style={styles.inputLabel} weight="bold">Your phone number</HelixaText>
-            <TextInput 
-              placeholder="(234) 000-0000-000" 
-              style={styles.input} 
-              keyboardType="phone-pad"
-              value={phone}
-              onChangeText={setPhone}
-              placeholderTextColor="#9CA3AF"
-            />
+
+            <View style={styles.phoneInputWrapper}>
+              <View style={styles.countryPicker}>
+                <View style={styles.flagCircle}>
+                  <View style={styles.flagGreen} />
+                  <View style={styles.flagWhite} />
+                  <View style={styles.flagGreen} />
+                </View>
+                <HelixaText style={styles.countryCode} weight="bold">+234</HelixaText>
+                {/* <Feather name="chevron-down" size={16} color="#9CA3AF" /> */}
+              </View>
+
+              <View style={styles.divider} />
+
+              <TextInput
+                placeholder="800 000 0000"
+                style={styles.phoneInput}
+                keyboardType="phone-pad"
+                value={phone}
+                onChangeText={setPhone}
+                placeholderTextColor="#D1D5DB"
+              />
+            </View>
           </View>
 
-          <Pressable 
-            style={[styles.continueButton, phone.length > 5 ? styles.continueButtonActive : styles.continueButtonDisabled]}
-            disabled={phone.length <= 5}
+          <Pressable
+            style={[styles.continueButton, isValidPhone ? styles.continueButtonActive : styles.continueButtonDisabled]}
+            disabled={!isValidPhone}
             onPress={() => router.push({ pathname: '/(auth)/verify-phone', params: { phone } })}
           >
             <HelixaText style={styles.continueButtonText} weight="bold">Send Verification Code</HelixaText>
@@ -95,10 +113,49 @@ const styles = StyleSheet.create({
     color: '#000000',
     marginBottom: 8,
   },
-  input: {
+  phoneInputWrapper: {
+    flexDirection: 'row',
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  countryPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  flagCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  flagGreen: {
+    flex: 1,
+    backgroundColor: '#008751',
+  },
+  flagWhite: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  countryCode: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  divider: {
+    width: 1,
+    height: '60%',
+    backgroundColor: '#E5E7EB',
+  },
+  phoneInput: {
+    flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,

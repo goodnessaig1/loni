@@ -85,7 +85,7 @@ export default function VerifyPhoneScreen() {
           <Pressable 
             style={[styles.continueButton, isComplete ? styles.continueButtonActive : styles.continueButtonDisabled]}
             disabled={!isComplete}
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => router.push('/(auth)/permissions')}
           >
             <HelixaText style={styles.continueButtonText} weight="bold">Verify</HelixaText>
           </Pressable>

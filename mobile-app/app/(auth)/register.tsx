@@ -27,6 +27,11 @@ const validationSchema = Yup.object().shape({
     then: (schema) => schema.required('Please select your trimester'),
     otherwise: (schema) => schema.notRequired(),
   }),
+  pregnancyWeek: Yup.string().when('status', {
+    is: 'pregnant',
+    then: (schema) => schema.required('Please select your pregnancy week'),
+    otherwise: (schema) => schema.notRequired(),
+  }),
   babyAge: Yup.string().when('status', {
     is: 'newMom',
     then: (schema) => schema.required('Please enter your baby\'s age'),
@@ -34,10 +39,17 @@ const validationSchema = Yup.object().shape({
   }),
 });
 
+const getWeeksForTrimester = (trimester: string) => {
+  if (trimester === '1st') return Array.from({ length: 12 }, (_, i) => String(i + 1));
+  if (trimester === '2nd') return Array.from({ length: 15 }, (_, i) => String(i + 13));
+  if (trimester === '3rd') return Array.from({ length: 15 }, (_, i) => String(i + 28)); // 28 to 42
+  return [];
+};
+
 export default function RegisterScreen() {
   return (
     <Formik
-      initialValues={{ name: '', email: '', password: '', status: '', trimester: '', babyAge: '' }}
+      initialValues={{ name: '', email: '', password: '', status: '', trimester: '', pregnancyWeek: '', babyAge: '' }}
       validationSchema={validationSchema}
       onSubmit={(values) => {
         console.log('Form Submitted:', values);
@@ -125,6 +137,7 @@ export default function RegisterScreen() {
                     onPress={() => {
                       setFieldValue('status', 'newMom');
                       setFieldValue('trimester', ''); // clear other state
+                      setFieldValue('pregnancyWeek', '');
                     }}
                   >
                     <View style={styles.statusHeader}>
@@ -148,7 +161,10 @@ export default function RegisterScreen() {
                       <Pressable 
                         key={trim}
                         style={[styles.trimesterBox, values.trimester === trim && styles.statusBoxSelected]}
-                        onPress={() => setFieldValue('trimester', trim)}
+                        onPress={() => {
+                          setFieldValue('trimester', trim);
+                          setFieldValue('pregnancyWeek', '');
+                        }}
                       >
                         <HelixaText style={styles.statusTitle} weight={values.trimester === trim ? 'bold' : 'regular'}>{trim}</HelixaText>
                         <View style={[styles.radioEmpty, values.trimester === trim && styles.radioSelected]}>
@@ -157,7 +173,33 @@ export default function RegisterScreen() {
                       </Pressable>
                     ))}
                   </View>
-                  {touched.trimester && errors.trimester && <Text style={styles.errorText}>{errors.trimester}</Text>}
+                  {touched.trimester && errors.trimester && <Text style={styles.errorText}>{errors.trimester as string}</Text>}
+
+                  {values.trimester ? (
+                    <View style={styles.weekSection}>
+                      <HelixaText style={styles.inputLabelSubtitle}>Which week?</HelixaText>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekScrollContent}>
+                        {getWeeksForTrimester(values.trimester).map((week) => (
+                          <Pressable
+                            key={week}
+                            style={[
+                              styles.weekBox,
+                              values.pregnancyWeek === week && styles.weekBoxSelected
+                            ]}
+                            onPress={() => setFieldValue('pregnancyWeek', week)}
+                          >
+                            <HelixaText 
+                              style={[styles.weekText, values.pregnancyWeek === week && styles.weekTextSelected]}
+                              weight={values.pregnancyWeek === week ? 'bold' : 'regular'}
+                            >
+                              Week {week}
+                            </HelixaText>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                      {touched.pregnancyWeek && errors.pregnancyWeek && <Text style={styles.errorText}>{errors.pregnancyWeek as string}</Text>}
+                    </View>
+                  ) : null}
                 </View>
               )}
 
@@ -354,5 +396,31 @@ const styles = StyleSheet.create({
   },
   switchModeHighlight: {
     color: '#D62D88',
+  },
+  weekSection: {
+    marginTop: 24,
+  },
+  weekScrollContent: {
+    gap: 10,
+    paddingVertical: 4,
+  },
+  weekBox: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  weekBoxSelected: {
+    backgroundColor: '#D62D88',
+    borderColor: '#D62D88',
+  },
+  weekText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  weekTextSelected: {
+    color: '#FFFFFF',
   },
 });
