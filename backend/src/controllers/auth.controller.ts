@@ -30,8 +30,8 @@ export class AuthController {
   async verifyOtp(req: Request, res: Response, next: NextFunction) {
     try {
       const { email, otp, type } = req.body;
-      await authService.verifyOtp(email, otp, type);
-      res.status(200).json({ success: true, message: 'Verification successful' });
+      const result = await authService.verifyOtp(email, otp, type);
+      res.status(200).json({ success: true, message: 'Verification successful', data: result });
     } catch (error: any) {
       res.status(400);
       next(error);
