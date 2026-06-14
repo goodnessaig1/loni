@@ -13,10 +13,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Button } from '../../components/Button';
 
 export default function VerifyScreen() {
-  const { email } = useLocalSearchParams<{ email?: string }>();
+  const { email, nextRoute } = useLocalSearchParams<{ email?: string, nextRoute?: string }>();
   const [code, setCode] = useState(['', '', '', '']);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputs = useRef<Array<TextInput | null>>([]);
 
   const handleCodeChange = (text: string, index: number) => {
@@ -44,6 +46,14 @@ export default function VerifyScreen() {
   };
 
   const isComplete = code.every(digit => digit.length === 1);
+
+  const handleVerify = () => {
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      router.push((nextRoute as any) || '/(auth)/phone');
+    }, 1500);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -82,13 +92,12 @@ export default function VerifyScreen() {
             <HelixaText style={styles.resendText} weight="bold">Resend Code</HelixaText>
           </Pressable>
 
-          <Pressable 
-            style={[styles.continueButton, isComplete ? styles.continueButtonActive : styles.continueButtonDisabled]}
+          <Button 
+            title="Verify"
+            onPress={handleVerify}
+            isLoading={isSubmitting}
             disabled={!isComplete}
-            onPress={() => router.push('/(auth)/phone')}
-          >
-            <HelixaText style={styles.continueButtonText} weight="bold">Verify</HelixaText>
-          </Pressable>
+          />
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -163,21 +172,5 @@ const styles = StyleSheet.create({
   resendText: {
     color: '#D62D88',
     fontSize: 15,
-  },
-  continueButton: {
-    borderRadius: 9999,
-    paddingVertical: 18,
-    alignItems: 'center',
-  },
-  continueButtonActive: {
-    backgroundColor: '#D62D88',
-  },
-  continueButtonDisabled: {
-    backgroundColor: '#F9C2D9',
-    opacity: 0.8,
-  },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
   },
 });

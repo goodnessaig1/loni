@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Pressable,
@@ -11,14 +11,29 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Button } from '../../components/Button';
+
+const PhoneSchema = Yup.object().shape({
+  phone: Yup.string()
+    .required('Phone number is required')
+    .test('len', 'Must be a valid 10 or 11 digit phone number', val => {
+      if (!val) return false;
+      const cleanPhone = val.replace(/[^0-9]/g, '');
+      return cleanPhone.length === 10 || cleanPhone.length === 11;
+    })
+});
 
 export default function PhoneScreen() {
-  const [phone, setPhone] = useState('');
-
-  const cleanPhone = phone.replace(/[^0-9]/g, '');
-  const isValidPhone = cleanPhone.length === 10 || cleanPhone.length === 11;
+  const handlePhoneSubmit = (values: any, { setSubmitting }: any) => {
+    setTimeout(() => {
+      setSubmitting(false);
+      router.push({ pathname: '/(auth)/verify-phone', params: { phone: values.phone } } as any);
+    }, 1500);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -33,40 +48,52 @@ export default function PhoneScreen() {
             We'll send you a verification code to confirm your number
           </HelixaText>
 
-          <View style={styles.inputContainer}>
-            <HelixaText style={styles.inputLabel} weight="bold">Your phone number</HelixaText>
-
-            <View style={styles.phoneInputWrapper}>
-              <View style={styles.countryPicker}>
-                <View style={styles.flagCircle}>
-                  <View style={styles.flagGreen} />
-                  <View style={styles.flagWhite} />
-                  <View style={styles.flagGreen} />
-                </View>
-                <HelixaText style={styles.countryCode} weight="bold">+234</HelixaText>
-                {/* <Feather name="chevron-down" size={16} color="#9CA3AF" /> */}
-              </View>
-
-              <View style={styles.divider} />
-
-              <TextInput
-                placeholder="800 000 0000"
-                style={styles.phoneInput}
-                keyboardType="phone-pad"
-                value={phone}
-                onChangeText={setPhone}
-                placeholderTextColor="#D1D5DB"
-              />
-            </View>
-          </View>
-
-          <Pressable
-            style={[styles.continueButton, isValidPhone ? styles.continueButtonActive : styles.continueButtonDisabled]}
-            disabled={!isValidPhone}
-            onPress={() => router.push({ pathname: '/(auth)/verify-phone', params: { phone } })}
+          <Formik
+            initialValues={{ phone: '' }}
+            validationSchema={PhoneSchema}
+            onSubmit={handlePhoneSubmit}
           >
-            <HelixaText style={styles.continueButtonText} weight="bold">Send Verification Code</HelixaText>
-          </Pressable>
+            {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isValid, dirty, isSubmitting }) => (
+              <>
+                <View style={styles.inputContainer}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Your phone number</HelixaText>
+
+                  <View style={[styles.phoneInputWrapper, touched.phone && errors.phone ? styles.inputError : null]}>
+                    <View style={styles.countryPicker}>
+                      <View style={styles.flagCircle}>
+                        <View style={styles.flagGreen} />
+                        <View style={styles.flagWhite} />
+                        <View style={styles.flagGreen} />
+                      </View>
+                      <HelixaText style={styles.countryCode} weight="bold">+234</HelixaText>
+                    </View>
+
+                    <View style={styles.divider} />
+
+                    <TextInput
+                      placeholder="800 000 0000"
+                      style={styles.phoneInput}
+                      keyboardType="phone-pad"
+                      value={values.phone}
+                      onChangeText={handleChange('phone')}
+                      onBlur={handleBlur('phone')}
+                      placeholderTextColor="#D1D5DB"
+                    />
+                  </View>
+                  {touched.phone && errors.phone && (
+                    <HelixaText style={styles.errorText}>{errors.phone}</HelixaText>
+                  )}
+                </View>
+
+                <Button
+                  title="Send Verification Code"
+                  onPress={handleSubmit as any}
+                  isLoading={isSubmitting}
+                  disabled={!(isValid && dirty)}
+                />
+              </>
+            )}
+          </Formik>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -177,5 +204,13 @@ const styles = StyleSheet.create({
   continueButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 8,
   },
 });

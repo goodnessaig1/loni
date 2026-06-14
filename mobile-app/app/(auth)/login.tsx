@@ -1,23 +1,36 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Pressable, 
-  TextInput, 
-  StyleSheet, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Pressable,
+  TextInput,
+  StyleSheet,
+  KeyboardAvoidingView,
   Platform,
   ScrollView
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
+import { Formik } from 'formik';
+import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Button } from '../../components/Button';
+
+const LoginSchema = Yup.object().shape({
+  email: Yup.string().email('Invalid email').required('Email is required'),
+  password: Yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
+});
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleLogin = (values: any, { setSubmitting }: any) => {
+    setTimeout(() => {
+      setSubmitting(false);
+      router.replace('/');
+    }, 1500);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -27,54 +40,76 @@ export default function LoginScreen() {
             <Feather name="chevron-left" size={28} color="black" />
           </Pressable>
 
-          <View style={styles.logoContainer}>
-            <Image
-              source={require('../../assets/logo.svg')}
-              style={{ width: 80, height: 80 }}
-              contentFit="contain"
-            />
-          </View>
+          <CalText style={styles.heading}>Log In</CalText>
+          <HelixaText style={styles.subtext}>
+            Log in to your LONI Server account.
+          </HelixaText>
 
-          <CalText style={styles.heading}>Welcome back</CalText>
-          <HelixaText style={styles.subtext}>Sign in to continue your journey.</HelixaText>
-
-          <View style={styles.inputContainer}>
-            <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
-            <TextInput 
-              placeholder="Enter your email" 
-              style={styles.input} 
-              keyboardType="email-address" 
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <HelixaText style={styles.inputLabel} weight="bold">Password</HelixaText>
-            <TextInput 
-              placeholder="Enter your password" 
-              style={styles.input} 
-              secureTextEntry 
-              value={password}
-              onChangeText={setPassword}
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          <Pressable 
-            style={styles.continueButton}
-            onPress={() => router.replace('/(tabs)')}
+          <Formik
+            initialValues={{ email: '', password: '' }}
+            validationSchema={LoginSchema}
+            onSubmit={handleLogin}
           >
-            <HelixaText style={styles.continueButtonText} weight="bold">Sign In</HelixaText>
-          </Pressable>
+            {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isSubmitting }) => (
+              <>
+                <View style={styles.inputGroup}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
+                  <TextInput
+                    style={[styles.input, touched.email && errors.email ? styles.inputError : null]}
+                    placeholder="Sarahchen@example.com"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={values.email}
+                    onChangeText={handleChange('email')}
+                    onBlur={handleBlur('email')}
+                  />
+                  {touched.email && errors.email && (
+                    <HelixaText style={styles.errorText}>{errors.email}</HelixaText>
+                  )}
+                </View>
 
-          <Pressable style={styles.switchModeContainer} onPress={() => router.replace('/(auth)/register')}>
-            <HelixaText style={styles.switchModeText}>
-              Don't have an account? <HelixaText style={styles.switchModeHighlight} weight="bold">Sign up</HelixaText>
+                <View style={styles.inputGroup}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Password</HelixaText>
+                  <View style={[styles.passwordInputContainer, touched.password && errors.password ? styles.inputError : null]}>
+                    <TextInput
+                      style={styles.passwordInput}
+                      placeholder="Min. 8 characters"
+                      placeholderTextColor="#9CA3AF"
+                      secureTextEntry={!showPassword}
+                      value={values.password}
+                      onChangeText={handleChange('password')}
+                      onBlur={handleBlur('password')}
+                    />
+                    <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                      <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#6B7280" />
+                    </Pressable>
+                  </View>
+                  {touched.password && errors.password && (
+                    <HelixaText style={styles.errorText}>{errors.password}</HelixaText>
+                  )}
+                </View>
+
+                <Pressable onPress={() => router.push('/(auth)/reset-password')} style={styles.forgotPasswordContainer}>
+                  <HelixaText style={styles.forgotPasswordText} weight="bold">Forgot Password?</HelixaText>
+                </Pressable>
+
+                <Button
+                  title="Continue"
+                  onPress={handleSubmit as any}
+                  isLoading={isSubmitting}
+                  style={styles.continueButtonSpacing}
+                />
+              </>
+            )}
+          </Formik>
+
+          <View style={styles.signUpContainer}>
+            <HelixaText style={styles.signUpText}>
+              Don't have an account? <HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
             </HelixaText>
-          </Pressable>
+          </View>
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -100,30 +135,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 24,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
   heading: {
-    fontSize: 28,
+    fontSize: 24,
     lineHeight: 34,
     color: '#000000',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: 6,
   },
   subtext: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#6B7280',
-    lineHeight: 24,
-    marginBottom: 32,
-    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 36,
   },
-  inputContainer: {
+  inputGroup: {
     marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 15,
-    color: '#000000',
+    fontSize: 14,
+    color: '#111827',
     marginBottom: 8,
   },
   input: {
@@ -132,31 +161,58 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontSize: 16,
+    fontSize: 15,
+    color: '#000000',
+    fontFamily: 'Helvetica Neue',
+    backgroundColor: '#FFFFFF',
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
     color: '#000000',
     fontFamily: 'Helvetica Neue',
   },
-  continueButton: {
-    backgroundColor: '#D62D88',
-    borderRadius: 9999,
-    paddingVertical: 18,
+  eyeIcon: {
+    padding: 14,
+  },
+  forgotPasswordContainer: {
+    alignItems: 'flex-end',
+    marginBottom: 32,
+  },
+  forgotPasswordText: {
+    color: '#D62D88',
+    fontSize: 14,
+  },
+  continueButtonSpacing: {
+    marginBottom: 24,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  signUpContainer: {
     alignItems: 'center',
-    marginTop: 12,
   },
-  continueButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  switchModeContainer: {
-    marginTop: 24,
-    alignItems: 'center',
-    padding: 8,
-  },
-  switchModeText: {
-    fontSize: 15,
+  signUpText: {
+    fontSize: 14,
     color: '#6B7280',
   },
-  switchModeHighlight: {
+  signUpTextBold: {
+    fontSize: 14,
     color: '#D62D88',
   },
 });

@@ -117,7 +117,16 @@ export default function OnboardingScreen() {
           <SafeAreaView style={styles.content}>
 
             {/* Header spacer to leave room for the logo */}
-            <View style={styles.header} />
+            <View style={styles.header}>
+              <TouchableOpacity 
+                activeOpacity={0.8}
+                onPress={() => router.push('/(auth)/login' as any)} // Use 'as any' temporarily if login route is not typed yet
+              >
+                <HelixaText style={styles.loginText}>
+                  Already have an account? <HelixaText style={styles.loginTextBold} weight="bold">Log in</HelixaText>
+                </HelixaText>
+              </TouchableOpacity>
+            </View>
 
             {/* Top Button */}
             <View style={styles.topButtonContainer}>
@@ -250,6 +259,16 @@ const styles = StyleSheet.create({
   header: {
     marginBottom: 16, // Reduced to push button up
     height: 90,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  loginText: {
+    fontSize: 15,
+    color: '#6B7280',
+  },
+  loginTextBold: {
+    fontSize: 15,
+    color: '#D62D88',
   },
   topButtonContainer: {
     alignItems: 'flex-start',

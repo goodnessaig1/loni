@@ -16,6 +16,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
+import { Button } from '../../components/Button';
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required('Name is required'),
@@ -51,12 +52,15 @@ export default function RegisterScreen() {
     <Formik
       initialValues={{ name: '', email: '', password: '', status: '', trimester: '', pregnancyWeek: '', babyAge: '' }}
       validationSchema={validationSchema}
-      onSubmit={(values) => {
+      onSubmit={(values, { setSubmitting }) => {
         console.log('Form Submitted:', values);
-        router.push({ pathname: '/(auth)/verify', params: { email: values.email } });
+        setTimeout(() => {
+          setSubmitting(false);
+          router.push({ pathname: '/(auth)/verify', params: { email: values.email } } as any);
+        }, 1500);
       }}
     >
-      {({ handleChange, handleBlur, handleSubmit, setFieldValue, values, errors, touched, isValid, dirty }) => (
+      {({ handleChange, handleBlur, handleSubmit, setFieldValue, values, errors, touched, isValid, dirty, isSubmitting }) => (
         <SafeAreaView style={styles.container}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -219,16 +223,12 @@ export default function RegisterScreen() {
                 </View>
               )}
 
-              <Pressable 
-                style={[
-                  styles.continueButton, 
-                  { backgroundColor: (isValid && dirty && values.status) ? '#D62D88' : '#F9C2D9' }
-                ]}
+              <Button 
+                title="Continue"
+                onPress={handleSubmit as any}
+                isLoading={isSubmitting}
                 disabled={!(isValid && dirty && values.status)}
-                onPress={() => handleSubmit()}
-              >
-                <HelixaText style={styles.continueButtonText} weight="bold">Continue</HelixaText>
-              </Pressable>
+              />
 
               <Pressable style={styles.switchModeContainer} onPress={() => router.replace('/(auth)/login')}>
                 <HelixaText style={styles.switchModeText}>

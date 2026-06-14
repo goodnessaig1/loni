@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Pressable,
@@ -11,29 +11,29 @@ import {
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Formik, FieldArray } from 'formik';
+import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Button } from '../../components/Button';
+
+const ContactSchema = Yup.object().shape({
+  contacts: Yup.array().of(
+    Yup.object().shape({
+      name: Yup.string().required('Name is required'),
+      phone: Yup.string().required('Phone number is required'),
+      relationship: Yup.string().required('Relationship is required'),
+    })
+  ).min(1, 'At least one contact is required'),
+});
 
 export default function EmergencyContactsScreen() {
-  const [contacts, setContacts] = useState([{ name: '', phone: '', relationship: '' }]);
-
-  const handleAddContact = () => {
-    setContacts([...contacts, { name: '', phone: '', relationship: '' }]);
+  const handleContactsSubmit = (values: any, { setSubmitting }: any) => {
+    setTimeout(() => {
+      setSubmitting(false);
+      router.replace('/(auth)/success');
+    }, 1500);
   };
-
-  const updateContact = (index: number, field: string, value: string) => {
-    const newContacts = [...contacts];
-    newContacts[index] = { ...newContacts[index], [field]: value };
-    setContacts(newContacts);
-  };
-
-  const removeContact = (index: number) => {
-    const newContacts = contacts.filter((_, i) => i !== index);
-    setContacts(newContacts);
-  };
-
-  // Check if every contact has name, phone, and relationship filled
-  const isFormComplete = contacts.length > 0 && contacts.every(c => c.name.trim() !== '' && c.phone.trim() !== '' && c.relationship.trim() !== '');
 
   return (
     <SafeAreaView style={styles.container}>
@@ -48,70 +48,100 @@ export default function EmergencyContactsScreen() {
             We'll notify these people if you request emergency help
           </HelixaText>
 
-          {contacts.map((contact, index) => (
-            <View key={index} style={styles.formContainer}>
-              {contacts.length > 1 && (
-                <Pressable onPress={() => removeContact(index)} style={styles.removeContactButton}>
-                  <Feather name="trash-2" size={16} color="#EF4444" />
-                </Pressable>
-              )}
-              <View style={styles.inputGroup}>
-                <HelixaText style={styles.inputLabel} weight="bold">Name</HelixaText>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter name"
-                  placeholderTextColor="#9CA3AF"
-                  value={contact.name}
-                  onChangeText={(val) => updateContact(index, 'name', val)}
-                />
-              </View>
+          <Formik
+            initialValues={{ contacts: [{ name: '', phone: '', relationship: '' }] }}
+            validationSchema={ContactSchema}
+            onSubmit={handleContactsSubmit}
+          >
+            {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isValid, dirty, isSubmitting }) => (
+              <FieldArray name="contacts">
+                {({ push, remove }) => (
+                  <>
+                    {values.contacts.map((contact, index) => {
+                      const contactErrors = (errors.contacts?.[index] as any) || {};
+                      const contactTouched = (touched.contacts?.[index] as any) || {};
 
-              <View style={styles.inputGroup}>
-                <HelixaText style={styles.inputLabel} weight="bold">Phone number</HelixaText>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter phone number"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  value={contact.phone}
-                  onChangeText={(val) => updateContact(index, 'phone', val)}
-                />
-              </View>
+                      return (
+                        <View key={index} style={styles.formContainer}>
+                          {values.contacts.length > 1 && (
+                            <Pressable onPress={() => remove(index)} style={styles.removeContactButton}>
+                              <Feather name="trash-2" size={16} color="#EF4444" />
+                            </Pressable>
+                          )}
+                          <View style={styles.inputGroup}>
+                            <HelixaText style={styles.inputLabel} weight="bold">Name</HelixaText>
+                            <TextInput
+                              style={[styles.input, contactTouched.name && contactErrors.name ? styles.inputError : null]}
+                              placeholder="Enter name"
+                              placeholderTextColor="#9CA3AF"
+                              value={contact.name}
+                              onChangeText={handleChange(`contacts.${index}.name`)}
+                              onBlur={handleBlur(`contacts.${index}.name`)}
+                            />
+                            {contactTouched.name && contactErrors.name && (
+                              <HelixaText style={styles.errorText}>{contactErrors.name}</HelixaText>
+                            )}
+                          </View>
 
-              <View style={styles.inputGroup}>
-                <HelixaText style={styles.inputLabel} weight="bold">Relationship</HelixaText>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g., Partner, Mother"
-                  placeholderTextColor="#9CA3AF"
-                  value={contact.relationship}
-                  onChangeText={(val) => updateContact(index, 'relationship', val)}
-                />
-              </View>
-            </View>
-          ))}
+                          <View style={styles.inputGroup}>
+                            <HelixaText style={styles.inputLabel} weight="bold">Phone number</HelixaText>
+                            <TextInput
+                              style={[styles.input, contactTouched.phone && contactErrors.phone ? styles.inputError : null]}
+                              placeholder="Enter phone number"
+                              placeholderTextColor="#9CA3AF"
+                              keyboardType="phone-pad"
+                              value={contact.phone}
+                              onChangeText={handleChange(`contacts.${index}.phone`)}
+                              onBlur={handleBlur(`contacts.${index}.phone`)}
+                            />
+                            {contactTouched.phone && contactErrors.phone && (
+                              <HelixaText style={styles.errorText}>{contactErrors.phone}</HelixaText>
+                            )}
+                          </View>
 
-          <Pressable style={styles.addAnotherButton} onPress={handleAddContact}>
-            <Feather name="plus" size={16} color="#D62D88" />
-            <HelixaText style={styles.addAnotherText}>Add another contact</HelixaText>
-          </Pressable>
+                          <View style={styles.inputGroup}>
+                            <HelixaText style={styles.inputLabel} weight="bold">Relationship</HelixaText>
+                            <TextInput
+                              style={[styles.input, contactTouched.relationship && contactErrors.relationship ? styles.inputError : null]}
+                              placeholder="e.g., Partner, Mother"
+                              placeholderTextColor="#9CA3AF"
+                              value={contact.relationship}
+                              onChangeText={handleChange(`contacts.${index}.relationship`)}
+                              onBlur={handleBlur(`contacts.${index}.relationship`)}
+                            />
+                            {contactTouched.relationship && contactErrors.relationship && (
+                              <HelixaText style={styles.errorText}>{contactErrors.relationship}</HelixaText>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
 
-          <View style={styles.footer}>
-            <Pressable
-              style={[styles.continueButton, isFormComplete ? styles.continueButtonActive : styles.continueButtonDisabled]}
-              disabled={!isFormComplete}
-              onPress={() => router.replace('/(auth)/success')}
-            >
-              <HelixaText style={styles.continueButtonText} weight="bold">Continue</HelixaText>
-            </Pressable>
+                    <Pressable style={styles.addAnotherButton} onPress={() => push({ name: '', phone: '', relationship: '' })}>
+                      <Feather name="plus" size={16} color="#D62D88" />
+                      <HelixaText style={styles.addAnotherText}>Add another contact</HelixaText>
+                    </Pressable>
 
-            <Pressable
-              style={styles.skipButton}
-              onPress={() => router.replace('/(auth)/success')}
-            >
-              <HelixaText style={styles.skipButtonText} weight="bold">Skip for now</HelixaText>
-            </Pressable>
-          </View>
+                    <View style={styles.footer}>
+                      <Button 
+                        title="Continue"
+                        onPress={handleSubmit as any}
+                        isLoading={isSubmitting}
+                        disabled={!(isValid && dirty)}
+                      />
+
+                      <Pressable
+                        style={styles.skipButton}
+                        onPress={() => router.replace('/(auth)/success')}
+                      >
+                        <HelixaText style={styles.skipButtonText} weight="bold">Skip for now</HelixaText>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+              </FieldArray>
+            )}
+          </Formik>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -219,5 +249,13 @@ const styles = StyleSheet.create({
   skipButtonText: {
     color: '#6B7280',
     fontSize: 15,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
