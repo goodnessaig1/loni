@@ -6,6 +6,13 @@ info:
 servers:
   - url: http://localhost:4201/api/v1
     description: Local development server
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
 paths:
   /health:
     get:
@@ -14,22 +21,273 @@ paths:
       responses:
         '200':
           description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
+
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+                - status
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+                status:
+                  type: string
+                  enum: [pregnant, newMom]
+                trimester:
+                  type: string
+                pregnancyWeek:
+                  type: string
+                babyAge:
+                  type: string
+                referredBy:
+                  type: string
+      responses:
+        '201':
+          description: User registered successfully
+
+  /auth/login:
+    post:
+      summary: Login user
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+
+  /auth/verify-email:
+    post:
+      summary: Verify Email OTP
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - otp
+                - type
+              properties:
+                email:
+                  type: string
+                  format: email
+                otp:
+                  type: string
+                  minLength: 4
+                  maxLength: 4
+                type:
+                  type: string
+                  enum: [email_verification, phone_verification, reset_password]
+      responses:
+        '200':
+          description: Verification successful
+
+  /auth/resend-otp:
+    post:
+      summary: Resend OTP
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - type
+              properties:
+                email:
+                  type: string
+                  format: email
+                type:
+                  type: string
+                  enum: [email_verification, phone_verification, reset_password]
+      responses:
+        '200':
+          description: OTP sent successfully
+
+  /auth/forgot-password:
+    post:
+      summary: Forgot password
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset OTP sent
+
+  /auth/reset-password:
+    post:
+      summary: Reset password
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - otp
+                - newPassword
+              properties:
+                email:
+                  type: string
+                  format: email
+                otp:
+                  type: string
+                  minLength: 4
+                  maxLength: 4
+                newPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successful
+
+  /auth/me:
+    get:
+      summary: Get current user
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User fetched successfully
+        '401':
+          description: Not authorized
+
+  /auth/add-phone:
+    post:
+      summary: Add phone number
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+              properties:
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: Phone added and OTP sent
+        '401':
+          description: Not authorized
+
+  /auth/verify-phone:
+    post:
+      summary: Verify phone OTP
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - otp
+              properties:
+                otp:
+                  type: string
+                  minLength: 4
+                  maxLength: 4
+      responses:
+        '200':
+          description: Phone verification successful
+        '401':
+          description: Not authorized
+
+  /auth/emergency-contacts:
+    post:
+      summary: Add emergency contacts
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - contacts
+              properties:
+                contacts:
+                  type: array
+                  items:
                     type: object
+                    required:
+                      - name
+                      - phone
+                      - relationship
                     properties:
-                      status:
+                      name:
                         type: string
-                        example: 'UP'
-                      database:
+                      phone:
                         type: string
-                        example: 'Connected'
-                      timestamp:
+                      relationship:
                         type: string
-                        format: date-time
+      responses:
+        '200':
+          description: Contacts added successfully
+        '401':
+          description: Not authorized

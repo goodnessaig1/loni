@@ -17,11 +17,13 @@ export const useRegister = () => {
 };
 
 export const useLogin = () => {
-  const { loginUser } = useAuth();
+  const { loginUser, refreshUser } = useAuth();
   return useMutation({
     mutationFn: async (data: any) => {
       const res = await apiClient.post('/auth/login', data);
       await loginUser(res.data.data.token, res.data.data.user);
+      // Fetch user details via auth/me
+      await refreshUser();
       return res.data;
     }
   });
