@@ -1,0 +1,35 @@
+openapi: 3.0.0
+info:
+  title: Loni Backend API
+  version: 1.0.0
+  description: API documentation for the Loni Backend
+servers:
+  - url: http://localhost:4201/api/v1
+    description: Local development server
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the API and the database connection
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: 'UP'
+                      database:
+                        type: string
+                        example: 'Connected'
+                      timestamp:
+                        type: string
+                        format: date-time
