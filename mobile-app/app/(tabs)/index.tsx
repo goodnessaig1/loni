@@ -5,12 +5,22 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function HomeTab() {
+  const { user } = useAuth();
+
+  const hour = new Date().getHours();
+  let greeting = 'Evening';
+  if (hour < 12) greeting = 'Morning';
+  else if (hour < 18) greeting = 'Afternoon';
+
+  const firstName = user?.name ? user.name.split(' ')[0] : 'User';
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 120 }}>
-        
+
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 }}>
           {/* Notification Bell */}
@@ -20,25 +30,25 @@ export default function HomeTab() {
           </TouchableOpacity>
 
           {/* Arrival Pill */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#000', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 }}>
+          {/* <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#000', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 }}>
             <View style={{ backgroundColor: '#D62D88', borderRadius: 12, width: 24, height: 24, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
               <MaterialCommunityIcons name="car" size={14} color="#FFF" />
             </View>
-            <Text style={{ color: '#FFF', fontSize: 13, marginRight: 10 }}>Estimated Arrival: 2:45 PM</Text>
+            <HelixaText style={{ color: '#FFF', fontSize: 12, marginRight: 10 }}>Estimated Arrival: 2:45 PM</HelixaText>
             <Feather name="maximize-2" size={14} color="#FFF" />
-          </View>
+          </View> */}
 
           {/* Avatar */}
-          <Image 
-            source={{ uri: 'https://i.pravatar.cc/100' }} 
+          <Image
+            source={{ uri: 'https://i.pravatar.cc/100' }}
             style={{ width: 44, height: 44, borderRadius: 22 }}
           />
         </View>
 
         {/* Greeting Section */}
         <View style={{ marginBottom: 30 }}>
-          <CalText style={{ color: '#D62D88', fontSize: 32, marginBottom: 4 }}>Morning</CalText>
-          <CalText style={{ fontSize: 36, color: '#000', marginBottom: 8 }}>Toyosola ☀️</CalText>
+          <CalText style={{ color: '#D62D88', fontSize: 32, marginBottom: 4 }}>{greeting}</CalText>
+          <HelixaText style={{ fontSize: 32, color: '#000', marginBottom: 8 }}>{firstName} ☀️</HelixaText>
           <HelixaText style={{ fontSize: 16, color: '#6B7280' }}>How are you feeling today?</HelixaText>
         </View>
 
@@ -49,16 +59,14 @@ export default function HomeTab() {
           {/* Left Column */}
           <View style={{ flex: 1, gap: 16 }}>
             {/* Recovery Plan Card */}
-            <TouchableOpacity style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'space-between' }}>
-              <View style={{ alignItems: 'center', marginTop: 10 }}>
-                <Image 
-                  source={require('../../assets/images/plan.svg')} 
-                  style={{ width: 100, height: 80 }} 
-                  contentFit="contain"
-                />
-              </View>
+            <TouchableOpacity style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+              <Image
+                source={require('../../assets/images/plan.svg')}
+                style={{ width: 130, height: 100, position: 'absolute', top: 10, right: -10 }}
+                contentFit="contain"
+              />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <CalText style={{ color: '#FFF', fontSize: 18, width: '70%' }}>Recovery Plan</CalText>
+                <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 17, width: '70%', lineHeight: 22 }}>Recovery Plan</HelixaText>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>
                   <Feather name="arrow-right" size={16} color="#F68AA8" />
                 </View>
@@ -66,16 +74,14 @@ export default function HomeTab() {
             </TouchableOpacity>
 
             {/* Emergency Ride Card */}
-            <TouchableOpacity style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'space-between' }}>
-              <View style={{ alignItems: 'center', marginTop: 10 }}>
-                <Image 
-                  source={require('../../assets/images/ride.svg')} 
-                  style={{ width: 100, height: 80 }} 
-                  contentFit="contain"
-                />
-              </View>
+            <TouchableOpacity style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+              <Image
+                source={require('../../assets/images/ride.svg')}
+                style={{ width: 120, height: 90, position: 'absolute', top: 30, right: -10 }}
+                contentFit="contain"
+              />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <CalText style={{ color: '#FFF', fontSize: 18, width: '70%' }}>Emergency Ride</CalText>
+                <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 17, width: '70%', lineHeight: 22 }}>Emergency Ride</HelixaText>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>
                   <Feather name="arrow-right" size={16} color="#D62D88" />
                 </View>
@@ -87,24 +93,22 @@ export default function HomeTab() {
           <View style={{ flex: 1 }}>
             {/* Talk to a Nurse Card */}
             <TouchableOpacity style={{ backgroundColor: '#2C4EDA', borderRadius: 20, padding: 16, height: 416, overflow: 'hidden' }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <CalText style={{ color: '#FFF', fontSize: 18, width: '60%' }}>Talk to a Nurse</CalText>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1 }}>
+                <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 17, width: '60%', lineHeight: 22 }}>Talk to a Nurse</HelixaText>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>
                   <Feather name="arrow-right" size={16} color="#2C4EDA" />
                 </View>
               </View>
-              <View style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center' }}>
-                <Image 
-                  source={require('../../assets/images/nurse.svg')} 
-                  style={{ width: 150, height: 250, marginBottom: -16 }} 
-                  contentFit="contain"
-                />
-              </View>
+              <Image
+                source={require('../../assets/images/nurse.svg')}
+                style={{ width: 180, height: 280, position: 'absolute', bottom: 0, right: -15 }}
+                contentFit="contain"
+              />
             </TouchableOpacity>
-            
+
             {/* Add Support Partner Button */}
-            <TouchableOpacity style={{ backgroundColor: '#00C300', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 40, left: -20, right: -20, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
-              <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 14 }}>Add Support Partner</Text>
+            <TouchableOpacity style={{ backgroundColor: '#00C300', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 40, left: -16, right: 0, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
+              <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>Add Support Partner</HelixaText>
               <Feather name="plus" size={18} color="#FFF" />
             </TouchableOpacity>
           </View>
