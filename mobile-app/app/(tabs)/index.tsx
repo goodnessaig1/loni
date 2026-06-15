@@ -19,14 +19,14 @@ export default function HomeTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 120 }}>
 
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 }}>
           {/* Notification Bell */}
-          <TouchableOpacity style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="bell" size={20} color="#000" />
-            <View style={{ position: 'absolute', top: 10, right: 12, width: 8, height: 8, backgroundColor: '#D62D88', borderRadius: 4 }} />
+          <TouchableOpacity style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="bell" size={24} color="#000" />
+            <View style={{ position: 'absolute', top: 13, right: 14, width: 10, height: 10, backgroundColor: '#D62D88', borderRadius: 5 }} />
           </TouchableOpacity>
 
           {/* Arrival Pill */}
@@ -39,10 +39,13 @@ export default function HomeTab() {
           </View> */}
 
           {/* Avatar */}
-          <Image
-            source={{ uri: 'https://i.pravatar.cc/100' }}
-            style={{ width: 44, height: 44, borderRadius: 22 }}
-          />
+          <TouchableOpacity onPress={() => { }}>
+            <Image
+              source={{ uri: user?.profilePicture || 'https://i.pravatar.cc/150' }}
+              style={{ width: 52, height: 52, borderRadius: 26 }}
+              contentFit="cover"
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Greeting Section */}

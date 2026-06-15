@@ -9,12 +9,15 @@ import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { SupportPartnersCard } from '../../components/profile/SupportPartnersCard';
 import { ProfileSection } from '../../components/profile/ProfileSection';
 import { ProfileMenuItem } from '../../components/profile/ProfileMenuItem';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const { user, logoutUser } = useAuth();
   const uploadMutation = useUploadProfilePicture();
+  const router = useRouter();
+
   console.log(user)
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
   let statusText = '';
@@ -26,6 +29,7 @@ export default function ProfileScreen() {
 
   const handleLogout = async () => {
     await logoutUser();
+    router.replace('/(auth)/login');
   };
 
   const handlePickImage = async () => {
