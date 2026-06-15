@@ -16,6 +16,7 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useLogin } from '../../hooks/useAuth';
 
 const LoginSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -24,12 +25,21 @@ const LoginSchema = Yup.object().shape({
 
 export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
+  const { mutateAsync: loginUser } = useLogin();
 
-  const handleLogin = (values: any, { setSubmitting }: any) => {
-    setTimeout(() => {
-      setSubmitting(false);
+  const handleLogin = async (values: any, { setSubmitting, setFieldError }: any) => {
+    try {
+      await loginUser({
+        email: values.email,
+        password: values.password,
+      });
       router.replace('/');
-    }, 1500);
+    } catch (error: any) {
+      console.error('Login failed:', error.response?.data || error.message);
+      setFieldError('email', error.response?.data?.error || 'Login failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

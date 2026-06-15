@@ -14,11 +14,13 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useVerifyEmail, useResendOtp } from '../../hooks/useAuth';
 
 export default function VerifyScreen() {
   const { email, nextRoute } = useLocalSearchParams<{ email?: string, nextRoute?: string }>();
   const [code, setCode] = useState(['', '', '', '']);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { mutateAsync: verifyEmail, isPending: isVerifying } = useVerifyEmail();
+  const { mutateAsync: resendOtp } = useResendOtp();
   const inputs = useRef<Array<TextInput | null>>([]);
 
   const handleCodeChange = (text: string, index: number) => {
@@ -47,12 +49,30 @@ export default function VerifyScreen() {
 
   const isComplete = code.every(digit => digit.length === 1);
 
-  const handleVerify = () => {
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+  const handleVerify = async () => {
+    try {
+      await verifyEmail({
+        email,
+        otp: code.join(''),
+        type: 'email_verification'
+      });
       router.push((nextRoute as any) || '/(auth)/phone');
-    }, 1500);
+    } catch (error: any) {
+      console.error('Verification failed:', error.response?.data || error.message);
+      alert(error.response?.data?.error || 'Verification failed');
+    }
+  };
+
+  const handleResend = async () => {
+    try {
+      await resendOtp({
+        email,
+        type: 'email_verification'
+      });
+      alert('OTP Resent successfully!');
+    } catch (error: any) {
+      console.error('Resend failed:', error.response?.data || error.message);
+    }
   };
 
   return (
@@ -88,14 +108,14 @@ export default function VerifyScreen() {
             </View>
           </View>
 
-          <Pressable style={styles.resendContainer}>
+          <Pressable onPress={handleResend} style={styles.resendContainer}>
             <HelixaText style={styles.resendText} weight="bold">Resend Code</HelixaText>
           </Pressable>
 
           <Button 
             title="Verify"
             onPress={handleVerify}
-            isLoading={isSubmitting}
+            isLoading={isVerifying}
             disabled={!isComplete}
           />
 
@@ -150,8 +170,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   boxInput: {
-    width: 65,
-    height: 65,
+    width: 45,
+    height: 55,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,

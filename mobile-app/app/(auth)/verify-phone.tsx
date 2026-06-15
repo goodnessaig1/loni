@@ -14,11 +14,11 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useVerifyPhone } from '../../hooks/useAuth';
 
 export default function VerifyPhoneScreen() {
   const { phone } = useLocalSearchParams<{ phone?: string }>();
   const [code, setCode] = useState(['', '', '', '']);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputs = useRef<Array<TextInput | null>>([]);
 
   const handleCodeChange = (text: string, index: number) => {
@@ -47,12 +47,18 @@ export default function VerifyPhoneScreen() {
 
   const isComplete = code.every(digit => digit.length === 1);
 
-  const handleVerify = () => {
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+  const { mutateAsync: verifyPhone, isPending: isSubmitting } = useVerifyPhone();
+
+  const handleVerify = async () => {
+    try {
+      await verifyPhone({
+        otp: code.join(''),
+      });
       router.push('/(auth)/permissions');
-    }, 1500);
+    } catch (error: any) {
+      console.error('Phone verification failed:', error.response?.data || error.message);
+      alert(error.response?.data?.error || 'Verification failed');
+    }
   };
 
   return (
