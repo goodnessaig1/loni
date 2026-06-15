@@ -143,6 +143,14 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, salt);
     await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email));
   }
+
+  async updateProfilePicture(userId: string, secureUrl: string) {
+    await db.update(users).set({ profilePicture: secureUrl }).where(eq(users.id, userId));
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    if (!user.length) throw new Error('User not found');
+    const { password, ...userWithoutPassword } = user[0];
+    return { message: 'Profile picture updated', user: userWithoutPassword };
+  }
 }
 
 export const authService = new AuthService();

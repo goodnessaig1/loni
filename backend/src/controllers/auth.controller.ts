@@ -110,6 +110,27 @@ export class AuthController {
       next(error);
     }
   }
+
+  async uploadProfilePicture(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, message: 'No file provided' });
+        return;
+      }
+      if (!req.user) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+      
+      const { uploadImageToCloudinary } = require('../services/upload.service');
+      const secureUrl = await uploadImageToCloudinary(req.file.buffer);
+      
+      const result = await authService.updateProfilePicture(req.user.id, secureUrl);
+      res.status(200).json({ success: true, ...result });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const authController = new AuthController();

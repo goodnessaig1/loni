@@ -32,10 +32,13 @@ router.post('/resend-otp', validate(resendOtpSchema), authController.resendOtp);
 router.post('/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 
+import { upload } from '../services/upload.service';
+
 // Protected routes
 router.get('/me', protect, authController.getMe);
 router.post('/add-phone', protect, validate(addPhoneSchema), authController.addPhone);
 router.post('/verify-phone', protect, validate(verifyPhoneSchema), authController.verifyPhone);
 router.post('/emergency-contacts', protect, validate(emergencyContactsSchema), authController.emergencyContacts);
+router.post('/profile-picture', protect, upload.single('image'), authController.uploadProfilePicture);
 
 export default router;

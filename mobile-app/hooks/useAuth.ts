@@ -99,3 +99,18 @@ export const useResetPassword = () => {
     }
   });
 };
+
+export const useUploadProfilePicture = () => {
+  const { refreshUser } = useAuth();
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await apiClient.post('/auth/profile-picture', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      await refreshUser();
+      return res.data;
+    }
+  });
+};

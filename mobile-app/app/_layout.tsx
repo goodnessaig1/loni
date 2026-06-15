@@ -6,6 +6,8 @@ import { AuthProvider } from '../context/AuthContext';
 
 import '../global.css';
 
+import Toast from 'react-native-toast-message';
+
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
@@ -30,6 +32,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
         </Stack>
         <StatusBar style="auto" />
+        <Toast />
       </AuthProvider>
     </QueryClientProvider>
   );
