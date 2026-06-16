@@ -9,6 +9,9 @@ export const healthChecks = pgTable('health_checks', {
 export const statusEnum = pgEnum('status', ['pregnant', 'newMom']);
 export const otpTypeEnum = pgEnum('otp_type', ['email_verification', 'phone_verification', 'reset_password']);
 
+export const genderEnum = pgEnum('gender', ['Male', 'Female', 'Others']);
+export const userTypeEnum = pgEnum('user_type', ['nurse', 'user', 'rider', 'admin']);
+
 export const users = pgTable('users', {
   id: varchar('id', { length: 12 }).primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
@@ -17,8 +20,11 @@ export const users = pgTable('users', {
   status: statusEnum('status').notNull(),
   trimester: varchar('trimester', { length: 50 }),
   pregnancyWeek: varchar('pregnancy_week', { length: 50 }),
+  pregnancyStartDate: timestamp('pregnancy_start_date'),
   babyAge: varchar('baby_age', { length: 50 }),
   phone: varchar('phone', { length: 50 }),
+  gender: genderEnum('gender').default('Female'),
+  userType: userTypeEnum('user_type').default('user'),
   isEmailVerified: boolean('is_email_verified').default(false).notNull(),
   isPhoneVerified: boolean('is_phone_verified').default(false).notNull(),
   profilePicture: varchar('profile_picture', { length: 255 }),
