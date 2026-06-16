@@ -10,6 +10,7 @@ export type User = {
   status: 'pregnant' | 'newMom';
   trimester?: string;
   pregnancyWeek?: string;
+  pregnancyStartDate?: string;
   babyAge?: string;
   profilePicture?: string;
   referralCode: string;
