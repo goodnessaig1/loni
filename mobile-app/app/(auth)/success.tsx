@@ -76,7 +76,7 @@ export default function SuccessScreen() {
         <View style={styles.footer}>
           <Pressable
             style={styles.startButton}
-            onPress={() => router.replace('/(tabs)')}
+            onPress={() => router.replace('/(auth)/onboarding')}
           >
             <HelixaText style={styles.startButtonText} weight="bold">Get Started</HelixaText>
           </Pressable>
