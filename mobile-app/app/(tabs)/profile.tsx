@@ -105,7 +105,7 @@ export default function ProfileScreen() {
           </ProfileSection>
 
           <ProfileSection>
-            <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => { }} />
+            <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => router.push('/notification-settings')} />
             <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={() => { }} />
             <ProfileMenuItem icon="shield" title="Privacy & Permissions" onPress={() => { }} isLast />
           </ProfileSection>
