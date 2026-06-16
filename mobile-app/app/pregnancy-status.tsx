@@ -35,6 +35,15 @@ export default function PregnancyStatusScreen() {
     dueDateStr = dueDate.toISOString().split('T')[0];
   }
 
+  const isPregnant = user?.status !== 'newMom'; // Default to pregnant if undefined
+
+  // For newMom, currentWeek is babyAge
+  let currentPostpartumWeek = 0;
+  if (!isPregnant && user?.babyAge) {
+    const parsed = parseInt(user.babyAge.toString().replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(parsed)) currentPostpartumWeek = parsed;
+  }
+
   const currentTrimester = user?.trimester || 'Unknown';
 
   return (
@@ -59,53 +68,92 @@ export default function PregnancyStatusScreen() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Stage Section */}
-        <View style={styles.stageSection}>
-          <HelixaText style={styles.stageLabel}>Current Stage</HelixaText>
-          <HelixaText style={styles.stageTitle} weight="bold">{currentTrimester}</HelixaText>
-          <HelixaText style={styles.stageSubtitle}>Week {currentWeek} of pregnancy</HelixaText>
+        {isPregnant ? (
+          <View style={styles.stageSection}>
+            <HelixaText style={styles.stageLabel}>Current Stage</HelixaText>
+            <HelixaText style={styles.stageTitle} weight="bold">{currentTrimester}</HelixaText>
+            <HelixaText style={styles.stageSubtitle}>Week {currentWeek} of pregnancy</HelixaText>
 
-          {/* Progress Bar */}
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressFill, { width: `${progressPercent}%` }]}>
-              <HelixaText style={styles.progressText} numberOfLines={1}>{currentWeek} weeks</HelixaText>
+            {/* Progress Bar */}
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressFill, { width: `${progressPercent}%` }]}>
+                <HelixaText style={styles.progressText} numberOfLines={1}>{currentWeek} weeks</HelixaText>
+              </View>
+              <View style={styles.progressFlag}>
+                <Feather name="flag" size={16} color="#D62D88" />
+              </View>
             </View>
-            <View style={styles.progressFlag}>
-              <Feather name="flag" size={16} color="#D62D88" />
+
+            <HelixaText style={styles.dueDateText}>Due {dueDateStr}</HelixaText>
+          </View>
+        ) : (
+          <View style={styles.postpartumCard}>
+            <Image
+              source={require('../assets/images/postpartum.svg')}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+            />
+            <View style={styles.postpartumCardContent}>
+              <HelixaText style={styles.postpartumLabel} weight="bold">Current Stage</HelixaText>
+              <HelixaText style={styles.postpartumTitle} weight="bold">Postpartum Recovery</HelixaText>
+              <HelixaText style={styles.postpartumSubtitle}>Week {currentPostpartumWeek} of recovery</HelixaText>
             </View>
           </View>
-
-          <HelixaText style={styles.dueDateText}>Due {dueDateStr}</HelixaText>
-        </View>
+        )}
 
         {/* Toggle Pill */}
         <View style={styles.toggleContainer}>
-          <View style={[styles.toggleButton, styles.toggleActive]}>
-            <HelixaText style={styles.toggleTextActive} weight="bold">Pregnancy</HelixaText>
+          <View style={[styles.toggleButton, isPregnant && styles.toggleActive]}>
+            <HelixaText style={isPregnant ? styles.toggleTextActive : styles.toggleTextInactive} weight={isPregnant ? "bold" : "regular"}>Pregnancy</HelixaText>
           </View>
-          <View style={styles.toggleButton}>
-            <HelixaText style={styles.toggleTextInactive}>Postpartum</HelixaText>
+          <View style={[styles.toggleButton, !isPregnant && styles.toggleActive]}>
+            <HelixaText style={!isPregnant ? styles.toggleTextActive : styles.toggleTextInactive} weight={!isPregnant ? "bold" : "regular"}>Postpartum</HelixaText>
           </View>
         </View>
 
-        {/* Trimesters List */}
+        {/* Stage List */}
         <View style={styles.trimestersSection}>
-          <HelixaText style={styles.sectionTitle} weight="bold">Current Trimester</HelixaText>
+          <HelixaText style={styles.sectionTitle} weight="bold">
+            {isPregnant ? "Current Trimester" : "Select Recovery Stage"}
+          </HelixaText>
 
-          <TrimesterCard
-            title="First Trimester"
-            weeks="Weeks 1 - 12"
-            isActive={currentTrimester.startsWith('1st')}
-          />
-          <TrimesterCard
-            title="Second Trimester"
-            weeks="Weeks 13 - 27"
-            isActive={currentTrimester.startsWith('2nd')}
-          />
-          <TrimesterCard
-            title="Third Trimester"
-            weeks="Weeks 28 - 40"
-            isActive={currentTrimester.startsWith('3rd')}
-          />
+          {isPregnant ? (
+            <>
+              <TrimesterCard
+                title="First Trimester"
+                weeks="Weeks 1 - 12"
+                isActive={currentTrimester.startsWith('1st')}
+              />
+              <TrimesterCard
+                title="Second Trimester"
+                weeks="Weeks 13 - 27"
+                isActive={currentTrimester.startsWith('2nd')}
+              />
+              <TrimesterCard
+                title="Third Trimester"
+                weeks="Weeks 28 - 40"
+                isActive={currentTrimester.startsWith('3rd')}
+              />
+            </>
+          ) : (
+            <>
+              <TrimesterCard
+                title="Early Recovery"
+                weeks="Weeks 1 - 6"
+                isActive={currentTrimester === 'Immediate' || currentTrimester === 'Early'}
+              />
+              <TrimesterCard
+                title="Active Recovery"
+                weeks="Weeks 7 - 12"
+                isActive={currentTrimester === 'Subacute'}
+              />
+              <TrimesterCard
+                title="Extended Recovery"
+                weeks="Weeks 13+"
+                isActive={currentTrimester === 'Ongoing'}
+              />
+            </>
+          )}
         </View>
 
         <HelixaText style={styles.footerText}>
@@ -224,6 +272,34 @@ const styles = StyleSheet.create({
   },
   dueDateText: {
     marginTop: 16,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  postpartumCard: {
+    marginTop: 24,
+    marginBottom: 32,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: '#FCE8F3', // fallback color
+    minHeight: 140,
+  },
+  postpartumCardContent: {
+    padding: 24,
+    justifyContent: 'center',
+    flex: 1,
+  },
+  postpartumLabel: {
+    fontSize: 14,
+    color: '#1E3A8A', // Dark blue text for label
+    marginBottom: 16,
+    fontWeight: 'semibold'
+  },
+  postpartumTitle: {
+    fontSize: 24,
+    color: '#000000',
+    marginBottom: 8,
+  },
+  postpartumSubtitle: {
     fontSize: 14,
     color: '#6B7280',
   },

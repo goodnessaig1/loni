@@ -14,13 +14,26 @@ export class AuthService {
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       const weeks = Math.floor(diffDays / 7);
       
-      user.pregnancyWeek = `${weeks} weeks`;
-      if (weeks <= 13) {
-        user.trimester = '1st Trimester';
-      } else if (weeks <= 27) {
-        user.trimester = '2nd Trimester';
-      } else {
-        user.trimester = '3rd Trimester';
+      if (user.status === 'pregnant') {
+        user.pregnancyWeek = `${weeks} weeks`;
+        if (weeks <= 13) {
+          user.trimester = '1st Trimester';
+        } else if (weeks <= 27) {
+          user.trimester = '2nd Trimester';
+        } else {
+          user.trimester = '3rd Trimester';
+        }
+      } else if (user.status === 'newMom') {
+        user.babyAge = `${weeks}`;
+        if (weeks === 0) {
+          user.trimester = 'Immediate';
+        } else if (weeks <= 6) {
+          user.trimester = 'Early';
+        } else if (weeks <= 12) {
+          user.trimester = 'Subacute';
+        } else {
+          user.trimester = 'Ongoing';
+        }
       }
     }
     return user;
@@ -39,8 +52,14 @@ export class AuthService {
     const referralCode = generateReferralCode(8);
 
     let pregnancyStartDate = null;
-    if (data.pregnancyWeek) {
+    if (data.status === 'pregnant' && data.pregnancyWeek) {
       const weeksStr = data.pregnancyWeek.toString().replace(/[^0-9]/g, '');
+      const weeks = parseInt(weeksStr, 10);
+      if (!isNaN(weeks)) {
+        pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      }
+    } else if (data.status === 'newMom' && data.babyAge) {
+      const weeksStr = data.babyAge.toString().replace(/[^0-9]/g, '');
       const weeks = parseInt(weeksStr, 10);
       if (!isNaN(weeks)) {
         pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
@@ -171,8 +190,14 @@ export class AuthService {
 
   async updateProfile(userId: string, data: any) {
     let pregnancyStartDate = undefined;
-    if (data.pregnancyWeek) {
+    if (data.status === 'pregnant' && data.pregnancyWeek) {
       const weeksStr = data.pregnancyWeek.toString().replace(/[^0-9]/g, '');
+      const weeks = parseInt(weeksStr, 10);
+      if (!isNaN(weeks)) {
+        pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      }
+    } else if (data.status === 'newMom' && data.babyAge) {
+      const weeksStr = data.babyAge.toString().replace(/[^0-9]/g, '');
       const weeks = parseInt(weeksStr, 10);
       if (!isNaN(weeks)) {
         pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);

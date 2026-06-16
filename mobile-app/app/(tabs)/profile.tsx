@@ -18,7 +18,6 @@ export default function ProfileScreen() {
   const uploadMutation = useUploadProfilePicture();
   const router = useRouter();
 
-  console.log(user)
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
   let statusText = '';
   if (user?.status === 'pregnant') {
