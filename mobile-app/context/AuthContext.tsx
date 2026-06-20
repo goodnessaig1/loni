@@ -10,6 +10,7 @@ export type User = {
   status: 'pregnant' | 'newMom';
   trimester?: string;
   pregnancyWeek?: string;
+  pregnancyStartDate?: string;
   babyAge?: string;
   profilePicture?: string;
   referralCode: string;
@@ -41,7 +42,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (token) {
-        const res = await apiClient.get('/auth/me');
+        const res = await apiClient.get('/users/me');
         setUser(res.data.data.user);
       }
     } catch (e) {

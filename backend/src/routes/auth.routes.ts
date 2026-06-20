@@ -41,4 +41,7 @@ router.post('/verify-phone', protect, validate(verifyPhoneSchema), authControlle
 router.post('/emergency-contacts', protect, validate(emergencyContactsSchema), authController.emergencyContacts);
 router.post('/profile-picture', protect, upload.single('image'), authController.uploadProfilePicture);
 
+import { updateProfileSchema } from '../validators/auth.validator';
+router.patch('/update-profile', protect, validate(updateProfileSchema), authController.updateProfile);
+
 export default router;

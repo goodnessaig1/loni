@@ -25,8 +25,8 @@ const validationSchema = Yup.object().shape({
   password: Yup.string().min(8, 'Password must be at least 8 chars').required('Password is required'),
   status: Yup.string().oneOf(['pregnant', 'newMom']).required('Please select your current status'),
   trimester: Yup.string().when('status', {
-    is: 'pregnant',
-    then: (schema) => schema.required('Please select your trimester'),
+    is: (status: string) => status === 'pregnant' || status === 'newMom',
+    then: (schema) => schema.required('Please select your current stage'),
     otherwise: (schema) => schema.notRequired(),
   }),
   pregnancyWeek: Yup.string().when('status', {
@@ -34,17 +34,30 @@ const validationSchema = Yup.object().shape({
     then: (schema) => schema.required('Please select your pregnancy week'),
     otherwise: (schema) => schema.notRequired(),
   }),
-  babyAge: Yup.string().when('status', {
-    is: 'newMom',
-    then: (schema) => schema.required('Please enter your baby\'s age'),
-    otherwise: (schema) => schema.notRequired(),
-  }),
+  babyAge: Yup.string().test(
+    'is-required-for-new-mom',
+    'Please select your postpartum week',
+    function (value) {
+      const { status, trimester } = this.parent;
+      if (status === 'newMom' && trimester !== 'Immediate') {
+        return !!value;
+      }
+      return true;
+    }
+  ),
 });
 
 const getWeeksForTrimester = (trimester: string) => {
   if (trimester === '1st') return Array.from({ length: 12 }, (_, i) => String(i + 1));
   if (trimester === '2nd') return Array.from({ length: 15 }, (_, i) => String(i + 13));
   if (trimester === '3rd') return Array.from({ length: 15 }, (_, i) => String(i + 28)); // 28 to 42
+  return [];
+};
+
+const getWeeksForPostpartumStage = (stage: string) => {
+  if (stage === 'Early') return Array.from({ length: 6 }, (_, i) => String(i + 1));
+  if (stage === 'Subacute') return Array.from({ length: 6 }, (_, i) => String(i + 7));
+  if (stage === 'Ongoing') return Array.from({ length: 12 }, (_, i) => String(i + 13));
   return [];
 };
 
@@ -231,19 +244,60 @@ export default function RegisterScreen() {
                 </View>
               )}
 
-              {/* Conditional Field: Baby Age */}
+              {/* Conditional Field: Baby Age (Postpartum) */}
               {values.status === 'newMom' && (
                 <View style={styles.conditionalSection}>
-                  <HelixaText style={styles.inputLabelSubtitle}>How old is your baby? (in weeks)</HelixaText>
-                  <TextInput 
-                    placeholder="e.g., 2 weeks, 3 weeks" 
-                    style={[styles.input, touched.babyAge && errors.babyAge && styles.inputError]}
-                    onChangeText={handleChange('babyAge')}
-                    onBlur={handleBlur('babyAge')}
-                    value={values.babyAge}
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  {touched.babyAge && errors.babyAge && <Text style={styles.errorText}>{errors.babyAge}</Text>}
+                  <HelixaText style={styles.inputLabelSubtitle}>Which postpartum stage are you in?</HelixaText>
+                  
+                  {/* Grid for Postpartum Stages */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+                    {['Immediate', 'Early', 'Subacute', 'Ongoing'].map((stage) => (
+                      <Pressable 
+                        key={stage}
+                        style={[
+                          styles.trimesterBox, 
+                          { width: '48%', flex: undefined, marginBottom: 12 }, 
+                          values.trimester === stage && styles.statusBoxSelected
+                        ]}
+                        onPress={() => {
+                          setFieldValue('trimester', stage);
+                          setFieldValue('babyAge', stage === 'Immediate' ? '0' : '');
+                        }}
+                      >
+                        <HelixaText style={styles.statusTitle} weight={values.trimester === stage ? 'bold' : 'regular'}>{stage}</HelixaText>
+                        <View style={[styles.radioEmpty, values.trimester === stage && styles.radioSelected]}>
+                          {values.trimester === stage && <View style={styles.radioInner} />}
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {touched.trimester && errors.trimester && <Text style={styles.errorText}>{errors.trimester as string}</Text>}
+
+                  {values.trimester && values.trimester !== 'Immediate' ? (
+                    <View style={styles.weekSection}>
+                      <HelixaText style={styles.inputLabelSubtitle}>Which week postpartum?</HelixaText>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.weekScrollContent}>
+                        {getWeeksForPostpartumStage(values.trimester).map((week) => (
+                          <Pressable
+                            key={week}
+                            style={[
+                              styles.weekBox,
+                              values.babyAge === week && styles.weekBoxSelected
+                            ]}
+                            onPress={() => setFieldValue('babyAge', week)}
+                          >
+                            <HelixaText 
+                              style={[styles.weekText, values.babyAge === week && styles.weekTextSelected]}
+                              weight={values.babyAge === week ? 'bold' : 'regular'}
+                            >
+                              Week {week}
+                            </HelixaText>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                      {touched.babyAge && errors.babyAge && <Text style={styles.errorText}>{errors.babyAge as string}</Text>}
+                    </View>
+                  ) : null}
                 </View>
               )}
 

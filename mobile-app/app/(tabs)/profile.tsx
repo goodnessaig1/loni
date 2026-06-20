@@ -9,23 +9,26 @@ import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { SupportPartnersCard } from '../../components/profile/SupportPartnersCard';
 import { ProfileSection } from '../../components/profile/ProfileSection';
 import { ProfileMenuItem } from '../../components/profile/ProfileMenuItem';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const { user, logoutUser } = useAuth();
   const uploadMutation = useUploadProfilePicture();
-  console.log(user)
+  const router = useRouter();
+
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
   let statusText = '';
   if (user?.status === 'pregnant') {
-    statusText = user.trimester ? `${user.trimester} Trimester` : 'Pregnant';
+    statusText = user.trimester ? user.trimester : 'Pregnant';
   } else if (user?.status === 'newMom') {
     statusText = user.babyAge ? `Baby is ${user.babyAge} old` : 'New Mom';
   }
 
   const handleLogout = async () => {
     await logoutUser();
+    router.replace('/(auth)/login');
   };
 
   const handlePickImage = async () => {
@@ -97,12 +100,12 @@ export default function ProfileScreen() {
           <SupportPartnersCard />
 
           <ProfileSection>
-            <ProfileMenuItem icon="heart" title="Pregnancy Status" onPress={() => { }} />
+            <ProfileMenuItem icon="heart" title="Pregnancy Status" onPress={() => router.push('/pregnancy-status')} />
             <ProfileMenuItem icon="users" title="Emergency Contacts" onPress={() => { }} isLast />
           </ProfileSection>
 
           <ProfileSection>
-            <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => { }} />
+            <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => router.push('/notification-settings')} />
             <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={() => { }} />
             <ProfileMenuItem icon="shield" title="Privacy & Permissions" onPress={() => { }} isLast />
           </ProfileSection>

@@ -33,7 +33,7 @@ export default function LoginScreen() {
         email: values.email,
         password: values.password,
       });
-      router.replace('/');
+      router.replace('/(tabs)');
     } catch (error: any) {
       console.error('Login failed:', error.response?.data || error.message);
       setFieldError('email', error.response?.data?.error || 'Login failed');

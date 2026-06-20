@@ -9,6 +9,18 @@ export const registerSchema = z.object({
   pregnancyWeek: z.string().optional(),
   babyAge: z.string().optional(),
   referredBy: z.string().optional(),
+  gender: z.enum(['Male', 'Female', 'Others']).optional(),
+  userType: z.enum(['nurse', 'user', 'rider', 'admin']).optional(),
+});
+
+export const updateProfileSchema = z.object({
+  name: z.string().optional(),
+  status: z.enum(['pregnant', 'newMom']).optional(),
+  trimester: z.string().optional(),
+  pregnancyWeek: z.string().optional(),
+  babyAge: z.string().optional(),
+  gender: z.enum(['Male', 'Female', 'Others']).optional(),
+  userType: z.enum(['nurse', 'user', 'rider', 'admin']).optional(),
 });
 
 export const loginSchema = z.object({

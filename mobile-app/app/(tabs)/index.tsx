@@ -6,9 +6,21 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import RideTrackerModal from '../../components/RideTrackerModal';
 
 export default function HomeTab() {
   const { user } = useAuth();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ startRide?: string }>();
+  const [rideActive, setRideActive] = React.useState(false);
+
+  React.useEffect(() => {
+    if (params.startRide === 'true') {
+      setRideActive(true);
+      // Clear the param so it doesn't re-trigger on remount, router.setParams isn't synchronously easy but this works for demo
+    }
+  }, [params.startRide]);
 
   const hour = new Date().getHours();
   let greeting = 'Evening';
@@ -19,14 +31,16 @@ export default function HomeTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 120 }}>
+      {rideActive && <RideTrackerModal onClose={() => setRideActive(false)} />}
+      
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 120 }}>
 
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 }}>
           {/* Notification Bell */}
-          <TouchableOpacity style={{ width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="bell" size={20} color="#000" />
-            <View style={{ position: 'absolute', top: 10, right: 12, width: 8, height: 8, backgroundColor: '#D62D88', borderRadius: 4 }} />
+          <TouchableOpacity style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="bell" size={24} color="#000" />
+            <View style={{ position: 'absolute', top: 13, right: 14, width: 10, height: 10, backgroundColor: '#D62D88', borderRadius: 5 }} />
           </TouchableOpacity>
 
           {/* Arrival Pill */}
@@ -39,10 +53,13 @@ export default function HomeTab() {
           </View> */}
 
           {/* Avatar */}
-          <Image
-            source={{ uri: 'https://i.pravatar.cc/100' }}
-            style={{ width: 44, height: 44, borderRadius: 22 }}
-          />
+          <TouchableOpacity onPress={() => { }}>
+            <Image
+              source={{ uri: user?.profilePicture || 'https://i.pravatar.cc/150' }}
+              style={{ width: 52, height: 52, borderRadius: 26 }}
+              contentFit="cover"
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Greeting Section */}
@@ -59,7 +76,7 @@ export default function HomeTab() {
           {/* Left Column */}
           <View style={{ flex: 1, gap: 16 }}>
             {/* Recovery Plan Card */}
-            <TouchableOpacity style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+            <TouchableOpacity onPress={() => router.push('/recovery')} style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
               <Image
                 source={require('../../assets/images/plan.svg')}
                 style={{ width: 130, height: 100, position: 'absolute', top: 10, right: -10 }}
@@ -74,7 +91,7 @@ export default function HomeTab() {
             </TouchableOpacity>
 
             {/* Emergency Ride Card */}
-            <TouchableOpacity style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+            <TouchableOpacity onPress={() => router.push('/ride/request')} style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
               <Image
                 source={require('../../assets/images/ride.svg')}
                 style={{ width: 120, height: 90, position: 'absolute', top: 30, right: -10 }}
@@ -92,7 +109,7 @@ export default function HomeTab() {
           {/* Right Column */}
           <View style={{ flex: 1 }}>
             {/* Talk to a Nurse Card */}
-            <TouchableOpacity style={{ backgroundColor: '#2C4EDA', borderRadius: 20, padding: 16, height: 416, overflow: 'hidden' }}>
+            <TouchableOpacity onPress={() => router.push('/nurse/connecting')} style={{ backgroundColor: '#2C4EDA', borderRadius: 20, padding: 16, height: 416, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1 }}>
                 <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 17, width: '60%', lineHeight: 22 }}>Talk to a Nurse</HelixaText>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>

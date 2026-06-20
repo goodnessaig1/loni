@@ -7,6 +7,38 @@ import { signToken } from '../utils/jwt';
 import { emailService } from './email.service';
 
 export class AuthService {
+  enrichUserData(user: any) {
+    if (user.pregnancyStartDate) {
+      const now = new Date();
+      const diffTime = now.getTime() - new Date(user.pregnancyStartDate).getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      const weeks = Math.floor(diffDays / 7);
+      
+      if (user.status === 'pregnant') {
+        user.pregnancyWeek = `${weeks} weeks`;
+        if (weeks <= 13) {
+          user.trimester = '1st Trimester';
+        } else if (weeks <= 27) {
+          user.trimester = '2nd Trimester';
+        } else {
+          user.trimester = '3rd Trimester';
+        }
+      } else if (user.status === 'newMom') {
+        user.babyAge = `${weeks}`;
+        if (weeks === 0) {
+          user.trimester = 'Immediate';
+        } else if (weeks <= 6) {
+          user.trimester = 'Early';
+        } else if (weeks <= 12) {
+          user.trimester = 'Subacute';
+        } else {
+          user.trimester = 'Ongoing';
+        }
+      }
+    }
+    return user;
+  }
+
   async register(data: any) {
     const existingUser = await db.select().from(users).where(eq(users.email, data.email)).limit(1);
     if (existingUser.length > 0) {
@@ -19,6 +51,21 @@ export class AuthService {
     const userId = generateId(12);
     const referralCode = generateReferralCode(8);
 
+    let pregnancyStartDate = null;
+    if (data.status === 'pregnant' && data.pregnancyWeek) {
+      const weeksStr = data.pregnancyWeek.toString().replace(/[^0-9]/g, '');
+      const weeks = parseInt(weeksStr, 10);
+      if (!isNaN(weeks)) {
+        pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      }
+    } else if (data.status === 'newMom' && data.babyAge) {
+      const weeksStr = data.babyAge.toString().replace(/[^0-9]/g, '');
+      const weeks = parseInt(weeksStr, 10);
+      if (!isNaN(weeks)) {
+        pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      }
+    }
+
     const newUser = await db.insert(users).values({
       id: userId,
       name: data.name,
@@ -27,7 +74,10 @@ export class AuthService {
       status: data.status,
       trimester: data.trimester,
       pregnancyWeek: data.pregnancyWeek,
+      pregnancyStartDate,
       babyAge: data.babyAge,
+      gender: data.gender || 'Female',
+      userType: data.userType || 'user',
       referralCode,
       referredBy: data.referredBy,
     }).returning();
@@ -60,7 +110,7 @@ export class AuthService {
 
     return {
       token,
-      user: userWithoutPassword,
+      user: this.enrichUserData(userWithoutPassword),
     };
   }
 
@@ -104,7 +154,7 @@ export class AuthService {
       const token = signToken({ userId: user[0].id });
       const { password, ...userWithoutPassword } = user[0];
       
-      return { token, user: userWithoutPassword };
+      return { token, user: this.enrichUserData(userWithoutPassword) };
     } else if (type === 'phone_verification') {
       await db.update(users).set({ isPhoneVerified: true }).where(eq(users.email, email));
     }
@@ -138,6 +188,33 @@ export class AuthService {
     await db.insert(emergencyContacts).values(contactValues);
   }
 
+  async updateProfile(userId: string, data: any) {
+    let pregnancyStartDate = undefined;
+    if (data.status === 'pregnant' && data.pregnancyWeek) {
+      const weeksStr = data.pregnancyWeek.toString().replace(/[^0-9]/g, '');
+      const weeks = parseInt(weeksStr, 10);
+      if (!isNaN(weeks)) {
+        pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      }
+    } else if (data.status === 'newMom' && data.babyAge) {
+      const weeksStr = data.babyAge.toString().replace(/[^0-9]/g, '');
+      const weeks = parseInt(weeksStr, 10);
+      if (!isNaN(weeks)) {
+        pregnancyStartDate = new Date(Date.now() - weeks * 7 * 24 * 60 * 60 * 1000);
+      }
+    }
+
+    const updateData: any = {
+      ...data,
+      ...(pregnancyStartDate ? { pregnancyStartDate } : {})
+    };
+
+    await db.update(users).set(updateData).where(eq(users.id, userId));
+    const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    const { password, ...userWithoutPassword } = user[0];
+    return { message: 'Profile updated successfully', user: this.enrichUserData(userWithoutPassword) };
+  }
+
   async resetPassword(email: string, newPassword: string) {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
@@ -149,7 +226,7 @@ export class AuthService {
     const user = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user.length) throw new Error('User not found');
     const { password, ...userWithoutPassword } = user[0];
-    return { message: 'Profile picture updated', user: userWithoutPassword };
+    return { message: 'Profile picture updated', user: this.enrichUserData(userWithoutPassword) };
   }
 }
 
