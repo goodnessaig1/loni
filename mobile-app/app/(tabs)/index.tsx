@@ -38,7 +38,7 @@ export default function HomeTab() {
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 }}>
           {/* Notification Bell */}
-          <TouchableOpacity style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}>
+          <TouchableOpacity onPress={() => router.push('/notifications')} style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}>
             <Feather name="bell" size={24} color="#000" />
             <View style={{ position: 'absolute', top: 13, right: 14, width: 10, height: 10, backgroundColor: '#D62D88', borderRadius: 5 }} />
           </TouchableOpacity>
