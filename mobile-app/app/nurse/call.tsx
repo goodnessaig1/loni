@@ -33,8 +33,8 @@ export default function CallOngoingScreen() {
   const timeParts = formatTime(secondsElapsed);
 
   const handleEndCall = () => {
-    // Go back to the screen before the call
-    router.back();
+    // Navigate to the rating feedback screen instead of going back
+    router.replace('/nurse/rating');
   };
 
   return (
