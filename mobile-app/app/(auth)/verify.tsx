@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { 
-  View, 
-  Pressable, 
-  TextInput, 
-  StyleSheet, 
-  KeyboardAvoidingView, 
+import {
+  View,
+  Pressable,
+  TextInput,
+  StyleSheet,
+  KeyboardAvoidingView,
   Platform,
   ScrollView
 } from 'react-native';
@@ -26,7 +26,7 @@ export default function VerifyScreen() {
   const handleCodeChange = (text: string, index: number) => {
     // Only allow numbers
     const newText = text.replace(/[^0-9]/g, '');
-    
+
     const newCode = [...code];
     newCode[index] = newText;
     setCode(newCode);
@@ -90,7 +90,7 @@ export default function VerifyScreen() {
 
           <View style={styles.inputSection}>
             <HelixaText style={styles.inputLabel} weight="bold">Enter Code</HelixaText>
-            
+
             <View style={styles.codeContainer}>
               {code.map((digit, index) => (
                 <TextInput
@@ -112,7 +112,7 @@ export default function VerifyScreen() {
             <HelixaText style={styles.resendText} weight="bold">Resend Code</HelixaText>
           </Pressable>
 
-          <Button 
+          <Button
             title="Verify"
             onPress={handleVerify}
             isLoading={isVerifying}
@@ -170,8 +170,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   boxInput: {
-    width: 45,
-    height: 55,
+    width: 65,
+    height: 65,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 12,

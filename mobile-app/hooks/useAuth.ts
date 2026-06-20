@@ -10,7 +10,9 @@ export const useAuth = () => {
 export const useRegister = () => {
   return useMutation({
     mutationFn: async (data: any) => {
+      console.log(data)
       const res = await apiClient.post('/auth/register', data);
+      console.log(res.data)
       return res.data;
     }
   });
@@ -76,7 +78,7 @@ export const useVerifyPhone = () => {
 export const useEmergencyContacts = () => {
   return useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiClient.post('/auth/emergency-contacts', data);
+      const res = await apiClient.post('/users/emergency-contacts', data);
       return res.data;
     }
   });
@@ -104,7 +106,7 @@ export const useUploadProfilePicture = () => {
   const { refreshUser } = useAuth();
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      const res = await apiClient.post('/auth/profile-picture', formData, {
+      const res = await apiClient.post('/users/profile-picture', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

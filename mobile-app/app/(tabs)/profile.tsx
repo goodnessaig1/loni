@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
   let statusText = '';
   if (user?.status === 'pregnant') {
-    statusText = user.trimester ? `${user.trimester} Trimester` : 'Pregnant';
+    statusText = user.trimester ? user.trimester : 'Pregnant';
   } else if (user?.status === 'newMom') {
     statusText = user.babyAge ? `Baby is ${user.babyAge} old` : 'New Mom';
   }
