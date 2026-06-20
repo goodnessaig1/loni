@@ -6,11 +6,21 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import RideTrackerModal from '../../components/RideTrackerModal';
 
 export default function HomeTab() {
   const { user } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams<{ startRide?: string }>();
+  const [rideActive, setRideActive] = React.useState(false);
+
+  React.useEffect(() => {
+    if (params.startRide === 'true') {
+      setRideActive(true);
+      // Clear the param so it doesn't re-trigger on remount, router.setParams isn't synchronously easy but this works for demo
+    }
+  }, [params.startRide]);
 
   const hour = new Date().getHours();
   let greeting = 'Evening';
@@ -21,6 +31,8 @@ export default function HomeTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      {rideActive && <RideTrackerModal onClose={() => setRideActive(false)} />}
+      
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 120 }}>
 
         {/* Header */}
@@ -79,7 +91,7 @@ export default function HomeTab() {
             </TouchableOpacity>
 
             {/* Emergency Ride Card */}
-            <TouchableOpacity style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+            <TouchableOpacity onPress={() => router.push('/ride/request')} style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
               <Image
                 source={require('../../assets/images/ride.svg')}
                 style={{ width: 120, height: 90, position: 'absolute', top: 30, right: -10 }}
