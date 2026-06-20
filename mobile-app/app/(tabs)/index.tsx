@@ -6,9 +6,11 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
+import { useRouter } from 'expo-router';
 
 export default function HomeTab() {
   const { user } = useAuth();
+  const router = useRouter();
 
   const hour = new Date().getHours();
   let greeting = 'Evening';
@@ -95,7 +97,7 @@ export default function HomeTab() {
           {/* Right Column */}
           <View style={{ flex: 1 }}>
             {/* Talk to a Nurse Card */}
-            <TouchableOpacity style={{ backgroundColor: '#2C4EDA', borderRadius: 20, padding: 16, height: 416, overflow: 'hidden' }}>
+            <TouchableOpacity onPress={() => router.push('/nurse/connecting')} style={{ backgroundColor: '#2C4EDA', borderRadius: 20, padding: 16, height: 416, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1 }}>
                 <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 17, width: '60%', lineHeight: 22 }}>Talk to a Nurse</HelixaText>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>
