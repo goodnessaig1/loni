@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { emergencyContactsApi, EmergencyContact } from '../api/emergencyContacts';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from 'hooks/useAuth';
+// import { useAuth } from './AuthContext';
 
 interface EmergencyContactsContextType {
   contacts: EmergencyContact[];
@@ -22,7 +23,7 @@ export const EmergencyContactsProvider = ({ children }: { children: ReactNode })
       setContacts([]);
       return;
     }
-    
+
     setIsLoading(true);
     setError(null);
     try {
