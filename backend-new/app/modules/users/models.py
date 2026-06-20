@@ -19,6 +19,10 @@ class UserTypeEnum(str, enum.Enum):
     rider = 'rider'
     admin = 'admin'
 
+class EmergencyContactStatus(str, enum.Enum):
+    pending = 'pending'
+    connected = 'connected'
+
 class User(Base):
     __tablename__ = 'users'
 
@@ -52,6 +56,12 @@ class EmergencyContact(Base):
     name = Column(String(255), nullable=False)
     phone = Column(String(50), nullable=False)
     relationship = Column(String(100), nullable=False)
+    status = Column(Enum(EmergencyContactStatus, native_enum=False, length=50), default=EmergencyContactStatus.pending, nullable=False)
+    email = Column(String(255), nullable=True)
+    profile_picture = Column(String(255), nullable=True)
+    location = Column(Boolean, default=False, nullable=False)
+    updates = Column(Boolean, default=False, nullable=False)
+    emergency = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = sa_relationship("User", back_populates="emergency_contacts")

@@ -101,7 +101,7 @@ export default function ProfileScreen() {
 
           <ProfileSection>
             <ProfileMenuItem icon="heart" title="Pregnancy Status" onPress={() => router.push('/pregnancy-status')} />
-            <ProfileMenuItem icon="users" title="Emergency Contacts" onPress={() => { }} isLast />
+            <ProfileMenuItem icon="users" title="Emergency Contacts" onPress={() => router.push('/profile/emergency-contacts')} isLast />
           </ProfileSection>
 
           <ProfileSection>

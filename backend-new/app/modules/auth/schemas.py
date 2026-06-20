@@ -69,6 +69,11 @@ class EmergencyContactItem(BaseModel):
 class EmergencyContactsRequest(BaseModel):
     contacts: List[EmergencyContactItem]
 
+class InvitePartnerRequest(BaseModel):
+    fullname: str = Field(..., min_length=1)
+    email: EmailStr
+    message: str
+
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[StatusEnum] = None
