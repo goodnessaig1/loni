@@ -76,7 +76,7 @@ export default function HomeTab() {
           {/* Left Column */}
           <View style={{ flex: 1, gap: 16 }}>
             {/* Recovery Plan Card */}
-            <TouchableOpacity style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+            <TouchableOpacity onPress={() => router.push('/recovery')} style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
               <Image
                 source={require('../../assets/images/plan.svg')}
                 style={{ width: 130, height: 100, position: 'absolute', top: 10, right: -10 }}
