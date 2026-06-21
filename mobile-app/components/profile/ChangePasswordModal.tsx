@@ -18,7 +18,7 @@ const ChangePasswordSchema = Yup.object().shape({
     .min(8, 'Password must be at least 8 characters')
     .required('New password is required'),
   confirmPassword: Yup.string()
-    .oneOf([Yup.ref('newPassword')], 'Passwords must match')
+    .oneOf([Yup.ref('newPassword')], 'Passwords do not match')
     .required('Please confirm your new password'),
 });
 
@@ -35,14 +35,21 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
       confirmPassword: '',
     },
     validationSchema: ChangePasswordSchema,
-    onSubmit: async (values, { resetForm }) => {
+    onSubmit: async (values, { resetForm, setFieldError }) => {
       try {
         await changePassword({ old_password: values.oldPassword, new_password: values.newPassword });
         Toast.show({ type: 'success', text1: 'Password changed successfully.' });
         resetForm();
         onClose();
       } catch (error: any) {
-        Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to change password.' });
+        console.log(error);
+        const errorMessage = error.response?.data?.detail || error.response?.data?.message || error.message || 'Failed to change password.';
+        
+        if (errorMessage.toLowerCase().includes('password') || errorMessage.toLowerCase().includes('incorrect') || errorMessage.toLowerCase().includes('400')) {
+          setFieldError('oldPassword', errorMessage);
+        } else {
+          Toast.show({ type: 'error', text1: 'Error', text2: errorMessage });
+        }
       }
     },
   });
