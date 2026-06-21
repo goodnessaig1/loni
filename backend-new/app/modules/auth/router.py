@@ -6,12 +6,12 @@ from app.modules.users.models import User
 from app.modules.auth.schemas import (
     LoginRequest, RegisterRequest, VerifyOtpRequest, ResendOtpRequest,
     ForgotPasswordRequest, ResetPasswordRequest, StandardResponse,
-    AddPhoneRequest, VerifyPhoneRequest
+    AddPhoneRequest, VerifyPhoneRequest, SetupPartnerRequest
 )
 from app.modules.auth.service import (
     authenticate_user, register_new_user, verify_otp, resend_otp, reset_password
 )
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_password_hash
 from sqlalchemy.future import select
 from app.utils.user_enrichment import enrich_user_data
 
@@ -81,3 +81,33 @@ async def verify_phone(
 ):
     await verify_otp(db, str(current_user.email), data.otp, "phone_verification")
     return {"success": True, "message": "Phone verification successful"}
+
+@router.post("/setup-partner", response_model=StandardResponse)
+async def setup_partner(data: SetupPartnerRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Please ensure you were invited first."
+        )
+        
+    if user.user_type != "partner":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This endpoint is only for invited partners."
+        )
+        
+    # Update password and phone
+    user.password = get_password_hash(data.password)
+    user.phone = data.phone
+    user.is_email_verified = False # ensure they verify
+    db.add(user)
+    await db.commit()
+    
+    # Send email verification OTP
+    await resend_otp(db, data.email, "email_verification")
+    
+    return {"success": True, "message": "Account setup. OTP sent to email."}
+

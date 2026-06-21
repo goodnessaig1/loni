@@ -85,6 +85,11 @@ class UpdateProfileRequest(BaseModel):
     gender: Optional[GenderEnum] = None
     userType: Optional[UserTypeEnum] = None
 
+class SetupPartnerRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    phone: str = Field(..., min_length=10)
+
 class TokenResponse(BaseModel):
     success: bool = True
     data: dict

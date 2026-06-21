@@ -103,7 +103,10 @@ def _send_partner_invite_email_sync(to_email: str, inviter_name: str, message: s
         </head>
         <body>
           <div class="container">
-            <div class="header">
+            <div style="text-align: center; padding-top: 30px;">
+              <img src="https://ik.imagekit.io/eqh0cjetc/amazon-image/Group%2013%201.png" alt="Loni Logo" style="height: 40px;" />
+            </div>
+            <div class="header" style="padding-top: 20px;">
               <img src="https://ik.imagekit.io/eqh0cjetc/amazon-image/support-emjoi.svg" alt="Support" />
             </div>
             <div class="content">
@@ -117,6 +120,9 @@ def _send_partner_invite_email_sync(to_email: str, inviter_name: str, message: s
               <p style="color: #666666; font-size: 14px; margin-top: 20px;">
                 Download the Loni app to stay connected, receive emergency updates, and support their journey.
               </p>
+              <div style="margin-top: 30px;">
+                <a href="{settings.FRONTEND_URL}/verify?email={to_email}" style="background-color: #D62D88; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: bold; display: inline-block;">Accept Invitation</a>
+              </div>
             </div>
             <div class="footer">
               <p>&copy; {datetime.now().year} Loni. All rights reserved.</p>
