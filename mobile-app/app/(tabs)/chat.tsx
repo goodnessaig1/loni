@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, ScrollView, Dimensions, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, TouchableOpacity, ScrollView, Dimensions, Image, ImageBackground, Animated } from 'react-native';
+
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../../components/HelixaText';
 import { useRouter, Tabs } from 'expo-router';
@@ -34,21 +34,46 @@ const SUPPORT_OPTIONS = [
 export default function ChatScreen() {
   const router = useRouter();
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const bounceValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (selectedOption !== null) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(bounceValue, {
+            toValue: 8,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(bounceValue, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      bounceValue.stopAnimation();
+      bounceValue.setValue(0);
+    }
+  }, [selectedOption, bounceValue]);
 
   const handleStartConversation = () => {
     if (selectedOption !== null) {
-      // Navigate to actual chat or next step
-      // router.push('/chat/conversation');
+      router.push({
+        pathname: '/chat/conversation',
+        params: { optionId: selectedOption }
+      });
     }
   };
 
   return (
     <>
       <Tabs.Screen options={{ tabBarStyle: { display: 'none' } }} />
-      <LinearGradient
-        colors={['#D62D88', '#F18C61', '#D62D88']}
-        locations={[0, 0.5, 1]}
+      <ImageBackground
+        source={require('../../assets/images/chat.jpg')}
         style={{ flex: 1 }}
+        resizeMode="cover"
       >
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: 40, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
@@ -108,8 +133,10 @@ export default function ChatScreen() {
           </View>
 
           {/* Bottom Section */}
-          <View className="mt-4 items-center">
-            <Feather name="chevron-down" size={28} color="rgba(255,255,255,0.8)" />
+          <View className="mt-4 items-center h-8 justify-center">
+            <Animated.View style={{ transform: [{ translateY: bounceValue }] }}>
+              <Feather name="chevrons-down" size={28} color="rgba(255,255,255,0.8)" />
+            </Animated.View>
           </View>
 
           <View className="px-6 mt-8">
@@ -140,7 +167,7 @@ export default function ChatScreen() {
 
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+      </ImageBackground>
     </>
   );
 }
