@@ -18,6 +18,11 @@ class UserTypeEnum(str, enum.Enum):
     user = 'user'
     rider = 'rider'
     admin = 'admin'
+    partner = 'partner'
+
+class EmergencyContactStatus(str, enum.Enum):
+    pending = 'pending'
+    connected = 'connected'
 
 class User(Base):
     __tablename__ = 'users'
@@ -42,16 +47,20 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    emergency_contacts = sa_relationship("EmergencyContact", back_populates="user")
+    emergency_contacts = sa_relationship("EmergencyContact", foreign_keys="[EmergencyContact.user_id]", back_populates="user")
 
 class EmergencyContact(Base):
     __tablename__ = 'emergency_contacts'
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(String(12), ForeignKey('users.id'), nullable=False)
-    name = Column(String(255), nullable=False)
-    phone = Column(String(50), nullable=False)
+    contact_user_id = Column(String(12), ForeignKey('users.id'), nullable=False)
     relationship = Column(String(100), nullable=False)
+    status = Column(Enum(EmergencyContactStatus, native_enum=False, length=50), default=EmergencyContactStatus.pending, nullable=False)
+    location = Column(Boolean, default=True, nullable=False)
+    updates = Column(Boolean, default=True, nullable=False)
+    emergency = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    user = sa_relationship("User", back_populates="emergency_contacts")
+    user = sa_relationship("User", foreign_keys=[user_id], back_populates="emergency_contacts")
+    contact_user = sa_relationship("User", foreign_keys=[contact_user_id])

@@ -4,9 +4,9 @@ import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../HelixaText';
 
-export const SupportPartnersCard = () => {
+export const SupportPartnersCard = ({ onPress }: { onPress?: () => void }) => {
   return (
-    <TouchableOpacity style={styles.card}>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
       <Image 
         source={require('../../assets/images/support.png')} 
         style={styles.bgImage}

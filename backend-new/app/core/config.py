@@ -4,6 +4,7 @@ from typing import Optional
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Loni Backend"
     API_V1_STR: str = "/api/v1"
+    FRONTEND_URL: str = "http://localhost:8081"
     
     # Database
     DATABASE_URL: str = ""

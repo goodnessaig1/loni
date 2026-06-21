@@ -64,10 +64,17 @@ class VerifyPhoneRequest(BaseModel):
 class EmergencyContactItem(BaseModel):
     name: str = Field(..., min_length=1)
     phone: str = Field(..., min_length=1)
+    email: EmailStr
     relationship: str = Field(..., min_length=1)
+    message: Optional[str] = None
 
 class EmergencyContactsRequest(BaseModel):
     contacts: List[EmergencyContactItem]
+
+class InvitePartnerRequest(BaseModel):
+    fullname: str = Field(..., min_length=1)
+    email: EmailStr
+    message: str
 
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
@@ -77,6 +84,15 @@ class UpdateProfileRequest(BaseModel):
     babyAge: Optional[str] = None
     gender: Optional[GenderEnum] = None
     userType: Optional[UserTypeEnum] = None
+
+class SetupPartnerRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    phone: str = Field(..., min_length=10)
+
+class VerifyPartnerSetupRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=4, max_length=6)
 
 class TokenResponse(BaseModel):
     success: bool = True

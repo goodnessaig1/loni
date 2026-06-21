@@ -18,3 +18,12 @@ class UserResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+class UpdateContactPermissions(BaseModel):
+    location: Optional[bool] = None
+    updates: Optional[bool] = None
+    emergency: Optional[bool] = None
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
