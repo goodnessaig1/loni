@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks
 import cloudinary
 import cloudinary.uploader
 import asyncio
@@ -71,7 +71,8 @@ async def change_password(
 
 @router.post("/emergency-contacts", response_model=StandardResponse)
 async def emergency_contacts(
-    data: EmergencyContactsRequest, 
+    data: EmergencyContactsRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user), 
     db: AsyncSession = Depends(get_db)
 ):
@@ -114,7 +115,7 @@ async def emergency_contacts(
 
         # Send invitation email
         message = contact.message or "I'm using LONI for pregnancy and recovery support. I'd love for you to join my support circle so we can stay connected during important moments 💜"
-        asyncio.create_task(send_partner_invite_email(contact.email, inviter_name, message))
+        background_tasks.add_task(send_partner_invite_email, contact.email, inviter_name, message)
 
     await db.commit()
     return {"success": True, "message": "Emergency contacts saved"}
@@ -149,6 +150,7 @@ async def get_emergency_contacts(
 @router.post("/invite-partner", response_model=StandardResponse)
 async def invite_partner(
     data: InvitePartnerRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -189,13 +191,14 @@ async def invite_partner(
 
     # 3. Send invitation email
     inviter_name = current_user.name if current_user.name else "A Loni User"
-    asyncio.create_task(send_partner_invite_email(data.email, inviter_name, data.message))
+    background_tasks.add_task(send_partner_invite_email, data.email, inviter_name, data.message)
     
     return {"success": True, "message": "Partner invited successfully"}
 
 @router.delete("/emergency-contacts/{contact_id}", response_model=StandardResponse)
 async def remove_emergency_contact(
     contact_id: int,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -228,9 +231,9 @@ async def remove_emergency_contact(
     # 4. Dispatch emails
     inviter_name = current_user.name if current_user.name else "A Loni User"
     if current_user.email:
-        asyncio.create_task(send_partner_removal_user_email(current_user.email, partner_name))
+        background_tasks.add_task(send_partner_removal_user_email, current_user.email, partner_name)
     if partner_email:
-        asyncio.create_task(send_partner_removal_partner_email(partner_email, inviter_name))
+        background_tasks.add_task(send_partner_removal_partner_email, partner_email, inviter_name)
 
     return {"success": True, "message": "Contact removed successfully"}
 
