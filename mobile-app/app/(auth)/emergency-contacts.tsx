@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Pressable,
@@ -31,6 +31,8 @@ const ContactSchema = Yup.object().shape({
 });
 
 export default function EmergencyContactsScreen() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleContactsSubmit = async (values: any, { setSubmitting }: any) => {
     try {
       setSubmitting(true);

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated, Modal, Dimensions, Image as RNImage, StyleSheet } from 'react-native';
+
+const { width } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -75,6 +77,7 @@ export default function EmergencyContactsScreen() {
   const router = useRouter();
   const { contacts, isLoading } = useEmergencyContacts();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [removeIndex, setRemoveIndex] = useState<number | null>(null);
 
   // Temporary local state for toggles until backend update endpoints are ready
   const [localToggles, setLocalToggles] = useState<Record<number, { location: boolean, updates: boolean, emergency: boolean }>>({});
@@ -177,7 +180,10 @@ export default function EmergencyContactsScreen() {
                     </View>
                   </View>
 
-                  <TouchableOpacity className="w-10 h-10 rounded-[12px] bg-[#B91C1C] justify-center items-center ml-2">
+                  <TouchableOpacity 
+                    className="w-10 h-10 rounded-[12px] bg-[#B91C1C] justify-center items-center ml-2"
+                    onPress={() => setRemoveIndex(contact.id)}
+                  >
                     <Feather name="trash-2" size={18} color="white" />
                   </TouchableOpacity>
                 </View>
@@ -232,6 +238,64 @@ export default function EmergencyContactsScreen() {
       </ScrollView>
 
       <InvitePartnerModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} />
+
+      <Modal
+        visible={removeIndex !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setRemoveIndex(null)}
+      >
+        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
+          <Pressable 
+            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} 
+            onPress={() => setRemoveIndex(null)} 
+          />
+          <View style={{ width: '100%', backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 0, paddingBottom: 40, alignItems: 'center', overflow: 'hidden' }}>
+            
+            <RNImage 
+              source={require('../../assets/images/confirm.png')} 
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, width: '100%', height: 480 }} 
+              resizeMode="stretch" 
+            />
+
+            <View style={{ width: 56, height: 6, backgroundColor: '#D1D5DB', borderRadius: 3, marginTop: 10, marginBottom: 40 }} />
+
+            <Image 
+              source={require('../../assets/images/iconn.png')} 
+              style={{ width: 120, height: 120, marginBottom: 24 }} 
+              contentFit="contain" 
+            />
+
+            <HelixaText style={{ fontSize: 24, color: '#000', marginBottom: 12, paddingHorizontal: 24, textAlign: 'center' }} weight="bold">
+              Remove Contact?
+            </HelixaText>
+
+            <HelixaText style={{ fontSize: 15, color: '#6B7280', textAlign: 'center', paddingHorizontal: 40, marginBottom: 32, lineHeight: 22 }}>
+              They will no longer be able to see your updates or receive emergency alerts.
+            </HelixaText>
+
+            <View style={{ width: '100%', paddingHorizontal: 24, gap: 12 }}>
+              <TouchableOpacity 
+                style={{ width: '100%', backgroundColor: '#000', paddingVertical: 18, borderRadius: 30, alignItems: 'center' }}
+                onPress={() => {
+                  // In the future, call context removeContact API here
+                  setRemoveIndex(null);
+                }}
+              >
+                <HelixaText style={{ color: '#FFF', fontSize: 16 }} weight="bold">Remove Contact</HelixaText>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={{ width: '100%', backgroundColor: '#F3F4F6', paddingVertical: 18, borderRadius: 30, alignItems: 'center' }}
+                onPress={() => setRemoveIndex(null)}
+              >
+                <HelixaText style={{ color: '#4B5563', fontSize: 16 }} weight="bold">Keep Contact</HelixaText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView>
   );
 }
