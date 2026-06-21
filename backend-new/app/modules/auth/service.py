@@ -137,6 +137,10 @@ async def resend_otp(db: AsyncSession, email: str, type: str):
     await db.commit()
     
     # Send email with Brevo API
+    print(f"\n\n==========================================")
+    print(f"   RESENT OTP FOR {email} IS: {otp_code}   ")
+    print(f"==========================================\n\n")
+    
     await send_otp_email(email, otp_code, "Verification")
     
     print(f"\n\n==========================================")

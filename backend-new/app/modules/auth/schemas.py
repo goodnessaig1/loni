@@ -90,6 +90,10 @@ class SetupPartnerRequest(BaseModel):
     password: str = Field(..., min_length=8)
     phone: str = Field(..., min_length=10)
 
+class VerifyPartnerSetupRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=4, max_length=6)
+
 class TokenResponse(BaseModel):
     success: bool = True
     data: dict

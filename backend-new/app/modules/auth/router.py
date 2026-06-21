@@ -6,13 +6,17 @@ from app.modules.users.models import User
 from app.modules.auth.schemas import (
     LoginRequest, RegisterRequest, VerifyOtpRequest, ResendOtpRequest,
     ForgotPasswordRequest, ResetPasswordRequest, StandardResponse,
-    AddPhoneRequest, VerifyPhoneRequest, SetupPartnerRequest
+    AddPhoneRequest, VerifyPhoneRequest, SetupPartnerRequest, VerifyPartnerSetupRequest
 )
 from app.modules.auth.service import (
     authenticate_user, register_new_user, verify_otp, resend_otp, reset_password
 )
+from app.modules.auth.email_service import (
+    send_inviter_connection_success_email, send_partner_connection_success_email
+)
 from app.core.security import create_access_token, get_password_hash
 from sqlalchemy.future import select
+from app.modules.users.models import User, EmergencyContact
 from app.utils.user_enrichment import enrich_user_data
 
 router = APIRouter()
@@ -102,12 +106,49 @@ async def setup_partner(data: SetupPartnerRequest, db: AsyncSession = Depends(ge
     # Update password and phone
     user.password = get_password_hash(data.password)
     user.phone = data.phone
-    user.is_email_verified = False # ensure they verify
+    user.is_email_verified = True # Since they clicked the link from their email
     db.add(user)
     await db.commit()
     
-    # Send email verification OTP
-    await resend_otp(db, data.email, "email_verification")
+    # Send phone verification OTP to their email
+    await resend_otp(db, data.email, "phone_verification")
     
     return {"success": True, "message": "Account setup. OTP sent to email."}
+
+@router.post("/verify-partner-setup", response_model=StandardResponse)
+async def verify_partner_setup(data: VerifyPartnerSetupRequest, db: AsyncSession = Depends(get_db)):
+    # Verify OTP
+    await verify_otp(db, data.email, data.otp, "phone_verification")
+    
+    # Fetch partner
+    result = await db.execute(select(User).where(User.email == data.email))
+    partner = result.scalar_one_or_none()
+    
+    if not partner or partner.user_type != "partner":
+        raise HTTPException(status_code=400, detail="Invalid partner user")
+        
+    # Find emergency contact relationship
+    contact_result = await db.execute(select(EmergencyContact).where(EmergencyContact.contact_user_id == partner.id))
+    emergency_contact = contact_result.scalar_one_or_none()
+    
+    if emergency_contact:
+        # Update relationship status
+        emergency_contact.status = "connected"
+        partner.is_phone_verified = True
+        db.add(emergency_contact)
+        db.add(partner)
+        await db.commit()
+        
+        # Get inviter to send emails
+        inviter_result = await db.execute(select(User).where(User.id == emergency_contact.user_id))
+        inviter = inviter_result.scalar_one_or_none()
+        
+        if inviter:
+            # Send emails in background
+            import asyncio
+            asyncio.create_task(send_inviter_connection_success_email(inviter.email, partner.name))
+            asyncio.create_task(send_partner_connection_success_email(partner.email, inviter.name))
+            
+    return {"success": True, "message": "Partner setup fully verified and connected."}
+
 
