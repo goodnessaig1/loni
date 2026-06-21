@@ -57,9 +57,9 @@ class EmergencyContact(Base):
     contact_user_id = Column(String(12), ForeignKey('users.id'), nullable=False)
     relationship = Column(String(100), nullable=False)
     status = Column(Enum(EmergencyContactStatus, native_enum=False, length=50), default=EmergencyContactStatus.pending, nullable=False)
-    location = Column(Boolean, default=False, nullable=False)
-    updates = Column(Boolean, default=False, nullable=False)
-    emergency = Column(Boolean, default=False, nullable=False)
+    location = Column(Boolean, default=True, nullable=False)
+    updates = Column(Boolean, default=True, nullable=False)
+    emergency = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = sa_relationship("User", foreign_keys=[user_id], back_populates="emergency_contacts")

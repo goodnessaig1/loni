@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +10,66 @@ import { CalText } from '../../components/CalText';
 import { SupportPartnersCard } from '../../components/profile/SupportPartnersCard';
 import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
 import { useEmergencyContacts } from '../../context/EmergencyContactsContext';
+
+const CustomSwitch = ({ value, onValueChange, disabled }: { value: boolean, onValueChange: (v: boolean) => void, disabled?: boolean }) => {
+  const translateX = useRef(new Animated.Value(value ? 14 : 0)).current;
+  const animatedTrackColor = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(translateX, {
+        toValue: value ? 14 : 0, // width 38, padding 2, thumb 20 -> 38 - 4 - 20 = 14
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(animatedTrackColor, {
+        toValue: value ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      })
+    ]).start();
+  }, [value]);
+
+  const interpolatedTrackColor = animatedTrackColor.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['#E5E7EB', '#000000']
+  });
+
+  const trackColor = disabled ? '#9CA3AF' : interpolatedTrackColor;
+  const thumbColor = disabled ? '#D1D5DB' : '#FFFFFF';
+
+  return (
+    <Pressable
+      onPress={() => !disabled && onValueChange(!value)}
+    >
+      <Animated.View
+        style={{
+          width: 38,
+          height: 24,
+          borderRadius: 15,
+          backgroundColor: trackColor,
+          justifyContent: 'center',
+          paddingHorizontal: 2,
+        }}
+      >
+        <Animated.View
+          style={{
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            backgroundColor: thumbColor,
+            transform: [{ translateX }],
+            shadowColor: disabled ? 'transparent' : '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: disabled ? 0 : 0.2,
+            shadowRadius: 2,
+            elevation: disabled ? 0 : 2,
+          }}
+        />
+      </Animated.View>
+    </Pressable>
+  );
+};
 
 export default function EmergencyContactsScreen() {
   const router = useRouter();
@@ -83,18 +143,17 @@ export default function EmergencyContactsScreen() {
                 className={`w-full rounded-[24px] p-5 mb-4 overflow-hidden ${isPending ? 'bg-[#F4F4F4]' : ''}`}
               >
                 {!isPending && (
-                  <View className="absolute top-0 left-0 right-0 bottom-0 opacity-40">
-                    <LinearGradient
-                      colors={['#FFD1E3', '#FFFFFF', '#FFD1E3']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      className="w-full h-full"
+                  <View className="absolute top-0 left-0 right-0 bottom-0">
+                    <Image 
+                      source={require('../../assets/images/connected.png')} 
+                      style={{ width: '100%', height: '100%', position: 'absolute' }} 
+                      contentFit="cover" 
                     />
                   </View>
                 )}
 
                 <View className="flex-row items-start relative z-10">
-                  <View className="w-14 h-14 rounded-full bg-gray-200 overflow-hidden mr-3">
+                  <View className="w-16 h-16 rounded-full bg-[#F2F2F2] overflow-hidden mr-3 border-2 border-white shadow-sm">
                     {contact.profile_picture ? (
                       <Image source={{ uri: contact.profile_picture }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                     ) : (
@@ -106,7 +165,7 @@ export default function EmergencyContactsScreen() {
 
                   <View className="flex-1 pt-1">
                     <CalText className="text-[18px] text-gray-900">{contact.name}</CalText>
-                    <HelixaText className="text-[14px] text-gray-500">{contact.phone}</HelixaText>
+                    <HelixaText className="text-[14px] text-gray-500">{contact.email}</HelixaText>
 
                     <View className="flex-row mt-3">
                       <View className={`px-3 py-1 rounded-full flex-row items-center ${isPending ? 'bg-[#FFE8DC]' : 'bg-[#DCFCE7]'}`}>
@@ -130,43 +189,37 @@ export default function EmergencyContactsScreen() {
                     </HelixaText>
                   </View>
                 ) : (
-                  <View className="mt-5 space-y-3 relative z-10">
-                    <View className="bg-white rounded-[16px] p-4 flex-row items-center justify-between">
+                  <View className="mt-5 relative z-10">
+                    <View className="bg-white rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50">
                       <View className="flex-row items-center gap-3">
                         <Feather name="map-pin" size={20} color="#374151" />
                         <HelixaText className="text-[16px] text-gray-900">Location</HelixaText>
                       </View>
-                      <Switch
+                      <CustomSwitch
                         value={toggles.location}
                         onValueChange={(val) => updateToggle(contact.id, 'location', val)}
-                        trackColor={{ false: '#E5E7EB', true: '#000000' }}
-                        thumbColor="#FFFFFF"
                       />
                     </View>
 
-                    <View className="bg-white rounded-[16px] p-4 flex-row items-center justify-between">
+                    <View className="bg-white rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50">
                       <View className="flex-row items-center gap-3">
                         <Feather name="bell" size={20} color="#374151" />
                         <HelixaText className="text-[16px] text-gray-900">Updates</HelixaText>
                       </View>
-                      <Switch
+                      <CustomSwitch
                         value={toggles.updates}
                         onValueChange={(val) => updateToggle(contact.id, 'updates', val)}
-                        trackColor={{ false: '#E5E7EB', true: '#000000' }}
-                        thumbColor="#FFFFFF"
                       />
                     </View>
 
-                    <View className="bg-white rounded-[16px] p-4 flex-row items-center justify-between">
+                    <View className="bg-white rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50">
                       <View className="flex-row items-center gap-3">
                         <Feather name="clock" size={20} color="#374151" />
                         <HelixaText className="text-[16px] text-gray-900">Emergency</HelixaText>
                       </View>
-                      <Switch
+                      <CustomSwitch
                         value={toggles.emergency}
                         onValueChange={(val) => updateToggle(contact.id, 'emergency', val)}
-                        trackColor={{ false: '#E5E7EB', true: '#000000' }}
-                        thumbColor="#FFFFFF"
                       />
                     </View>
                   </View>

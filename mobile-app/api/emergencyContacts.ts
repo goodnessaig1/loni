@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 
 export interface EmergencyContact {
+  email: string;
   id: number;
   name: string;
   phone: string;
