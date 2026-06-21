@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -20,8 +20,10 @@ export const InvitePartnerModal = ({ visible, onClose }: InvitePartnerModalProps
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState("I'm using LONI for pregnancy and recovery support. I'd love for you to join my support circle so we can stay connected during important moments 💜");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSendInvite = async () => {
+    setErrorMessage(null);
     if (!fullname.trim() || !email.trim()) {
       Toast.show({
         type: 'error',
@@ -51,15 +53,16 @@ export const InvitePartnerModal = ({ visible, onClose }: InvitePartnerModalProps
       setFullname('');
       setEmail('');
     } catch (error: any) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error.message || 'Failed to send invite.',
-      });
+      const rawMessage = error.response?.data?.message || error.message || 'Failed to send invite.';
+      const cleanMessage = rawMessage.replace(/^\[?AxiosError:\s*/, '').replace(/\]$/, '');
+      setErrorMessage(cleanMessage);
     } finally {
       setIsLoading(false);
     }
   };
+  useEffect(() => {
+    setErrorMessage(null);
+  }, [email]);
 
   return (
     <Modal
@@ -140,6 +143,15 @@ export const InvitePartnerModal = ({ visible, onClose }: InvitePartnerModalProps
                 />
               </View>
             </View>
+
+            {/* Error Message */}
+            {errorMessage && (
+              <View className="mb-4 bg-[#FF383C1F] border border-[#FF383C7A] rounded-[12px] p-3">
+                <HelixaText className="text-[#9A1316] text-[14px] text-center">
+                  {errorMessage}
+                </HelixaText>
+              </View>
+            )}
 
             {/* Submit Button */}
             <TouchableOpacity

@@ -19,3 +19,21 @@ apiClient.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => {
+    // If the backend returns 200 OK but with an explicit success: false flag
+    if (response.data && response.data.success === false) {
+      return Promise.reject(new Error(response.data.message || response.data.detail || 'API request failed'));
+    }
+    return response;
+  },
+  (error) => {
+    // Handle standard HTTP errors (4xx, 5xx)
+    if (error.response && error.response.data) {
+      const data = error.response.data;
+      error.message = data.message || data.detail || error.message;
+    }
+    return Promise.reject(error);
+  }
+);

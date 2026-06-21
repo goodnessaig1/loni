@@ -8,12 +8,14 @@ import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import RideTrackerModal from '../../components/RideTrackerModal';
+import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
 
 export default function HomeTab() {
   const { user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams<{ startRide?: string }>();
   const [rideActive, setRideActive] = React.useState(false);
+  const [isInviteModalVisible, setIsInviteModalVisible] = React.useState(false);
 
   React.useEffect(() => {
     if (params.startRide === 'true') {
@@ -124,7 +126,9 @@ export default function HomeTab() {
             </TouchableOpacity>
 
             {/* Add Support Partner Button */}
-            <TouchableOpacity style={{ backgroundColor: '#00C300', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 40, left: -16, right: 0, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
+            <TouchableOpacity 
+              onPress={() => setIsInviteModalVisible(true)}
+              style={{ backgroundColor: '#00C300', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 40, left: -16, right: 0, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
               <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>Add Support Partner</HelixaText>
               <Feather name="plus" size={18} color="#FFF" />
             </TouchableOpacity>
@@ -132,6 +136,11 @@ export default function HomeTab() {
         </View>
 
       </ScrollView>
+      
+      <InvitePartnerModal 
+        visible={isInviteModalVisible} 
+        onClose={() => setIsInviteModalVisible(false)} 
+      />
     </SafeAreaView>
   );
 }
