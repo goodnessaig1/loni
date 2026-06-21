@@ -9,6 +9,7 @@ interface EmergencyContactsContextType {
   error: string | null;
   refreshContacts: () => Promise<void>;
   removeContact: (contactId: number) => Promise<void>;
+  updateContactPermissions: (contactId: number, permissions: { location?: boolean; updates?: boolean; emergency?: boolean }) => Promise<void>;
 }
 
 const EmergencyContactsContext = createContext<EmergencyContactsContextType | undefined>(undefined);
@@ -58,12 +59,29 @@ export const EmergencyContactsProvider = ({ children }: { children: ReactNode })
     }
   };
 
+  const updateContactPermissions = async (contactId: number, permissions: { location?: boolean; updates?: boolean; emergency?: boolean }) => {
+    try {
+      const response = await emergencyContactsApi.updateContactPermissions(contactId, permissions);
+      if (response.success) {
+        // Soft update (mutate context) rather than a full refetch
+        setContacts(prev => prev.map(contact => 
+          contact.id === contactId ? { ...contact, ...permissions } : contact
+        ));
+      } else {
+        throw new Error(response.message || 'Failed to update permissions');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to update permissions');
+      throw err;
+    }
+  };
+
   useEffect(() => {
     refreshContacts();
   }, [user]);
 
   return (
-    <EmergencyContactsContext.Provider value={{ contacts, isLoading, error, refreshContacts, removeContact }}>
+    <EmergencyContactsContext.Provider value={{ contacts, isLoading, error, refreshContacts, removeContact, updateContactPermissions }}>
       {children}
     </EmergencyContactsContext.Provider>
   );

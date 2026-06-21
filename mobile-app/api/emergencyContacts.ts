@@ -30,5 +30,9 @@ export const emergencyContactsApi = {
   removeContact: async (contactId: number) => {
     const response = await apiClient.delete(`/users/emergency-contacts/${contactId}`);
     return response.data;
+  },
+  updateContactPermissions: async (contactId: number, permissions: { location?: boolean; updates?: boolean; emergency?: boolean }) => {
+    const response = await apiClient.patch(`/users/emergency-contacts/${contactId}/permissions`, permissions);
+    return response.data;
   }
 };

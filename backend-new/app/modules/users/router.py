@@ -6,6 +6,8 @@ from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+from app.core.security import verify_password, get_password_hash
+from app.modules.users.schemas import UserResponse, UpdateContactPermissions
 from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.modules.users.models import User, EmergencyContact
@@ -214,6 +216,37 @@ async def remove_emergency_contact(
         asyncio.create_task(send_partner_removal_partner_email(partner_email, inviter_name))
 
     return {"success": True, "message": "Contact removed successfully"}
+
+@router.patch("/emergency-contacts/{contact_id}/permissions", response_model=StandardResponse)
+async def update_emergency_contact_permissions(
+    contact_id: int,
+    permissions: UpdateContactPermissions,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from fastapi import HTTPException
+    
+    stmt = select(EmergencyContact).where(
+        EmergencyContact.id == contact_id,
+        EmergencyContact.user_id == current_user.id
+    )
+    result = await db.execute(stmt)
+    contact = result.scalars().first()
+
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found or access denied")
+
+    if permissions.location is not None:
+        contact.location = permissions.location
+    if permissions.updates is not None:
+        contact.updates = permissions.updates
+    if permissions.emergency is not None:
+        contact.emergency = permissions.emergency
+
+    db.add(contact)
+    await db.commit()
+
+    return {"success": True, "message": "Permissions updated successfully"}
 
 cloudinary.config(
     cloud_name=settings.CLOUDINARY_CLOUD_NAME,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated, Modal, Dimensions, Image as RNImage, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated, Modal, Dimensions, Image as RNImage, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const { width } = Dimensions.get('window');
@@ -13,6 +13,7 @@ import { CalText } from '../../components/CalText';
 import { SupportPartnersCard } from '../../components/profile/SupportPartnersCard';
 import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
 import { useEmergencyContacts } from '../../context/EmergencyContactsContext';
+import Toast from 'react-native-toast-message';
 
 const CustomSwitch = ({ value, onValueChange, disabled }: { value: boolean, onValueChange: (v: boolean) => void, disabled?: boolean }) => {
   const translateX = useRef(new Animated.Value(value ? 14 : 0)).current;
@@ -76,10 +77,22 @@ const CustomSwitch = ({ value, onValueChange, disabled }: { value: boolean, onVa
 
 export default function EmergencyContactsScreen() {
   const router = useRouter();
-  const { contacts, isLoading, removeContact } = useEmergencyContacts();
+  const { contacts, isLoading, removeContact, refreshContacts, updateContactPermissions } = useEmergencyContacts();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshContacts();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshContacts]);
 
   const handleRemoveContact = async () => {
     if (removeIndex === null) return;
@@ -101,7 +114,8 @@ export default function EmergencyContactsScreen() {
     return localToggles[id] || { location: contact.location, updates: contact.updates, emergency: contact.emergency };
   };
 
-  const updateToggle = (id: number, key: 'location' | 'updates' | 'emergency', value: boolean) => {
+  const updateToggle = async (id: number, key: 'location' | 'updates' | 'emergency', value: boolean) => {
+    // Optimistic update
     setLocalToggles(prev => ({
       ...prev,
       [id]: {
@@ -109,7 +123,33 @@ export default function EmergencyContactsScreen() {
         [key]: value
       }
     }));
-    // TODO: Add API call to update contact toggle on backend
+
+    try {
+      await updateContactPermissions(id, { [key]: value });
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: `Partner ${key} permission updated.`,
+        position: 'bottom',
+        bottomOffset: 100,
+      });
+    } catch (error: any) {
+      // Revert on failure
+      setLocalToggles(prev => ({
+        ...prev,
+        [id]: {
+          ...(prev[id] || contacts.find(c => c.id === id)),
+          [key]: !value
+        }
+      }));
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to update permission.',
+        position: 'bottom',
+        bottomOffset: 100,
+      });
+    }
   };
 
   return (
@@ -127,7 +167,18 @@ export default function EmergencyContactsScreen() {
         </CalText>
       </View>
 
-      <ScrollView className="flex-1 px-5 mt-5" showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        className="flex-1 px-5 mt-5" 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#D62D88']}
+            tintColor="#D62D88"
+          />
+        }
+      >
         <View className="mb-4">
           <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
         </View>
