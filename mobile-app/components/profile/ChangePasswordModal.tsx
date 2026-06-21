@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Modal, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { HelixaText } from '../HelixaText';
+import { Feather } from '@expo/vector-icons';
 import { useChangePassword } from '../../hooks/useAuth';
 import Toast from 'react-native-toast-message';
 
@@ -22,6 +23,9 @@ const ChangePasswordSchema = Yup.object().shape({
 });
 
 export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalProps) => {
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { mutateAsync: changePassword, isPending } = useChangePassword();
 
   const formik = useFormik({
@@ -45,6 +49,9 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
 
   const handleClose = () => {
     formik.resetForm();
+    setShowOldPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmPassword(false);
     onClose();
   };
 
@@ -76,14 +83,22 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
 
             <View className="mb-4">
               <HelixaText className="text-[14px] mb-2 text-gray-700" weight="bold">Current Password</HelixaText>
-              <TextInput
-                className={`bg-[#F9FAFB] border ${formik.touched.oldPassword && formik.errors.oldPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 text-[15px]`}
-                placeholder="Enter current password"
-                secureTextEntry
-                value={formik.values.oldPassword}
-                onChangeText={formik.handleChange('oldPassword')}
-                onBlur={formik.handleBlur('oldPassword')}
-              />
+              <View className="relative justify-center">
+                <TextInput
+                  className={`bg-[#F9FAFB] border ${formik.touched.oldPassword && formik.errors.oldPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 pr-12 text-[15px]`}
+                  placeholder="Enter current password"
+                  secureTextEntry={!showOldPassword}
+                  value={formik.values.oldPassword}
+                  onChangeText={formik.handleChange('oldPassword')}
+                  onBlur={formik.handleBlur('oldPassword')}
+                />
+                <TouchableOpacity 
+                  className="absolute right-4" 
+                  onPress={() => setShowOldPassword(!showOldPassword)}
+                >
+                  <Feather name={showOldPassword ? "eye" : "eye-off"} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
               {formik.touched.oldPassword && formik.errors.oldPassword && (
                 <HelixaText className="text-red-500 text-[12px] mt-1 ml-1">{formik.errors.oldPassword}</HelixaText>
               )}
@@ -91,14 +106,22 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
 
             <View className="mb-4">
               <HelixaText className="text-[14px] mb-2 text-gray-700" weight="bold">New Password</HelixaText>
-              <TextInput
-                className={`bg-[#F9FAFB] border ${formik.touched.newPassword && formik.errors.newPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 text-[15px]`}
-                placeholder="Enter new password"
-                secureTextEntry
-                value={formik.values.newPassword}
-                onChangeText={formik.handleChange('newPassword')}
-                onBlur={formik.handleBlur('newPassword')}
-              />
+              <View className="relative justify-center">
+                <TextInput
+                  className={`bg-[#F9FAFB] border ${formik.touched.newPassword && formik.errors.newPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 pr-12 text-[15px]`}
+                  placeholder="Enter new password"
+                  secureTextEntry={!showNewPassword}
+                  value={formik.values.newPassword}
+                  onChangeText={formik.handleChange('newPassword')}
+                  onBlur={formik.handleBlur('newPassword')}
+                />
+                <TouchableOpacity 
+                  className="absolute right-4" 
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                >
+                  <Feather name={showNewPassword ? "eye" : "eye-off"} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
               {formik.touched.newPassword && formik.errors.newPassword && (
                 <HelixaText className="text-red-500 text-[12px] mt-1 ml-1">{formik.errors.newPassword}</HelixaText>
               )}
@@ -106,14 +129,22 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
 
             <View className="mb-8">
               <HelixaText className="text-[14px] mb-2 text-gray-700" weight="bold">Confirm New Password</HelixaText>
-              <TextInput
-                className={`bg-[#F9FAFB] border ${formik.touched.confirmPassword && formik.errors.confirmPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 text-[15px]`}
-                placeholder="Confirm new password"
-                secureTextEntry
-                value={formik.values.confirmPassword}
-                onChangeText={formik.handleChange('confirmPassword')}
-                onBlur={formik.handleBlur('confirmPassword')}
-              />
+              <View className="relative justify-center">
+                <TextInput
+                  className={`bg-[#F9FAFB] border ${formik.touched.confirmPassword && formik.errors.confirmPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 pr-12 text-[15px]`}
+                  placeholder="Confirm new password"
+                  secureTextEntry={!showConfirmPassword}
+                  value={formik.values.confirmPassword}
+                  onChangeText={formik.handleChange('confirmPassword')}
+                  onBlur={formik.handleBlur('confirmPassword')}
+                />
+                <TouchableOpacity 
+                  className="absolute right-4" 
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Feather name={showConfirmPassword ? "eye" : "eye-off"} size={20} color="#9CA3AF" />
+                </TouchableOpacity>
+              </View>
               {formik.touched.confirmPassword && formik.errors.confirmPassword && (
                 <HelixaText className="text-red-500 text-[12px] mt-1 ml-1">{formik.errors.confirmPassword}</HelixaText>
               )}
