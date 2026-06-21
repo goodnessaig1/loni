@@ -13,7 +13,11 @@ from app.modules.auth.schemas import (
     StandardResponse, UpdateProfileRequest, AddPhoneRequest, 
     VerifyPhoneRequest, EmergencyContactsRequest, InvitePartnerRequest
 )
-from app.modules.auth.email_service import send_partner_invite_email
+from app.modules.auth.email_service import (
+    send_partner_invite_email,
+    send_partner_removal_user_email,
+    send_partner_removal_partner_email
+)
 from app.utils.user_enrichment import enrich_user_data, calculate_pregnancy_start_date
 
 router = APIRouter()
@@ -169,6 +173,47 @@ async def invite_partner(
     asyncio.create_task(send_partner_invite_email(data.email, inviter_name, data.message))
     
     return {"success": True, "message": "Partner invited successfully"}
+
+@router.delete("/emergency-contacts/{contact_id}", response_model=StandardResponse)
+async def remove_emergency_contact(
+    contact_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from fastapi import HTTPException
+    
+    # 1. Fetch contact ensuring it belongs to current_user
+    stmt = select(EmergencyContact).where(
+        EmergencyContact.id == contact_id,
+        EmergencyContact.user_id == current_user.id
+    ).options(selectinload(EmergencyContact.contact_user))
+    result = await db.execute(stmt)
+    contact = result.scalars().first()
+
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found or access denied")
+
+    partner_user = contact.contact_user
+    partner_email = partner_user.email if partner_user else None
+    partner_name = partner_user.name if partner_user else "Partner"
+    
+    # 2. Delete EmergencyContact
+    await db.delete(contact)
+    
+    # 3. Delete partner User account
+    if partner_user and partner_user.user_type.value == "partner":
+        await db.delete(partner_user)
+        
+    await db.commit()
+
+    # 4. Dispatch emails
+    inviter_name = current_user.name if current_user.name else "A Loni User"
+    if current_user.email:
+        asyncio.create_task(send_partner_removal_user_email(current_user.email, partner_name))
+    if partner_email:
+        asyncio.create_task(send_partner_removal_partner_email(partner_email, inviter_name))
+
+    return {"success": True, "message": "Contact removed successfully"}
 
 cloudinary.config(
     cloud_name=settings.CLOUDINARY_CLOUD_NAME,

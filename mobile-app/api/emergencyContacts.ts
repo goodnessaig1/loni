@@ -26,5 +26,9 @@ export const emergencyContactsApi = {
   addContacts: async (contacts: any[]) => {
     const response = await apiClient.post('/users/emergency-contacts', { contacts });
     return response.data;
+  },
+  removeContact: async (contactId: number) => {
+    const response = await apiClient.delete(`/users/emergency-contacts/${contactId}`);
+    return response.data;
   }
 };

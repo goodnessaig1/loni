@@ -8,6 +8,7 @@ interface EmergencyContactsContextType {
   isLoading: boolean;
   error: string | null;
   refreshContacts: () => Promise<void>;
+  removeContact: (contactId: number) => Promise<void>;
 }
 
 const EmergencyContactsContext = createContext<EmergencyContactsContextType | undefined>(undefined);
@@ -40,12 +41,29 @@ export const EmergencyContactsProvider = ({ children }: { children: ReactNode })
     }
   };
 
+  const removeContact = async (contactId: number) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await emergencyContactsApi.removeContact(contactId);
+      if (response.success) {
+        await refreshContacts();
+      } else {
+        throw new Error(response.message || 'Failed to remove contact');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to remove contact');
+      setIsLoading(false); // only set false on error, refreshContacts handles success
+      throw err;
+    }
+  };
+
   useEffect(() => {
     refreshContacts();
   }, [user]);
 
   return (
-    <EmergencyContactsContext.Provider value={{ contacts, isLoading, error, refreshContacts }}>
+    <EmergencyContactsContext.Provider value={{ contacts, isLoading, error, refreshContacts, removeContact }}>
       {children}
     </EmergencyContactsContext.Provider>
   );

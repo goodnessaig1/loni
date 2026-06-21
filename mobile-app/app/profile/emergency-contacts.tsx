@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated, Modal, Dimensions, Image as RNImage, StyleSheet } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated, Modal, Dimensions, Image as RNImage, StyleSheet, ActivityIndicator } from 'react-native';
+import { WebView } from 'react-native-webview';
 
 const { width } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
@@ -75,9 +76,23 @@ const CustomSwitch = ({ value, onValueChange, disabled }: { value: boolean, onVa
 
 export default function EmergencyContactsScreen() {
   const router = useRouter();
-  const { contacts, isLoading } = useEmergencyContacts();
+  const { contacts, isLoading, removeContact } = useEmergencyContacts();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleRemoveContact = async () => {
+    if (removeIndex === null) return;
+    try {
+      setIsDeleting(true);
+      await removeContact(removeIndex);
+      setRemoveIndex(null);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Temporary local state for toggles until backend update endpoints are ready
   const [localToggles, setLocalToggles] = useState<Record<number, { location: boolean, updates: boolean, emergency: boolean }>>({});
@@ -122,8 +137,18 @@ export default function EmergencyContactsScreen() {
         </HelixaText>
 
         {isLoading ? (
-          <View className="py-10 items-center">
-            <HelixaText className="text-gray-500">Loading contacts...</HelixaText>
+          <View className="py-10 mt-20 items-center">
+            <View style={{ width: 100, height: 100, overflow: 'hidden' }}>
+              <WebView 
+                originWhitelist={['*']}
+                source={{ html: `<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" /></head><body style="margin:0;padding:0;background-color:transparent;display:flex;justify-content:center;align-items:center;"><svg fill="none" height="100%" width="100%" viewBox="0 0 300 300" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="i0" gradientUnits="userSpaceOnUse" spreadMethod="pad" x2="30.5" y2="30.5" x1="-29.5" y1="-30"><stop offset="0%" stop-color="#f684bb" /><stop offset="56%" stop-color="#bb4478" /><stop offset="100%" stop-color="#7d3b57" /></linearGradient><linearGradient id="i1" gradientUnits="userSpaceOnUse" spreadMethod="pad" x2="31.5" y2="34" x1="-30.5" y1="-30.5"><stop offset="0%" stop-color="#c8195f" /><stop offset="56%" stop-color="#b91d61" /><stop offset="100%" stop-color="#b91d61" /></linearGradient><linearGradient id="i2" gradientUnits="userSpaceOnUse" spreadMethod="pad" x2="31" y2="31" x1="-29" y1="-29.5"><stop offset="0%" stop-color="#a21251" /><stop offset="56%" stop-color="#803c5a" /><stop offset="100%" stop-color="#6e113a" /></linearGradient><linearGradient id="i3" gradientUnits="userSpaceOnUse" spreadMethod="pad" x2="30.5" y2="30.5" x1="-30" y1="-29.5"><stop offset="0%" stop-color="#fac337" /><stop offset="56%" stop-color="#feb806" /><stop offset="100%" stop-color="#ff0571" /></linearGradient></defs><g id="i4"><g transform="translate(150,150)"><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 360; 360; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(0.11,0.11) translate(0,0)"><g id="i5"><g transform="translate(-509.091,509.091)"><animateTransform repeatCount="indefinite" type="translate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="-509.091 509.091; 0 0; 0 0; -509.091 509.091; -509.091 509.091" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0 0 1 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 720; 0; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(9.091,9.091)"><animateTransform repeatCount="indefinite" type="scale" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="9.091 9.091; 9.091 9.091; 8.551 8.551; 8.551 8.551; 9.091 9.091; 9.091 9.091" keyTimes="0; 0.39; 0.41; 0.49; 0.51; 1" keySplines="0 0 1 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="translate(-13.11,8.232)"><g id="i6" transform="matrix(1,0,0,1,13.11,-8.232)"><ellipse ry="30" rx="30" cy="0" cx="0" stroke-width="0" stroke="#f4e0e8" fill="url(#i0)" /></g></g></g></g></g></g></g></g></g></g><g id="i4"><g transform="translate(150,150)"><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 360; 360; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(0.11,0.11) translate(0,0)"><g id="i7"><g transform="translate(509.091,-509.091)"><animateTransform repeatCount="indefinite" type="translate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="509.091 -509.091; 0 0; 0 0; 509.091 -509.091; 509.091 -509.091" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0 0 1 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 720; 0; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(9.091,9.091)"><animateTransform repeatCount="indefinite" type="scale" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="9.091 9.091; 9.091 9.091; 8.551 8.551; 8.551 8.551; 9.091 9.091; 9.091 9.091" keyTimes="0; 0.39; 0.41; 0.49; 0.51; 1" keySplines="0 0 1 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="translate(-13.11,8.232)"><g id="i6" transform="matrix(1,0,0,1,13.11,-8.232)"><ellipse ry="30" rx="30" cy="0" cx="0" stroke-width="0" stroke="#f4e0e8" fill="url(#i1)" /></g></g></g></g></g></g></g></g></g></g><g id="i4"><g transform="translate(150,150)"><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 360; 360; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(0.11,0.11) translate(0,0)"><g id="i8"><g transform="translate(509.091,509.091)"><animateTransform repeatCount="indefinite" type="translate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="509.091 509.091; 0 0; 0 0; 509.091 509.091; 509.091 509.091" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0 0 1 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 720; 0; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(9.091,9.091)"><animateTransform repeatCount="indefinite" type="scale" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="9.091 9.091; 9.091 9.091; 8.551 8.551; 8.551 8.551; 9.091 9.091; 9.091 9.091" keyTimes="0; 0.39; 0.41; 0.49; 0.51; 1" keySplines="0 0 1 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="translate(-13.11,8.232)"><g id="i6" transform="matrix(1,0,0,1,13.11,-8.232)"><ellipse ry="30" rx="30" cy="0" cx="0" stroke-width="0" stroke="#f4e0e8" fill="url(#i2)" /></g></g></g></g></g></g></g></g></g></g><g id="i4"><g transform="translate(150,150)"><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 360; 360; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(0.11,0.11) translate(0,0)"><g id="i9"><g transform="translate(-509.091,-509.091)"><animateTransform repeatCount="indefinite" type="translate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="-509.091 -509.091; 0 0; 0 0; -509.091 -509.091; -509.091 -509.091" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0 0 1 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 720; 0; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(9.091,9.091) translate(-13.11,8.232)"><g id="i6" transform="matrix(1,0,0,1,13.11,-8.232)"><ellipse ry="30" rx="30" cy="0" cx="0" stroke-width="0" stroke="#f4e0e8" fill="url(#i3)" /></g></g></g></g></g></g></g></g></g><g opacity="0" id="i4"><g transform="translate(150,150)"><g transform="rotate(0)"><animateTransform repeatCount="indefinite" type="rotate" attributeName="transform" dur="3.333s" begin="0s" calcMode="spline" values="0; 360; 360; 720; 720" keyTimes="0; 0.4; 0.5; 0.89; 1" keySplines="0.333 0 0.667 1; 0.333 0 0.667 1; 0.333 0 0.667 1; 0 0 1 1" fill="freeze" /><g transform="scale(0.11,0.11) translate(0,0)" /></g></g></g></svg></body></html>` }} 
+                style={{ width: 100, height: 100, backgroundColor: 'transparent' }} 
+                scrollEnabled={false}
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              />
+            </View>
           </View>
         ) : contacts.length === 0 ? (
           <View className="py-16 items-center justify-center mt-4">
@@ -143,7 +168,7 @@ export default function EmergencyContactsScreen() {
             return (
               <View
                 key={contact.id}
-                className={`w-full rounded-[24px] p-5 mb-4 overflow-hidden ${isPending ? 'bg-[#F4F4F4]' : ''}`}
+                className={`w-full rounded-[24px] p-5 mb-4 overflow-hidden ${isPending ? 'bg-[#F2F2F2]' : ''}`}
               >
                 {!isPending && (
                   <View className="absolute top-0 left-0 right-0 bottom-0">
@@ -189,8 +214,8 @@ export default function EmergencyContactsScreen() {
                 </View>
 
                 {isPending ? (
-                  <View className="mt-5 bg-[#FFE8E8] border border-[#FFCCCC] rounded-[12px] p-4 relative z-10">
-                    <HelixaText className="text-[#B91C1C] text-[14px]">
+                  <View className="mt-5 bg-[#FF383C1F] border border-[#FF383C7A] rounded-[12px] p-4 relative z-10">
+                    <HelixaText className="text-[#9A1316] text-[14px]">
                       Waiting for them to accept your invite.
                     </HelixaText>
                   </View>
@@ -276,18 +301,23 @@ export default function EmergencyContactsScreen() {
 
             <View style={{ width: '100%', paddingHorizontal: 24, gap: 12 }}>
               <TouchableOpacity 
-                style={{ width: '100%', backgroundColor: '#000', paddingVertical: 18, borderRadius: 30, alignItems: 'center' }}
-                onPress={() => {
-                  // In the future, call context removeContact API here
-                  setRemoveIndex(null);
-                }}
+                style={{ width: '100%', backgroundColor: isDeleting ? '#9CA3AF' : '#000', paddingVertical: 18, borderRadius: 30, alignItems: 'center' }}
+                onPress={handleRemoveContact}
+                disabled={isDeleting}
               >
-                <HelixaText style={{ color: '#FFF', fontSize: 16 }} weight="bold">Remove Contact</HelixaText>
+                {isDeleting ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <HelixaText style={{ color: '#FFF', fontSize: 16 }} weight="bold">
+                    Remove Contact
+                  </HelixaText>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={{ width: '100%', backgroundColor: '#F3F4F6', paddingVertical: 18, borderRadius: 30, alignItems: 'center' }}
+                style={{ width: '100%', backgroundColor: '#F3F4F6', paddingVertical: 18, borderRadius: 30, alignItems: 'center', opacity: isDeleting ? 0.5 : 1 }}
                 onPress={() => setRemoveIndex(null)}
+                disabled={isDeleting}
               >
                 <HelixaText style={{ color: '#4B5563', fontSize: 16 }} weight="bold">Keep Contact</HelixaText>
               </TouchableOpacity>
