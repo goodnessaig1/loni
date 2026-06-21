@@ -21,5 +21,9 @@ export const emergencyContactsApi = {
   invitePartner: async (data: { fullname: string; email: string; message: string }) => {
     const response = await apiClient.post('/users/invite-partner', data);
     return response.data;
+  },
+  addContacts: async (contacts: any[]) => {
+    const response = await apiClient.post('/users/emergency-contacts', { contacts });
+    return response.data;
   }
 };

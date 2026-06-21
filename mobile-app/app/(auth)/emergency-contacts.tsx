@@ -16,23 +16,35 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { emergencyContactsApi } from '../../api/emergencyContacts';
+import Toast from 'react-native-toast-message';
 
 const ContactSchema = Yup.object().shape({
   contacts: Yup.array().of(
     Yup.object().shape({
       name: Yup.string().required('Name is required'),
       phone: Yup.string().required('Phone number is required'),
+      email: Yup.string().email('Invalid email address').required('Email is required'),
       relationship: Yup.string().required('Relationship is required'),
     })
   ).min(1, 'At least one contact is required'),
 });
 
 export default function EmergencyContactsScreen() {
-  const handleContactsSubmit = (values: any, { setSubmitting }: any) => {
-    setTimeout(() => {
-      setSubmitting(false);
+  const handleContactsSubmit = async (values: any, { setSubmitting }: any) => {
+    try {
+      setSubmitting(true);
+      await emergencyContactsApi.addContacts(values.contacts);
       router.replace('/(auth)/success');
-    }, 1500);
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to save emergency contacts',
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -49,7 +61,7 @@ export default function EmergencyContactsScreen() {
           </HelixaText>
 
           <Formik
-            initialValues={{ contacts: [{ name: '', phone: '', relationship: '' }] }}
+            initialValues={{ contacts: [{ name: '', phone: '', email: '', relationship: '' }] }}
             validationSchema={ContactSchema}
             onSubmit={handleContactsSubmit}
           >
@@ -80,6 +92,23 @@ export default function EmergencyContactsScreen() {
                             />
                             {contactTouched.name && contactErrors.name && (
                               <HelixaText style={styles.errorText}>{contactErrors.name}</HelixaText>
+                            )}
+                          </View>
+
+                          <View style={styles.inputGroup}>
+                            <HelixaText style={styles.inputLabel} weight="bold">Email address</HelixaText>
+                            <TextInput
+                              style={[styles.input, contactTouched.email && contactErrors.email ? styles.inputError : null]}
+                              placeholder="Enter email address"
+                              placeholderTextColor="#9CA3AF"
+                              keyboardType="email-address"
+                              autoCapitalize="none"
+                              value={contact.email}
+                              onChangeText={handleChange(`contacts.${index}.email`)}
+                              onBlur={handleBlur(`contacts.${index}.email`)}
+                            />
+                            {contactTouched.email && contactErrors.email && (
+                              <HelixaText style={styles.errorText}>{contactErrors.email}</HelixaText>
                             )}
                           </View>
 
@@ -117,7 +146,7 @@ export default function EmergencyContactsScreen() {
                       );
                     })}
 
-                    <Pressable style={styles.addAnotherButton} onPress={() => push({ name: '', phone: '', relationship: '' })}>
+                    <Pressable style={styles.addAnotherButton} onPress={() => push({ name: '', phone: '', email: '', relationship: '' })}>
                       <Feather name="plus" size={16} color="#D62D88" />
                       <HelixaText style={styles.addAnotherText}>Add another contact</HelixaText>
                     </Pressable>

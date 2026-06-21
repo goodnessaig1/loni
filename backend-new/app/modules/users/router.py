@@ -5,6 +5,7 @@ import asyncio
 from app.core.config import settings
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.modules.users.models import User, EmergencyContact
@@ -51,14 +52,47 @@ async def emergency_contacts(
     current_user: User = Depends(get_current_user), 
     db: AsyncSession = Depends(get_db)
 ):
+    from fastapi import HTTPException
+    import uuid
+    from app.modules.users.models import UserTypeEnum, StatusEnum, GenderEnum
+
+    inviter_name = current_user.name if current_user.name else "A Loni User"
+
     for contact in data.contacts:
+        # Check if email exists
+        stmt = select(User).where(User.email == contact.email)
+        result = await db.execute(stmt)
+        partner_user = result.scalars().first()
+
+        if partner_user:
+            raise HTTPException(status_code=400, detail=f"The email {contact.email} is already registered to a Loni account.")
+
+        partner_user = User(
+            id=str(uuid.uuid4())[:12],
+            name=contact.name,
+            email=contact.email,
+            password="unusable_password_hash",
+            status=StatusEnum.newMom,
+            phone=contact.phone,
+            gender=GenderEnum.Others,
+            user_type=UserTypeEnum.partner,
+            referral_code=f"REF{uuid.uuid4().hex[:8].upper()}",
+            referred_by=current_user.referral_code
+        )
+        db.add(partner_user)
+        await db.flush()
+
         new_contact = EmergencyContact(
             user_id=current_user.id,
-            name=contact.name,
-            phone=contact.phone,
+            contact_user_id=partner_user.id,
             relationship=contact.relationship
         )
         db.add(new_contact)
+
+        # Send invitation email
+        message = contact.message or "I'm using LONI for pregnancy and recovery support. I'd love for you to join my support circle so we can stay connected during important moments 💜"
+        asyncio.create_task(send_partner_invite_email(contact.email, inviter_name, message))
+
     await db.commit()
     return {"success": True, "message": "Emergency contacts saved"}
 
@@ -67,25 +101,26 @@ async def get_emergency_contacts(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    stmt = select(EmergencyContact).where(EmergencyContact.user_id == current_user.id)
+    stmt = select(EmergencyContact).where(EmergencyContact.user_id == current_user.id).options(selectinload(EmergencyContact.contact_user))
     result = await db.execute(stmt)
     contacts = result.scalars().all()
     
-    contacts_data = [
-        {
-            "id": contact.id,
-            "name": contact.name,
-            "phone": contact.phone,
-            "relationship": contact.relationship,
-            "status": contact.status.value if contact.status else "pending",
-            "profile_picture": contact.profile_picture,
-            "location": contact.location,
-            "updates": contact.updates,
-            "emergency": contact.emergency,
-            "created_at": contact.created_at
-        }
-        for contact in contacts
-    ]
+    contacts_data = []
+    for contact in contacts:
+        if contact.contact_user:
+            contacts_data.append({
+                "id": contact.id,
+                "name": contact.contact_user.name,
+                "phone": contact.contact_user.phone or "",
+                "email": contact.contact_user.email,
+                "relationship": contact.relationship,
+                "status": contact.status.value if contact.status else "pending",
+                "profile_picture": contact.contact_user.profile_picture,
+                "location": contact.location,
+                "updates": contact.updates,
+                "emergency": contact.emergency,
+                "created_at": contact.created_at
+            })
     return {"success": True, "data": {"contacts": contacts_data}}
 
 @router.post("/invite-partner", response_model=StandardResponse)
@@ -94,22 +129,43 @@ async def invite_partner(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # 1. Create EmergencyContact record with pending status
-    new_contact = EmergencyContact(
-        user_id=current_user.id,
+    from fastapi import HTTPException
+    import uuid
+    from app.modules.users.models import UserTypeEnum, StatusEnum, GenderEnum
+
+    # 1. Check if user already exists by email
+    stmt = select(User).where(User.email == data.email)
+    result = await db.execute(stmt)
+    partner_user = result.scalars().first()
+
+    if partner_user:
+        raise HTTPException(status_code=400, detail=f"The email {data.email} is already registered to a Loni account.")
+
+    partner_user = User(
+        id=str(uuid.uuid4())[:12],
         name=data.fullname,
         email=data.email,
-        phone="",  # Phone can be updated later by the partner
+        password="unusable_password_hash",
+        status=StatusEnum.newMom,
+        gender=GenderEnum.Others,
+        user_type=UserTypeEnum.partner,
+        referral_code=f"REF{uuid.uuid4().hex[:8].upper()}",
+        referred_by=current_user.referral_code
+    )
+    db.add(partner_user)
+    await db.flush()
+
+    # 2. Create EmergencyContact record connecting them
+    new_contact = EmergencyContact(
+        user_id=current_user.id,
+        contact_user_id=partner_user.id,
         relationship="Partner"
     )
     db.add(new_contact)
     await db.commit()
 
-    # 2. Send invitation email
-    # Determine inviter name (fallback to User if name is None)
+    # 3. Send invitation email
     inviter_name = current_user.name if current_user.name else "A Loni User"
-    
-    # Run the email sending asynchronously
     asyncio.create_task(send_partner_invite_email(data.email, inviter_name, data.message))
     
     return {"success": True, "message": "Partner invited successfully"}

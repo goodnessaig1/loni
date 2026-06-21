@@ -64,7 +64,9 @@ class VerifyPhoneRequest(BaseModel):
 class EmergencyContactItem(BaseModel):
     name: str = Field(..., min_length=1)
     phone: str = Field(..., min_length=1)
+    email: EmailStr
     relationship: str = Field(..., min_length=1)
+    message: Optional[str] = None
 
 class EmergencyContactsRequest(BaseModel):
     contacts: List[EmergencyContactItem]

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScrollView, View, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -9,6 +9,7 @@ import { ProfileHeader } from '../../components/profile/ProfileHeader';
 import { SupportPartnersCard } from '../../components/profile/SupportPartnersCard';
 import { ProfileSection } from '../../components/profile/ProfileSection';
 import { ProfileMenuItem } from '../../components/profile/ProfileMenuItem';
+import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -17,6 +18,7 @@ export default function ProfileScreen() {
   const { user, logoutUser } = useAuth();
   const uploadMutation = useUploadProfilePicture();
   const router = useRouter();
+  const [isModalVisible, setIsModalVisible] = useState(false);
 
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
   let statusText = '';
@@ -97,7 +99,7 @@ export default function ProfileScreen() {
         />
 
         <View className='bg-white flex flex-col'>
-          <SupportPartnersCard />
+          <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
 
           <ProfileSection>
             <ProfileMenuItem icon="heart" title="Pregnancy Status" onPress={() => router.push('/pregnancy-status')} />
@@ -116,6 +118,8 @@ export default function ProfileScreen() {
         </View>
 
       </ScrollView>
+
+      <InvitePartnerModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} />
     </SafeAreaView>
   );
 }
