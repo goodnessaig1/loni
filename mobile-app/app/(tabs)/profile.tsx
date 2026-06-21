@@ -10,7 +10,10 @@ import { SupportPartnersCard } from '../../components/profile/SupportPartnersCar
 import { ProfileSection } from '../../components/profile/ProfileSection';
 import { ProfileMenuItem } from '../../components/profile/ProfileMenuItem';
 import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
+import { ActionModal } from '../../components/ActionModal';
+import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { HelixaText } from '../../components/HelixaText';
 
 const { width } = Dimensions.get('window');
 
@@ -19,6 +22,9 @@ export default function ProfileScreen() {
   const uploadMutation = useUploadProfilePicture();
   const router = useRouter();
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isCancelSubVisible, setIsCancelSubVisible] = useState(false);
+  const [cancelStep, setCancelStep] = useState<1 | 2>(1);
+  const [isCanceling, setIsCanceling] = useState(false);
 
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
   let statusText = '';
@@ -108,7 +114,7 @@ export default function ProfileScreen() {
 
           <ProfileSection>
             <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => router.push('/notification-settings')} />
-            <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={() => { }} />
+            <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={() => { setCancelStep(1); setIsCancelSubVisible(true); }} />
             <ProfileMenuItem icon="shield" title="Privacy & Permissions" onPress={() => { }} isLast />
           </ProfileSection>
 
@@ -120,6 +126,60 @@ export default function ProfileScreen() {
       </ScrollView>
 
       <InvitePartnerModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} />
+      
+      <ActionModal
+        visible={isCancelSubVisible}
+        onClose={() => setIsCancelSubVisible(false)}
+        title={cancelStep === 1 ? "Cancel Subscription?" : "Before you go..."}
+        description={cancelStep === 1 
+          ? "Your premium access will continue until the end of your billing period. You can resubscribe anytime."
+          : "Here is what you will miss without LoniPlus:"}
+        primaryButtonText={cancelStep === 1 ? "Continue to Cancel" : "I Understand, Cancel"}
+        onPrimaryPress={() => {
+          if (cancelStep === 1) {
+            setCancelStep(2);
+          } else {
+            setIsCancelSubVisible(false);
+            setCancelStep(1);
+            router.push('/profile/cancel-subscription');
+          }
+        }}
+        isPrimaryLoading={isCanceling}
+        secondaryButtonText="Keep Subscription"
+        onSecondaryPress={() => { setIsCancelSubVisible(false); setCancelStep(1); }}
+        icon={
+          cancelStep === 1 ? (
+             <Image 
+                source={require('../../assets/images/iconn.png')} 
+                style={{ width: 120, height: 120 }} 
+                contentFit="contain" 
+              />
+          ) : (
+             <View className="w-24 h-24 bg-[#D62D88] rounded-[32px] items-center justify-center shadow-md shadow-pink-200">
+               <MaterialCommunityIcons name="robot-outline" size={56} color="#FFF" />
+             </View>
+          )
+        }
+      >
+        {cancelStep === 2 && (
+          <View className="w-full pl-2 pr-4">
+            {[
+              'Unlimited nurse calls',
+              'Unlimited emergency rides',
+              'Request your preferred nurse',
+              'Faster ride dispatch',
+              'Enhanced recovery plans'
+            ].map((feature, idx) => (
+              <View key={idx} className="flex-row items-center mb-4">
+                <View className="w-5 h-5 rounded-full bg-[#E5E7EB] items-center justify-center mr-3">
+                  <Feather name="check" size={12} color="#6B7280" />
+                </View>
+                <HelixaText className="text-gray-500 text-[15px]">{feature}</HelixaText>
+              </View>
+            ))}
+          </View>
+        )}
+      </ActionModal>
     </SafeAreaView>
   );
 }
