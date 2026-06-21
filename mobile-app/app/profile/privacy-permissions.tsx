@@ -5,9 +5,11 @@ import { useRouter } from 'expo-router';
 import { HelixaText } from '../../components/HelixaText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CustomSwitch } from '../../components/CustomSwitch';
+import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
 
 export default function PrivacyPermissionsScreen() {
   const router = useRouter();
+  const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
   
   const [toggles, setToggles] = useState({
     location: false,
@@ -89,7 +91,11 @@ export default function PrivacyPermissionsScreen() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.6} className="flex-row justify-between items-center bg-white p-4 rounded-[14px]">
+          <TouchableOpacity 
+            activeOpacity={0.6} 
+            className="flex-row justify-between items-center bg-white p-4 rounded-[14px]"
+            onPress={() => setIsPasswordModalVisible(true)}
+          >
             <View className="flex-1 pr-4">
               <HelixaText className="text-[15px] mb-1 text-black">Change Password</HelixaText>
               <HelixaText className="text-[13px] text-gray-500 leading-4">Update your account password securely</HelixaText>
@@ -116,6 +122,11 @@ export default function PrivacyPermissionsScreen() {
         </HelixaText>
 
       </ScrollView>
+
+      <ChangePasswordModal 
+        visible={isPasswordModalVisible} 
+        onClose={() => setIsPasswordModalVisible(false)} 
+      />
     </SafeAreaView>
   );
 }

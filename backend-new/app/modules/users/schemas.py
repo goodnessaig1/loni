@@ -23,3 +23,7 @@ class UpdateContactPermissions(BaseModel):
     location: Optional[bool] = None
     updates: Optional[bool] = None
     emergency: Optional[bool] = None
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str

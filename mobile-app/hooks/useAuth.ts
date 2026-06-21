@@ -116,3 +116,12 @@ export const useUploadProfilePicture = () => {
     }
   });
 };
+
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiClient.put('/users/me/password', data);
+      return res.data;
+    }
+  });
+};

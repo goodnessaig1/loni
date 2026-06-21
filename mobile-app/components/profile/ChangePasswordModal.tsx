@@ -1,0 +1,138 @@
+import React from 'react';
+import { View, Modal, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { useFormik } from 'formik';
+import * as Yup from 'yup';
+import { HelixaText } from '../HelixaText';
+import { useChangePassword } from '../../hooks/useAuth';
+import Toast from 'react-native-toast-message';
+
+interface ChangePasswordModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+const ChangePasswordSchema = Yup.object().shape({
+  oldPassword: Yup.string().required('Current password is required'),
+  newPassword: Yup.string()
+    .min(8, 'Password must be at least 8 characters')
+    .required('New password is required'),
+  confirmPassword: Yup.string()
+    .oneOf([Yup.ref('newPassword')], 'Passwords must match')
+    .required('Please confirm your new password'),
+});
+
+export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalProps) => {
+  const { mutateAsync: changePassword, isPending } = useChangePassword();
+
+  const formik = useFormik({
+    initialValues: {
+      oldPassword: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+    validationSchema: ChangePasswordSchema,
+    onSubmit: async (values, { resetForm }) => {
+      try {
+        await changePassword({ old_password: values.oldPassword, new_password: values.newPassword });
+        Toast.show({ type: 'success', text1: 'Password changed successfully.' });
+        resetForm();
+        onClose();
+      } catch (error: any) {
+        Toast.show({ type: 'error', text1: 'Error', text2: error.message || 'Failed to change password.' });
+      }
+    },
+  });
+
+  const handleClose = () => {
+    formik.resetForm();
+    onClose();
+  };
+
+  const isButtonDisabled = !formik.isValid || !formik.dirty || isPending;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity 
+            className="absolute top-0 bottom-0 left-0 right-0" 
+            onPress={handleClose} 
+            activeOpacity={1} 
+          />
+          
+          <View className="bg-white rounded-t-[32px] p-6 w-full max-h-[90%] pt-4 pb-12">
+            <View className="items-center mb-6">
+              <View className="w-12 h-1.5 bg-gray-300 rounded-full mb-6" />
+              <HelixaText className="text-[20px] text-center" weight="bold">Change Password</HelixaText>
+            </View>
+
+            <View className="mb-4">
+              <HelixaText className="text-[14px] mb-2 text-gray-700" weight="bold">Current Password</HelixaText>
+              <TextInput
+                className={`bg-[#F9FAFB] border ${formik.touched.oldPassword && formik.errors.oldPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 text-[15px]`}
+                placeholder="Enter current password"
+                secureTextEntry
+                value={formik.values.oldPassword}
+                onChangeText={formik.handleChange('oldPassword')}
+                onBlur={formik.handleBlur('oldPassword')}
+              />
+              {formik.touched.oldPassword && formik.errors.oldPassword && (
+                <HelixaText className="text-red-500 text-[12px] mt-1 ml-1">{formik.errors.oldPassword}</HelixaText>
+              )}
+            </View>
+
+            <View className="mb-4">
+              <HelixaText className="text-[14px] mb-2 text-gray-700" weight="bold">New Password</HelixaText>
+              <TextInput
+                className={`bg-[#F9FAFB] border ${formik.touched.newPassword && formik.errors.newPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 text-[15px]`}
+                placeholder="Enter new password"
+                secureTextEntry
+                value={formik.values.newPassword}
+                onChangeText={formik.handleChange('newPassword')}
+                onBlur={formik.handleBlur('newPassword')}
+              />
+              {formik.touched.newPassword && formik.errors.newPassword && (
+                <HelixaText className="text-red-500 text-[12px] mt-1 ml-1">{formik.errors.newPassword}</HelixaText>
+              )}
+            </View>
+
+            <View className="mb-8">
+              <HelixaText className="text-[14px] mb-2 text-gray-700" weight="bold">Confirm New Password</HelixaText>
+              <TextInput
+                className={`bg-[#F9FAFB] border ${formik.touched.confirmPassword && formik.errors.confirmPassword ? 'border-red-500' : 'border-gray-200'} rounded-[16px] px-4 py-4 text-[15px]`}
+                placeholder="Confirm new password"
+                secureTextEntry
+                value={formik.values.confirmPassword}
+                onChangeText={formik.handleChange('confirmPassword')}
+                onBlur={formik.handleBlur('confirmPassword')}
+              />
+              {formik.touched.confirmPassword && formik.errors.confirmPassword && (
+                <HelixaText className="text-red-500 text-[12px] mt-1 ml-1">{formik.errors.confirmPassword}</HelixaText>
+              )}
+            </View>
+
+            <TouchableOpacity 
+              className={`w-full py-4 rounded-full items-center mb-6 flex-row justify-center ${isButtonDisabled ? 'bg-[#D62D88]/50' : 'bg-[#D62D88]'}`}
+              onPress={() => formik.handleSubmit()}
+              disabled={isButtonDisabled}
+            >
+              {isPending ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <HelixaText className="text-white text-[16px]" weight="bold">Update Password</HelixaText>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};

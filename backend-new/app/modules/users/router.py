@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.core.security import verify_password, get_password_hash
-from app.modules.users.schemas import UserResponse, UpdateContactPermissions
+from app.modules.users.schemas import UserResponse, UpdateContactPermissions, ChangePasswordRequest
 from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.modules.users.models import User, EmergencyContact
@@ -51,6 +51,23 @@ async def update_profile(
     db.add(current_user)
     await db.commit()
     return {"success": True, "message": "Profile updated successfully"}
+
+@router.put("/me/password", response_model=StandardResponse)
+async def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    from fastapi import HTTPException
+    
+    if not verify_password(data.old_password, current_user.password):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+        
+    current_user.password = get_password_hash(data.new_password)
+    db.add(current_user)
+    await db.commit()
+    
+    return {"success": True, "message": "Password changed successfully"}
 
 @router.post("/emergency-contacts", response_model=StandardResponse)
 async def emergency_contacts(
