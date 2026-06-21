@@ -15,65 +15,7 @@ import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal'
 import { useEmergencyContacts } from '../../context/EmergencyContactsContext';
 import Toast from 'react-native-toast-message';
 
-const CustomSwitch = ({ value, onValueChange, disabled }: { value: boolean, onValueChange: (v: boolean) => void, disabled?: boolean }) => {
-  const translateX = useRef(new Animated.Value(value ? 14 : 0)).current;
-  const animatedTrackColor = useRef(new Animated.Value(value ? 1 : 0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(translateX, {
-        toValue: value ? 14 : 0, // width 38, padding 2, thumb 20 -> 38 - 4 - 20 = 14
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(animatedTrackColor, {
-        toValue: value ? 1 : 0,
-        duration: 200,
-        useNativeDriver: false,
-      })
-    ]).start();
-  }, [value]);
-
-  const interpolatedTrackColor = animatedTrackColor.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['#E5E7EB', '#000000']
-  });
-
-  const trackColor = disabled ? '#9CA3AF' : interpolatedTrackColor;
-  const thumbColor = disabled ? '#D1D5DB' : '#FFFFFF';
-
-  return (
-    <Pressable
-      onPress={() => !disabled && onValueChange(!value)}
-    >
-      <Animated.View
-        style={{
-          width: 38,
-          height: 24,
-          borderRadius: 15,
-          backgroundColor: trackColor,
-          justifyContent: 'center',
-          paddingHorizontal: 2,
-        }}
-      >
-        <Animated.View
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 10,
-            backgroundColor: thumbColor,
-            transform: [{ translateX }],
-            shadowColor: disabled ? 'transparent' : '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: disabled ? 0 : 0.2,
-            shadowRadius: 2,
-            elevation: disabled ? 0 : 2,
-          }}
-        />
-      </Animated.View>
-    </Pressable>
-  );
-};
+import { CustomSwitch } from '../../components/CustomSwitch';
 
 export default function EmergencyContactsScreen() {
   const router = useRouter();
@@ -277,9 +219,10 @@ export default function EmergencyContactsScreen() {
                         <Feather name="map-pin" size={20} color="#374151" />
                         <HelixaText className="text-[16px] text-gray-900">Location</HelixaText>
                       </View>
-                      <CustomSwitch
-                        value={toggles.location}
-                        onValueChange={(val) => updateToggle(contact.id, 'location', val)}
+                      <CustomSwitch 
+                        value={contact.location ?? false} 
+                        onValueChange={(v) => updateToggle(contact.id, 'location', v)}
+                        activeColor="#000000"
                       />
                     </View>
 
@@ -288,9 +231,10 @@ export default function EmergencyContactsScreen() {
                         <Feather name="bell" size={20} color="#374151" />
                         <HelixaText className="text-[16px] text-gray-900">Updates</HelixaText>
                       </View>
-                      <CustomSwitch
-                        value={toggles.updates}
-                        onValueChange={(val) => updateToggle(contact.id, 'updates', val)}
+                      <CustomSwitch 
+                        value={contact.updates ?? false} 
+                        onValueChange={(v) => updateToggle(contact.id, 'updates', v)}
+                        activeColor="#000000"
                       />
                     </View>
 
@@ -299,9 +243,10 @@ export default function EmergencyContactsScreen() {
                         <Feather name="clock" size={20} color="#374151" />
                         <HelixaText className="text-[16px] text-gray-900">Emergency</HelixaText>
                       </View>
-                      <CustomSwitch
-                        value={toggles.emergency}
-                        onValueChange={(val) => updateToggle(contact.id, 'emergency', val)}
+                      <CustomSwitch 
+                        value={contact.emergency ?? false} 
+                        onValueChange={(v) => updateToggle(contact.id, 'emergency', v)}
+                        activeColor="#000000"
                       />
                     </View>
                   </View>

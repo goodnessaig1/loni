@@ -78,7 +78,7 @@ export default function HomeTab() {
           {/* Left Column */}
           <View style={{ flex: 1, gap: 16 }}>
             {/* Recovery Plan Card */}
-            <TouchableOpacity onPress={() => router.push('/recovery')} style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+            <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/recovery')} style={{ backgroundColor: '#F68AA8', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
               <Image
                 source={require('../../assets/images/plan.svg')}
                 style={{ width: 130, height: 100, position: 'absolute', top: 10, right: -10 }}
@@ -93,7 +93,7 @@ export default function HomeTab() {
             </TouchableOpacity>
 
             {/* Emergency Ride Card */}
-            <TouchableOpacity onPress={() => router.push('/ride/request')} style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
+            <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/ride/request')} style={{ backgroundColor: '#D62D88', borderRadius: 20, padding: 16, height: 200, overflow: 'hidden', justifyContent: 'flex-end' }}>
               <Image
                 source={require('../../assets/images/ride.svg')}
                 style={{ width: 120, height: 90, position: 'absolute', top: 30, right: -10 }}
@@ -111,7 +111,7 @@ export default function HomeTab() {
           {/* Right Column */}
           <View style={{ flex: 1 }}>
             {/* Talk to a Nurse Card */}
-            <TouchableOpacity onPress={() => router.push('/nurse/connecting')} style={{ backgroundColor: '#2C4EDA', borderRadius: 20, padding: 16, height: 416, overflow: 'hidden' }}>
+            <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/nurse/connecting')} style={{ backgroundColor: '#2C4EDA', borderRadius: 20, padding: 16, height: 416, overflow: 'hidden' }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1 }}>
                 <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 17, width: '60%', lineHeight: 22 }}>Talk to a Nurse</HelixaText>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }}>
@@ -127,6 +127,7 @@ export default function HomeTab() {
 
             {/* Add Support Partner Button */}
             <TouchableOpacity 
+              activeOpacity={0.6}
               onPress={() => setIsInviteModalVisible(true)}
               style={{ backgroundColor: '#00C300', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 40, left: -16, right: 0, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
               <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>Add Support Partner</HelixaText>
