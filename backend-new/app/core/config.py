@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     MONGODB_URI: str = "mongodb://localhost:27017"
 
     OPENAI_API_KEY: str = ""
+    AI_ENVIRONMENT: str = "production" # "production" or "local"
+    OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
     
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

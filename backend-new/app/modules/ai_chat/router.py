@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from typing import List
 from app.modules.users.models import User
 from app.api.deps import get_current_user
@@ -34,7 +35,7 @@ async def get_messages(
     messages = await service.get_session_messages(session_id)
     return {"success": True, "data": {"messages": messages}}
 
-@router.post("/sessions/{session_id}/messages", response_model=schemas.StandardChatResponse)
+@router.post("/sessions/{session_id}/messages")
 async def send_message(
     session_id: str,
     data: schemas.ChatMessageRequest,
@@ -45,6 +46,7 @@ async def send_message(
     if not any(s["id"] == session_id for s in sessions):
         raise HTTPException(status_code=403, detail="Not authorized to access this session")
         
-    response_msg = await service.send_chat_message(session_id, current_user.id, data.content)
-    
-    return {"success": True, "message": "Message processed", "data": {"message": response_msg}}
+    return StreamingResponse(
+        service.stream_chat_message(session_id, current_user.id, data.content),
+        media_type="text/event-stream"
+    )

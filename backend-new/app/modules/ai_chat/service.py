@@ -8,9 +8,86 @@ from app.modules.ai_chat.prompts import SYSTEM_PROMPT
 # Default model configuration
 DEFAULT_MODEL = "gpt-3.5-turbo"
 
-# Initialize AsyncOpenAI client
-# It will automatically use OPENAI_API_KEY from environment/settings if set.
-openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+async def stream_chat_message(session_id: str, user_id: str, content: str):
+    db = get_mongo_db()
+    now = datetime.now(timezone.utc)
+    
+    # 1. Save user message to DB
+    user_message_id = str(uuid.uuid4())
+    user_msg_doc = {
+        "id": user_message_id,
+        "session_id": session_id,
+        "role": "user",
+        "content": content,
+        "created_at": now
+    }
+    await db["messages"].insert_one(user_msg_doc)
+    
+    # Update session updated_at
+    await db["sessions"].update_one(
+        {"id": session_id},
+        {"$set": {"updated_at": now}}
+    )
+
+    # 2. Retrieve conversation history (keep context small: last 20 msgs max)
+    history = await get_session_messages(session_id)
+    history = history[-20:]
+    
+    # 3. Format messages for OpenAI
+    openai_messages = [
+        {"role": "system", "content": SYSTEM_PROMPT}
+    ]
+    
+    for msg in history:
+        openai_messages.append({
+            "role": msg["role"],
+            "content": msg["content"]
+        })
+        
+    # 4. Configure client based on environment
+    if settings.AI_ENVIRONMENT == "local":
+        client = AsyncOpenAI(
+            base_url=settings.OLLAMA_BASE_URL,
+            api_key="ollama"
+        )
+        model = "qwen3:8b"
+    else:
+        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        model = DEFAULT_MODEL
+        
+    # 5. Call AI API with streaming enabled
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=openai_messages,
+            temperature=0.7,
+            stream=True
+        )
+        
+        full_assistant_content = ""
+        
+        async for chunk in response:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                full_assistant_content += delta
+                yield delta
+                
+    except Exception as e:
+        print(f"Error calling AI API: {e}")
+        error_msg = "I'm sorry, I am currently experiencing technical difficulties. Please try again later."
+        yield error_msg
+        full_assistant_content = error_msg
+
+    # 6. Save assistant response to DB
+    assistant_message_id = str(uuid.uuid4())
+    assistant_msg_doc = {
+        "id": assistant_message_id,
+        "session_id": session_id,
+        "role": "assistant",
+        "content": full_assistant_content,
+        "created_at": datetime.now(timezone.utc)
+    }
+    await db["messages"].insert_one(assistant_msg_doc)
 
 async def create_chat_session(user_id: str, title: str = "New Chat"):
     db = get_mongo_db()
@@ -45,63 +122,4 @@ async def get_session_messages(session_id: str):
         m.pop("_id", None)
     return messages
 
-async def send_chat_message(session_id: str, user_id: str, content: str):
-    db = get_mongo_db()
-    now = datetime.now(timezone.utc)
-    
-    # 1. Save user message to DB
-    user_message_id = str(uuid.uuid4())
-    user_msg_doc = {
-        "id": user_message_id,
-        "session_id": session_id,
-        "role": "user",
-        "content": content,
-        "created_at": now
-    }
-    await db["messages"].insert_one(user_msg_doc)
-    
-    # Update session updated_at
-    await db["sessions"].update_one(
-        {"id": session_id},
-        {"$set": {"updated_at": now}}
-    )
 
-    # 2. Retrieve conversation history
-    history = await get_session_messages(session_id)
-    
-    # 3. Format messages for OpenAI
-    openai_messages = [
-        {"role": "system", "content": SYSTEM_PROMPT}
-    ]
-    
-    for msg in history:
-        openai_messages.append({
-            "role": msg["role"],
-            "content": msg["content"]
-        })
-        
-    # 4. Call OpenAI API
-    try:
-        response = await openai_client.chat.completions.create(
-            model=DEFAULT_MODEL,
-            messages=openai_messages,
-            temperature=0.7
-        )
-        assistant_content = response.choices[0].message.content
-    except Exception as e:
-        print(f"Error calling OpenAI API: {e}")
-        assistant_content = "I'm sorry, I am currently experiencing technical difficulties. Please try again later."
-
-    # 5. Save assistant response to DB
-    assistant_message_id = str(uuid.uuid4())
-    assistant_msg_doc = {
-        "id": assistant_message_id,
-        "session_id": session_id,
-        "role": "assistant",
-        "content": assistant_content,
-        "created_at": datetime.now(timezone.utc)
-    }
-    await db["messages"].insert_one(assistant_msg_doc)
-    
-    assistant_msg_doc.pop("_id", None)
-    return assistant_msg_doc
