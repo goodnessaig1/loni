@@ -66,16 +66,20 @@ async def stream_chat_message(session_id: str, user_id: str, content: str):
         
         full_assistant_content = ""
         
+        import json
         async for chunk in response:
             delta = chunk.choices[0].delta.content
             if delta:
                 full_assistant_content += delta
-                yield delta
+                yield f"data: {json.dumps({'content': delta})}\n\n"
+        
+        yield "data: [DONE]\n\n"
                 
     except Exception as e:
+        import json
         print(f"Error calling AI API: {e}")
         error_msg = "I'm sorry, I am currently experiencing technical difficulties. Please try again later."
-        yield error_msg
+        yield f"data: {json.dumps({'content': error_msg})}\n\n"
         full_assistant_content = error_msg
 
     # 6. Save assistant response to DB
@@ -114,12 +118,44 @@ async def get_user_sessions(user_id: str):
         s.pop("_id", None)
     return sessions
 
-async def get_session_messages(session_id: str):
+async def delete_chat_session(session_id: str, user_id: str) -> bool:
     db = get_mongo_db()
-    cursor = db["messages"].find({"session_id": session_id}).sort("created_at", 1)
-    messages = await cursor.to_list(length=1000)
+    result = await db["sessions"].delete_one({"id": session_id, "user_id": user_id})
+    if result.deleted_count > 0:
+        await db["messages"].delete_many({"session_id": session_id})
+        return True
+    return False
+
+async def clear_user_sessions(user_id: str) -> bool:
+    db = get_mongo_db()
+    # Find all sessions to get their IDs
+    cursor = db["sessions"].find({"user_id": user_id})
+    sessions = await cursor.to_list(length=None)
+    session_ids = [s["id"] for s in sessions]
+    
+    if session_ids:
+        await db["messages"].delete_many({"session_id": {"$in": session_ids}})
+        await db["sessions"].delete_many({"user_id": user_id})
+    return True
+
+async def update_chat_session_title(session_id: str, user_id: str, title: str) -> bool:
+    db = get_mongo_db()
+    result = await db["sessions"].update_one(
+        {"id": session_id, "user_id": user_id},
+        {"$set": {"title": title, "updated_at": datetime.now(timezone.utc)}}
+    )
+    return result.modified_count > 0
+
+async def get_session_messages(session_id: str, limit: int = 1000, skip: int = 0):
+    db = get_mongo_db()
+    # Sort by created_at DESC so we can paginate from newest to oldest
+    cursor = db["messages"].find({"session_id": session_id}).sort("created_at", -1).skip(skip).limit(limit)
+    messages = await cursor.to_list(length=limit)
     for m in messages:
         m.pop("_id", None)
+    
+    # Reverse so they are returned in chronological order
+    messages.reverse()
     return messages
 
 

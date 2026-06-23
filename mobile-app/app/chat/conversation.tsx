@@ -1,39 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform, Animated, ActivityIndicator, Modal } from 'react-native';
+import { View, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../../components/HelixaText';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LumaIcon } from '../../components/icons/LumaIcon';
+import { useAIChat } from '../../hooks/useAIChat';
+import Markdown from 'react-native-markdown-display';
 
 // --- Helper Components ---
-
-const TypewriterText = ({ text, onComplete }: { text: string, onComplete?: () => void }) => {
-  const [displayedText, setDisplayedText] = useState('');
-
-  const onCompleteRef = useRef(onComplete);
-
-  useEffect(() => {
-    onCompleteRef.current = onComplete;
-  }, [onComplete]);
-
-  useEffect(() => {
-    let index = 0;
-    const interval = setInterval(() => {
-      setDisplayedText(text.slice(0, index + 1));
-      index++;
-      if (index >= text.length) {
-        clearInterval(interval);
-        onCompleteRef.current?.();
-      }
-    }, 30); // 30ms per character
-
-    return () => clearInterval(interval);
-  }, [text]);
-
-  return <HelixaText className="text-[15px] leading-6 text-black">{displayedText}</HelixaText>;
-};
 
 const TypingIndicator = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -74,84 +50,112 @@ const TypingIndicator = () => {
 
 // --- Main Screen ---
 
-type Message = {
-  id: string;
-  text: string;
-  sender: 'user' | 'luma';
-  isTyping?: boolean;
-  animated?: boolean;
-  pending?: boolean;
-};
-
 export default function ConversationScreen() {
   const router = useRouter();
-  const { optionId } = useLocalSearchParams();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const { optionTitle, existingSessionId } = useLocalSearchParams<{ optionTitle: string, existingSessionId: string }>();
+  const flatListRef = useRef<FlatList>(null);
   
-  const [message, setMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
+  const [inputText, setInputText] = useState('');
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      text: "Hi, I'm Luma. Here to support you through pregnancy, recovery, and more.",
-      sender: 'luma',
+  
+  // Real AI hook with pagination
+  const { 
+    sessionId,
+    messages, 
+    sendMessage, 
+    initializeSession, 
+    fetchMessages,
+    isLoading, 
+    isLoadingMore,
+    hasMore,
+    error, 
+    stopStream 
+  } = useAIChat();
+
+  const hasInitialized = useRef(false);
+
+  // Initialize session automatically
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    const start = async () => {
+      const title = optionTitle || 'Support Chat';
+      const newSessionId = await initializeSession(title, existingSessionId);
+      
+      // If we created a BRAND NEW session with an optionTitle context, trigger the first message
+      if (!existingSessionId && newSessionId && optionTitle) {
+        await sendMessage(`I need some help or information regarding: ${optionTitle}`, newSessionId);
+      }
+    };
+    start();
+    
+    return () => {
+      stopStream();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [optionTitle, existingSessionId]);
+
+  const handleSend = async () => {
+    if (!inputText.trim() || isLoading) return;
+    const textToSend = inputText.trim();
+    setInputText('');
+    
+    // In an inverted list, index 0 is the bottom. Scroll to bottom smoothly.
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    
+    // Send it off to our streaming AI backend
+    await sendMessage(textToSend);
+  };
+
+  const handleLoadMore = () => {
+    if (sessionId && hasMore && !isLoadingMore) {
+      fetchMessages(sessionId, messages.length);
     }
-  ]);
+  };
 
-  const handleSend = () => {
-    if (!message.trim() || isSending) return;
-
-    const userMessageText = message.trim();
-    setMessage('');
-    setIsSending(true);
-
-    const newMsgId = Date.now().toString();
-    setMessages(prev => [...prev, { id: newMsgId, text: userMessageText, sender: 'user', pending: true }]);
-
-    // Scroll to bottom immediately
-    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-
-    // Simulate network delay for sending
-    setTimeout(() => {
-      setMessages(prev => prev.map(m => m.id === newMsgId ? { ...m, pending: false } : m));
-      setIsSending(false);
-      
-      // Add Luma typing indicator
-      setMessages(prev => [...prev, { id: 'typing', text: '', sender: 'luma', isTyping: true }]);
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-      
-      // Simulate Luma "thinking" then responding
-      setTimeout(() => {
-        setMessages(prev => {
-          const filtered = prev.filter(m => m.id !== 'typing');
-          
-          let responseText = "That's completely normal. Let me know if you need any specific guidance or if it gets worse.";
-          
-          // If this is the FIRST response from Luma (meaning total messages before this response is 2: welcome + user), give contextual.
-          // Otherwise, give a generic continuous chat response.
-          if (filtered.length <= 2) {
-            if (optionId === '1') responseText = "Pregnancy brings many changes. How are you feeling today? I can help with information about cramps, diet, or general wellness.";
-            else if (optionId === '2') responseText = "Recovery takes time and patience. Remember to rest and stay hydrated. How can I assist you with your recovery today?";
-            else if (optionId === '3') responseText = "I'm here to listen. It's perfectly okay to feel overwhelmed. Would you like some grounding exercises?";
-            else if (optionId === '4') responseText = "I see you selected Emergency Guidance. If you are experiencing a severe medical emergency, please stop chatting and call emergency services immediately. Otherwise, how can I advise you?";
-          } else {
-            const lumaResponses = [
-              "I understand. Can you tell me a little more about that?",
-              "That makes complete sense. I'm here to support you.",
-              "Thank you for sharing that with me. How long have you been feeling this way?",
-              "It's completely normal to feel that way. Many mothers experience something similar.",
-              "I'm always here to listen. Remember to be gentle with yourself.",
-            ];
-            responseText = lumaResponses[Math.floor(Math.random() * lumaResponses.length)];
-          }
-
-          return [...filtered, { id: Date.now().toString() + 'r', text: responseText, sender: 'luma', animated: true }];
-        });
-        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
-
-      }, 2000);
-    }, 800);
+  const renderMessage = ({ item: msg, index }: { item: any, index: number }) => {
+    if (msg.role === 'user') {
+      return (
+        <View key={msg.id || index} className="flex-row justify-end mb-8">
+          <View className="bg-[#C82A81] rounded-[24px] rounded-br-none px-5 py-4 shadow-sm max-w-[80%] flex-row items-end">
+            <HelixaText className="text-[15px] leading-6 text-white">
+              {msg.content}
+            </HelixaText>
+          </View>
+        </View>
+      );
+    } else {
+      // Assistant Message
+      return (
+        <View key={msg.id || index} className="flex-row items-end mb-8">
+          <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full bg-white items-center justify-center shadow-sm">
+            <LumaIcon size={24} />
+          </View>
+          <View className="bg-white rounded-[24px] rounded-bl-none px-5 py-4 shadow-sm max-w-[80%]">
+            {msg.isStreaming && !msg.content ? (
+              <TypingIndicator />
+            ) : (
+              <Markdown 
+                style={{
+                  body: {
+                    color: 'black',
+                    fontSize: 15,
+                    lineHeight: 24,
+                    fontFamily: 'Inter-Regular',
+                  },
+                  strong: {
+                    fontFamily: 'Inter-Bold',
+                  }
+                }}
+              >
+                {msg.content}
+              </Markdown>
+            )}
+          </View>
+        </View>
+      );
+    }
   };
 
   return (
@@ -176,7 +180,9 @@ export default function ConversationScreen() {
               <Feather name="arrow-left" size={24} color="black" />
             </TouchableOpacity>
             
-            <HelixaText className="text-[20px]" weight="bold">New Chat</HelixaText>
+            <HelixaText className="text-[20px]" weight="bold" numberOfLines={1} style={{ maxWidth: '60%' }}>
+              {optionTitle || 'Loni Support'}
+            </HelixaText>
             
             <TouchableOpacity 
               onPress={() => setIsDropdownVisible(true)}
@@ -186,76 +192,48 @@ export default function ConversationScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Chat Area */}
-          <ScrollView 
-            ref={scrollViewRef}
-            className="flex-1 px-6 pt-6" 
-            contentContainerStyle={{ paddingBottom: 20 }}
-            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-          >
-            {messages.map((msg) => {
-              if (msg.sender === 'user') {
-                return (
-                  <View key={msg.id} className="flex-row justify-end mb-6">
-                    <View className="bg-[#C82A81] rounded-2xl rounded-tr-sm px-5 py-3 shadow-sm max-w-[80%] flex-row items-end">
-                      <HelixaText className="text-[15px] leading-6 text-white mr-2">
-                        {msg.text}
-                      </HelixaText>
-                      {msg.pending && (
-                        <Feather name="clock" size={12} color="rgba(255,255,255,0.7)" style={{ marginBottom: 4 }} />
-                      )}
-                    </View>
-                  </View>
-                );
-              } else {
-                return (
-                  <View key={msg.id} className="flex-row items-start mb-6">
-                    <View className="w-12 h-12 rounded-full bg-white items-center justify-center mr-3 mt-1 shadow-sm">
-                      <LumaIcon size={24} />
-                    </View>
-                    <View className="bg-white rounded-3xl rounded-tl-sm p-4 shadow-sm max-w-[75%]">
-                      {msg.isTyping ? (
-                        <TypingIndicator />
-                      ) : msg.animated ? (
-                        <TypewriterText text={msg.text} onComplete={() => {
-                          // Could trigger scroll to bottom again after typing finishes
-                          scrollViewRef.current?.scrollToEnd({ animated: true });
-                        }} />
-                      ) : (
-                        <HelixaText className="text-[15px] leading-6 text-black">
-                          {msg.text}
-                        </HelixaText>
-                      )}
-                    </View>
-                    {!msg.isTyping && (
-                      <TouchableOpacity className="ml-2 mt-2">
-                        <Feather name="copy" size={16} color="gray" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
-              }
-            })}
-          </ScrollView>
+          {/* Chat Area (Inverted FlatList for standard Chat behavior) */}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            inverted
+            keyExtractor={(item, index) => item.id || index.toString()}
+            renderItem={renderMessage}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 }}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              isLoadingMore ? (
+                <View className="items-center justify-center py-4">
+                  <ActivityIndicator color="#C82A81" size="small" />
+                </View>
+              ) : error ? (
+                <View className="items-center py-4">
+                  <HelixaText className="text-red-500 text-sm mt-2">{error}</HelixaText>
+                </View>
+              ) : null
+            }
+          />
 
           {/* Input Area */}
           <View className="px-6 py-4 pb-8">
             <View className="flex-row items-center bg-black rounded-full pl-6 pr-2 py-2 min-h-[64px]">
               <TextInput
                 className="flex-1 text-white text-[15px] py-3"
-                placeholder="Tell Luma How You Feel..."
+                placeholder="Ask Loni..."
                 placeholderTextColor="rgba(255,255,255,0.6)"
-                value={message}
-                onChangeText={setMessage}
+                value={inputText}
+                onChangeText={setInputText}
                 multiline
                 maxLength={500}
               />
               <TouchableOpacity 
                 className="w-12 h-12 rounded-full bg-white items-center justify-center ml-2"
                 onPress={handleSend}
-                disabled={isSending || !message.trim()}
+                disabled={isLoading || !inputText.trim()}
               >
-                {isSending ? (
+                {isLoading ? (
                   <ActivityIndicator size="small" color="#D62D88" />
                 ) : (
                   <Feather name="send" size={20} color="#D62D88" style={{ marginLeft: -2, marginTop: 2 }} />
@@ -275,37 +253,19 @@ export default function ConversationScreen() {
                 activeOpacity={1}
                 className="absolute top-20 right-6 bg-white rounded-3xl w-72 shadow-lg"
               >
-                <View className="p-4 bg-[#FFF4F7] m-2 rounded-2xl">
-                  <HelixaText className="text-[#1F2937] text-[15px] font-bold">Are these cramps normal?</HelixaText>
-                </View>
-                
-                <View className="px-4 py-2">
-                  <HelixaText className="text-[#1F2937] text-[15px] font-bold mt-2">Recents</HelixaText>
+                <View className="px-4 py-2 mt-4">
+                  <HelixaText className="text-[#1F2937] text-[15px] font-bold mt-2">Options</HelixaText>
                   <View className="h-[1px] bg-gray-100 my-3" />
                   
-                  <TouchableOpacity className="py-3">
-                    <HelixaText className="text-[#374151] text-[15px]">Why do I feel overwhelmed?</HelixaText>
-                  </TouchableOpacity>
-                  <TouchableOpacity className="py-3">
-                    <HelixaText className="text-[#374151] text-[15px]">What should I pack?</HelixaText>
-                  </TouchableOpacity>
-                  <TouchableOpacity className="py-3">
-                    <HelixaText className="text-[#374151] text-[15px]">Is it okay I skipped recovery?</HelixaText>
-                  </TouchableOpacity>
-                  <TouchableOpacity className="py-3">
-                    <HelixaText className="text-[#374151] text-[15px]">Should I worry about baby move...</HelixaText>
-                  </TouchableOpacity>
-                  
-                  <View className="h-[1px] bg-gray-100 my-3" />
                   <TouchableOpacity 
-                    className="py-3 mb-2 flex-row items-center justify-end"
+                    className="py-3 mb-2 flex-row items-center justify-between"
                     onPress={() => {
                       setIsDropdownVisible(false);
                       router.push('/chat/history');
                     }}
                   >
-                    <HelixaText className="text-[#1F2937] text-[16px] mr-1" weight="bold">See All</HelixaText>
-                    <Feather name="chevron-right" size={20} color="#1F2937" />
+                    <HelixaText className="text-[#1F2937] text-[16px] mr-1" weight="bold">View Chat History</HelixaText>
+                    <Feather name="clock" size={20} color="#1F2937" />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
