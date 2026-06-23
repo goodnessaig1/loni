@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: Optional[str] = None
     CLOUDINARY_API_SECRET: Optional[str] = None
     
+    MONGODB_URI: str = "mongodb://localhost:27017"
+
+    OPENAI_API_KEY: str = ""
+    
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.router import api_router
+from app.core import mongo_db
+from motor.motor_asyncio import AsyncIOMotorClient
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -11,6 +13,19 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+import certifi
+
+@app.on_event("startup")
+async def startup_db_client():
+    mongo_db.client = AsyncIOMotorClient(settings.MONGODB_URI, tlsCAFile=certifi.where())
+    mongo_db.db = mongo_db.client["loni_ai_chat"]
+    print("Connected to MongoDB")
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    mongo_db.client.close()
+    print("Closed MongoDB connection")
 
 app.add_middleware(
     CORSMiddleware,
