@@ -1,4 +1,5 @@
 import uuid
+import asyncio
 from datetime import datetime, timezone
 from openai import AsyncOpenAI
 from app.core.config import settings
@@ -7,6 +8,28 @@ from app.modules.ai_chat.prompts import SYSTEM_PROMPT
 
 # Default model configuration
 DEFAULT_MODEL = "gpt-3.5-turbo"
+
+async def generate_and_update_title(session_id: str, user_id: str, content: str, client, model: str):
+    try:
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "Generate a concise title (maximum 4 words) summarizing the user's message. Output ONLY the title text, without quotes, punctuation, or any other formatting."},
+                {"role": "user", "content": content}
+            ],
+            temperature=0.3,
+            max_tokens=15,
+            stream=False
+        )
+        title = response.choices[0].message.content.strip()
+        if title.startswith('"') and title.endswith('"'):
+            title = title[1:-1]
+            
+        if title:
+            await update_chat_session_title(session_id, user_id, title)
+    except Exception as e:
+        print(f"Error generating title: {e}")
+
 
 async def stream_chat_message(session_id: str, user_id: str, content: str):
     db = get_mongo_db()
@@ -31,6 +54,7 @@ async def stream_chat_message(session_id: str, user_id: str, content: str):
 
     # 2. Retrieve conversation history (keep context small: last 20 msgs max)
     history = await get_session_messages(session_id)
+    is_first_message = len(history) == 0
     history = history[-20:]
     
     # 3. Format messages for OpenAI
@@ -60,6 +84,9 @@ async def stream_chat_message(session_id: str, user_id: str, content: str):
             api_key=settings.ABACUS_API_KEY
         )
         model = "deepseek-v4-flash"
+        
+    if is_first_message:
+        asyncio.create_task(generate_and_update_title(session_id, user_id, content, client, model))
         
     # 5. Call AI API with streaming enabled
     try:
