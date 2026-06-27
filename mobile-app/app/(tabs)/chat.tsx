@@ -60,9 +60,10 @@ export default function ChatScreen() {
 
   const handleStartConversation = () => {
     if (selectedOption !== null) {
+      const selected = SUPPORT_OPTIONS.find(o => o.id === selectedOption);
       router.push({
         pathname: '/chat/conversation',
-        params: { optionId: selectedOption }
+        params: { optionId: selectedOption, optionTitle: selected?.title }
       });
     }
   };
