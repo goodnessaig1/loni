@@ -51,9 +51,15 @@ async def stream_chat_message(session_id: str, user_id: str, content: str):
             api_key="ollama"
         )
         model = "qwen3:8b"
-    else:
+    elif settings.AI_ENVIRONMENT == "openai":
         client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         model = DEFAULT_MODEL
+    else:
+        client = AsyncOpenAI(
+            base_url="https://routellm.abacus.ai/v1",
+            api_key=settings.ABACUS_API_KEY
+        )
+        model = "deepseek-v4-flash"
         
     # 5. Call AI API with streaming enabled
     try:

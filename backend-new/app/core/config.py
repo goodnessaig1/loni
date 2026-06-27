@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     MONGODB_URI: str = "mongodb://localhost:27017"
 
     OPENAI_API_KEY: str = ""
+    ABACUS_API_KEY: str = ""
     AI_ENVIRONMENT: str = "production" # "production" or "local"
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
     
