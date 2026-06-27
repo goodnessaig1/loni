@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, ActivityIndicator, Modal, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../../components/HelixaText';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -10,6 +11,71 @@ import { useAIChat } from '../../hooks/useAIChat';
 import Markdown from 'react-native-markdown-display';
 
 // --- Helper Components ---
+
+const PulseView = ({ children, className }: { children: React.ReactNode, className?: string }) => {
+  const opacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.7,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [opacity]);
+
+  return (
+    <Animated.View style={{ opacity }} className={className}>
+      {children}
+    </Animated.View>
+  );
+};
+
+const ChatSkeleton = () => (
+  <View className="flex-1 px-6 pb-4 justify-end">
+    {/* Extra bubbles to fill the screen */}
+    <PulseView className="flex-row items-end mb-8 opacity-50">
+      <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full bg-white/50 shadow-sm" />
+      <View className="bg-white/40 rounded-[24px] rounded-bl-none h-16 w-[65%] shadow-sm" />
+    </PulseView>
+    
+    <PulseView className="flex-row justify-end mb-8 opacity-50">
+      <View className="bg-[#C82A81]/30 rounded-[24px] rounded-br-none h-20 w-[75%] shadow-sm" />
+    </PulseView>
+
+    <PulseView className="flex-row items-end mb-8 opacity-70">
+      <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full bg-white/50 shadow-sm" />
+      <View className="bg-white/40 rounded-[24px] rounded-bl-none h-24 w-[85%] shadow-sm" />
+    </PulseView>
+    
+    <PulseView className="flex-row justify-end mb-8 opacity-80">
+      <View className="bg-[#C82A81]/30 rounded-[24px] rounded-br-none h-12 w-[50%] shadow-sm" />
+    </PulseView>
+
+    {/* Original bottom bubbles */}
+    <PulseView className="flex-row items-end mb-8">
+      <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full bg-white/50 shadow-sm" />
+      <View className="bg-white/40 rounded-[24px] rounded-bl-none h-28 w-[80%] shadow-sm" />
+    </PulseView>
+    
+    <PulseView className="flex-row justify-end mb-8">
+      <View className="bg-[#C82A81]/30 rounded-[24px] rounded-br-none h-16 w-[70%] shadow-sm" />
+    </PulseView>
+
+    <PulseView className="flex-row items-end mb-4">
+      <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full bg-white/50 shadow-sm" />
+      <View className="bg-white/40 rounded-[24px] rounded-bl-none h-20 w-[60%] shadow-sm" />
+    </PulseView>
+  </View>
+);
 
 const TypingIndicator = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
@@ -192,29 +258,34 @@ export default function ConversationScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Chat Area (Inverted FlatList for standard Chat behavior) */}
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            inverted
-            keyExtractor={(item, index) => item.id || index.toString()}
-            renderItem={renderMessage}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 }}
-            onEndReached={handleLoadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              isLoadingMore ? (
-                <View className="items-center justify-center py-4">
-                  <ActivityIndicator color="#C82A81" size="small" />
-                </View>
-              ) : error ? (
-                <View className="items-center py-4">
-                  <HelixaText className="text-red-500 text-sm mt-2">{error}</HelixaText>
-                </View>
-              ) : null
-            }
-          />
+          {/* Chat Area */}
+          {/* {!isLoading  ? ( */}
+          {isLoading && messages.length === 0 ? (
+            <ChatSkeleton />
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              inverted
+              keyExtractor={(item, index) => item.id || index.toString()}
+              renderItem={renderMessage}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 }}
+              onEndReached={handleLoadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={
+                isLoadingMore ? (
+                  <View className="items-center justify-center py-4">
+                    <ActivityIndicator color="#C82A81" size="small" />
+                  </View>
+                ) : error ? (
+                  <View className="items-center py-4">
+                    <HelixaText className="text-red-500 text-sm mt-2">{error}</HelixaText>
+                  </View>
+                ) : null
+              }
+            />
+          )}
 
           {/* Input Area */}
           <View className="px-6 py-4 pb-8">
@@ -230,11 +301,12 @@ export default function ConversationScreen() {
               />
               <TouchableOpacity 
                 className="w-12 h-12 rounded-full bg-white items-center justify-center ml-2"
-                onPress={handleSend}
-                disabled={isLoading || !inputText.trim()}
+                onPress={isLoading ? stopStream : handleSend}
+                disabled={!isLoading && !inputText.trim()}
               >
                 {isLoading ? (
-                  <ActivityIndicator size="small" color="#D62D88" />
+                  <MaterialCommunityIcons name="checkbox-blank" size={20} color="#D62D88" />
+                  // <Feather name="pause" size={20} color="#D62D88" />
                 ) : (
                   <Feather name="send" size={20} color="#D62D88" style={{ marginLeft: -2, marginTop: 2 }} />
                 )}
