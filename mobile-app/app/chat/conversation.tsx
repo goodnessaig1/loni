@@ -224,6 +224,10 @@ export default function ConversationScreen() {
     }
   };
 
+    const handleBackToHome = () => {
+      router.replace('/(tabs)/');
+    };
+
   return (
     <LinearGradient
       colors={['#FFC2E3', '#FFEFF8']}
@@ -240,7 +244,7 @@ export default function ConversationScreen() {
           {/* Header */}
           <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
             <TouchableOpacity 
-              onPress={() => router.back()}
+              onPress={() => handleBackToHome()}
               className="w-12 h-12 rounded-full bg-white items-center justify-center shadow-sm"
             >
               <Feather name="arrow-left" size={24} color="black" />
