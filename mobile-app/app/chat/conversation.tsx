@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, ActivityIndicator, Modal, FlatList } from 'react-native';
+import { View, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, ActivityIndicator, Modal, FlatList, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Feather } from '@expo/vector-icons';
@@ -266,6 +266,32 @@ export default function ConversationScreen() {
           {/* {!isLoading  ? ( */}
           {isLoading && messages.length === 0 ? (
             <ChatSkeleton />
+          ) : messages.length === 0 ? (
+            <View className="flex-1 justify-center items-center px-6 mt-10">
+              <Image 
+                source={require('../../assets/chat-img.png')} 
+                style={{ width: 160, height: 160 }} 
+                resizeMode="contain" 
+              />
+              <HelixaText className="text-[24px] text-center mt-6 mb-12" weight="regular" style={{ lineHeight: 32 }}>
+                Hey there, What are you{'\n'}looking for today?
+              </HelixaText>
+              
+              <View className="flex-row flex-wrap justify-between w-full">
+                {['Pregnancy Support ?', 'Recovery Support ?', 'Emotional Support ?', 'Emergency Guidance ?'].map((option, idx) => (
+                  <TouchableOpacity 
+                    key={idx}
+                    onPress={() => sendMessage(`I need some help or information regarding: ${option}`)}
+                    className="bg-white rounded-[16px] py-4 px-2 mb-3 items-center justify-center shadow-sm"
+                    style={{ width: '48%' }}
+                  >
+                    <HelixaText className="text-[13px] text-center" weight="regular">
+                      {option}
+                    </HelixaText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           ) : (
             <FlatList
               ref={flatListRef}
@@ -296,7 +322,7 @@ export default function ConversationScreen() {
             <View className="flex-row items-center bg-black rounded-full pl-6 pr-2 py-2 min-h-[64px]">
               <TextInput
                 className="flex-1 text-white text-[15px] py-3"
-                placeholder="Ask Loni..."
+                placeholder="Tell Luma How You Feel..."
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 value={inputText}
                 onChangeText={setInputText}

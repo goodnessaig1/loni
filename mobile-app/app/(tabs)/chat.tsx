@@ -31,10 +31,30 @@ const SUPPORT_OPTIONS = [
   },
 ];
 
+import * as SecureStore from 'expo-secure-store';
+import { useFocusEffect } from 'expo-router';
+
 export default function ChatScreen() {
   const router = useRouter();
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
   const bounceValue = useRef(new Animated.Value(0)).current;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let isActive = true;
+      const checkOnboarding = async () => {
+        const hasSeen = await SecureStore.getItemAsync('hasSeenChatIntro');
+        if (hasSeen === 'true') {
+          if (isActive) router.replace('/chat/conversation');
+        } else {
+          if (isActive) setIsChecking(false);
+        }
+      };
+      checkOnboarding();
+      return () => { isActive = false; };
+    }, [])
+  );
 
   useEffect(() => {
     if (selectedOption !== null) {
@@ -58,15 +78,20 @@ export default function ChatScreen() {
     }
   }, [selectedOption, bounceValue]);
 
-  const handleStartConversation = () => {
+  const handleStartConversation = async () => {
     if (selectedOption !== null) {
+      await SecureStore.setItemAsync('hasSeenChatIntro', 'true');
       const selected = SUPPORT_OPTIONS.find(o => o.id === selectedOption);
-      router.push({
+      router.replace({
         pathname: '/chat/conversation',
         params: { optionId: selectedOption, optionTitle: selected?.title }
       });
     }
   };
+
+  if (isChecking) {
+    return <View style={{ flex: 1, backgroundColor: '#D62D88' }} />;
+  }
 
   return (
     <>
