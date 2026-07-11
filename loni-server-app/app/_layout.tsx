@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { EmergencyContactsProvider } from '../context/EmergencyContactsContext';
 import { NotificationProvider } from '../context/NotificationContext';
+import { CallModals } from '../components/CallModals';
 
 import '../global.css';
 
@@ -36,6 +37,7 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
             </Stack>
+            <CallModals />
             <StatusBar style="auto" />
             <Toast />
           </EmergencyContactsProvider>

@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { AuthContext } from './AuthContext';
 import { apiClient } from '../api/client';
+import { useCallStore } from '../store/callStore';
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -21,12 +22,19 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     setupNotificationHandlers();
 
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data;
       console.log('[Push] Notification received in foreground:', notification);
+      if (data && data.type === 'incoming_call') {
+        useCallStore.getState().setIncomingCall(Number(data.call_id), data.caller_name as string, data.room_name as string);
+      }
     });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data;
       console.log('[Push] Notification clicked. Data:', data);
+      if (data && data.type === 'incoming_call') {
+        useCallStore.getState().setIncomingCall(Number(data.call_id), data.caller_name as string, data.room_name as string);
+      }
     });
 
     return () => {

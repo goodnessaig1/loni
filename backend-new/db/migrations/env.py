@@ -17,6 +17,7 @@ from app.core.database import Base
 import app.modules.users.models
 import app.modules.auth.models
 import app.modules.health.models
+import app.modules.calls.models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

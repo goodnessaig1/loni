@@ -1,0 +1,8 @@
+livekit.yourdomain.com {
+    reverse_proxy localhost:7880
+}
+
+turn.yourdomain.com {
+    # If serving anything on HTTPS for Turn, though Coturn handles TLS mostly.
+    # We mainly use Caddy for the livekit API / WebSockets
+}
