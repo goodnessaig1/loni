@@ -23,7 +23,6 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
       const data = notification.request.content.data;
-      console.log('[Push] Notification received in foreground:', notification);
       if (data && data.type === 'incoming_call') {
         useCallStore.getState().setIncomingCall(Number(data.call_id), data.caller_name as string, data.room_name as string);
       }
@@ -31,15 +30,25 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data;
-      console.log('[Push] Notification clicked. Data:', data);
       if (data && data.type === 'incoming_call') {
         useCallStore.getState().setIncomingCall(Number(data.call_id), data.caller_name as string, data.room_name as string);
+      }
+    });
+
+    // Firebase Data Message Foreground Handler
+    const importMessaging = require('@react-native-firebase/messaging').default;
+    const unsubscribeFirebase = importMessaging().onMessage(async (remoteMessage: any) => {
+      console.log('[Firebase] Foreground Message:', remoteMessage);
+      const data = remoteMessage.data;
+      if (data && data.type === 'incoming_call') {
+        useCallStore.getState().setIncomingCall(Number(data.call_id), data.caller_name, data.room_name);
       }
     });
 
     return () => {
       notificationListener.remove();
       responseListener.remove();
+      unsubscribeFirebase();
     };
   }, []);
 

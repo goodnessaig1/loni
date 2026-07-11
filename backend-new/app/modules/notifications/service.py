@@ -19,14 +19,25 @@ class NotificationService:
         # Ensure data values are strings as required by Firebase
         firebase_data = {str(k): str(v) for k, v in data.items()} if data else {}
         
-        message = messaging.MulticastMessage(
-            notification=messaging.Notification(
-                title=title,
-                body=body,
-            ),
-            data=firebase_data,
-            tokens=tokens,
-        )
+        is_incoming_call = firebase_data.get("type") == "incoming_call"
+        
+        if is_incoming_call:
+            message = messaging.MulticastMessage(
+                data=firebase_data,
+                tokens=tokens,
+                android=messaging.AndroidConfig(
+                    priority='high'
+                )
+            )
+        else:
+            message = messaging.MulticastMessage(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
+                data=firebase_data,
+                tokens=tokens,
+            )
         
         try:
             response = messaging.send_each_for_multicast(message)

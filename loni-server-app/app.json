@@ -21,6 +21,18 @@
           "cameraPermission": "Camera is required for video calls",
           "microphonePermission": "Microphone is required for audio calls"
         }
+      ],
+      [
+        "@react-native-firebase/app",
+        {}
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
       ]
     ],
     "orientation": "portrait",
@@ -38,7 +50,10 @@
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "bitcode": false,
-      "bundleIdentifier": "com.loni.server"
+      "bundleIdentifier": "com.loni.server",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio", "voip", "fetch", "remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
