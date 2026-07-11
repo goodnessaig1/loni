@@ -11,8 +11,8 @@ class LiveKitService:
         """
         Generate a short-lived JWT token for a user to join a specific room.
         """
-        api_key = os.getenv('LIVEKIT_API_KEY')
-        api_secret = os.getenv('LIVEKIT_API_SECRET')
+        api_key = os.getenv('LIVEKIT_API_KEY', 'devkey')
+        api_secret = os.getenv('LIVEKIT_API_SECRET', 'secret')
         
         if not api_key or not api_secret:
             raise Exception("LiveKit credentials not configured in environment.")
@@ -40,9 +40,9 @@ class LiveKitService:
         Create a room forcefully if needed, or update its settings.
         Using Livekit API.
         """
-        livekit_url = os.getenv('LIVEKIT_API_URL', 'http://localhost:7880')
-        api_key = os.getenv('LIVEKIT_API_KEY')
-        api_secret = os.getenv('LIVEKIT_API_SECRET')
+        livekit_url = os.getenv('LIVEKIT_URL', 'http://localhost:7880')
+        api_key = os.getenv('LIVEKIT_API_KEY', 'devkey')
+        api_secret = os.getenv('LIVEKIT_API_SECRET', 'secret')
         
         async with api.LiveKitAPI(livekit_url, api_key, api_secret) as lkapi:
             room = await lkapi.room.create_room(
@@ -56,9 +56,9 @@ class LiveKitService:
 
     @staticmethod
     async def delete_room(room_name: str):
-        livekit_url = os.getenv('LIVEKIT_API_URL', 'http://localhost:7880')
-        api_key = os.getenv('LIVEKIT_API_KEY')
-        api_secret = os.getenv('LIVEKIT_API_SECRET')
+        livekit_url = os.getenv('LIVEKIT_URL', 'http://localhost:7880')
+        api_key = os.getenv('LIVEKIT_API_KEY', 'devkey')
+        api_secret = os.getenv('LIVEKIT_API_SECRET', 'secret')
         
         async with api.LiveKitAPI(livekit_url, api_key, api_secret) as lkapi:
             await lkapi.room.delete_room(
