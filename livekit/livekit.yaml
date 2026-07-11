@@ -4,11 +4,12 @@ bind_addresses:
 rtc:
   tcp_port: 7881
   port_range_start: 50000
-  port_range_end: 60000
-  use_external_ip: true
+  port_range_end: 50050
+  use_external_ip: false
+  node_ip: 192.168.100.132
   enable_loopback_candidate: false
 redis:
-  address: "127.0.0.1:6379"
+  address: "redis:6379"
   username: ""
   password: ""
   db: 0
@@ -18,9 +19,9 @@ turn:
   tls_port: 5349
   udp_port: 3478
   external_tls: true
-webhook:
-  api_key: ${LIVEKIT_API_KEY}
-  urls:
-    - ${WEBHOOK_URL}
+# webhook:
+#   api_key: devkey
+#   urls:
+#     - http://192.168.100.132:8000/api/v1/calls/webhook
 keys:
-  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+  devkey: "super_secret_livekit_key_32_chars_long!"

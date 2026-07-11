@@ -1,10 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useCallStore } from '../store/callStore';
 import { apiClient } from '../api/client';
 
@@ -12,41 +11,14 @@ const { width, height } = Dimensions.get('window');
 
 export default function IncomingCallScreen() {
   const router = useRouter();
-  const { call_id, caller_name, room_name } = useLocalSearchParams<{ call_id: string, caller_name: string, room_name: string }>();
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const { call_id, caller_name, room_name, profile_picture } = useLocalSearchParams<{ call_id: string, caller_name: string, room_name: string, profile_picture?: string }>();
   const setCallConnected = useCallStore(state => state.setCallConnected);
-  const clearIncomingCall = useCallStore(state => state.clearIncomingCall);
-
-  useEffect(() => {
-    async function playRingtone() {
-      try {
-        const { sound: newSound } = await Audio.Sound.createAsync(
-          require('../assets/ringtone.mp3'),
-          { isLooping: true }
-        );
-        setSound(newSound);
-        await newSound.playAsync();
-      } catch (e) {
-        console.warn('Could not play ringtone', e);
-      }
-    }
-    playRingtone();
-
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, []);
+  const endCall = useCallStore(state => state.endCall);
 
   const handleAccept = async () => {
-    if (sound) await sound.stopAsync();
-    
     try {
       const res = await apiClient.post(`/calls/${call_id}/join`);
       setCallConnected(res.data.token);
-      clearIncomingCall();
-      // Navigate to the active call screen or back to index which renders CallModals
       router.replace('/'); 
     } catch (e) {
       console.error("Failed to accept call", e);
@@ -55,13 +27,12 @@ export default function IncomingCallScreen() {
   };
 
   const handleDecline = async () => {
-    if (sound) await sound.stopAsync();
     try {
       await apiClient.post(`/calls/${call_id}/end`);
     } catch (e) {
       console.error("Failed to decline call", e);
     }
-    clearIncomingCall();
+    endCall();
     router.replace('/');
   };
 
@@ -71,11 +42,19 @@ export default function IncomingCallScreen() {
       style={styles.container}
     >
       <View style={styles.header}>
-        <Image
-          source={require('../assets/images/default-avatar.png')} // Replace with actual avatar if available
-          style={styles.avatar}
-          contentFit="cover"
-        />
+        <View style={styles.avatarContainer}>
+          {profile_picture ? (
+            <Image
+              source={{ uri: profile_picture }}
+              style={styles.avatar}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={40} color="white" />
+            </View>
+          )}
+        </View>
         <View style={styles.callerInfo}>
           <Text style={styles.callerName}>{caller_name || 'Unknown Caller'}</Text>
           <Text style={styles.statusText}>connecting...</Text>
@@ -114,12 +93,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     gap: 20
   },
-  avatar: {
+  avatarContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
+    overflow: 'hidden',
     borderWidth: 2,
     borderColor: 'white',
+  },
+  avatarPlaceholder: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#fff',
   },
   callerInfo: {

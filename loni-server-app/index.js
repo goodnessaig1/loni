@@ -9,10 +9,11 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
 
   if (remoteMessage.data && remoteMessage.data.type === 'incoming_call') {
     const channelId = await notifee.createChannel({
-      id: 'calls',
+      id: 'calls_v2',
       name: 'Incoming Calls',
       vibration: true,
       importance: AndroidImportance.HIGH,
+      sound: 'default',
     });
 
     await notifee.displayNotification({

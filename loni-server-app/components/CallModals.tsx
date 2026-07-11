@@ -6,8 +6,7 @@ import { LiveKitRoom, useRoomContext, useLocalParticipant } from '@livekit/react
 import { RoomEvent } from 'livekit-client';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { Feather, MaterialIcons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
+import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
@@ -98,40 +97,19 @@ const ActiveCallUI = () => {
   );
 };
 
+import { Audio } from 'expo-av';
+
 export const CallModals = () => {
   const { isIncoming, isActive, callerName, callId, roomToken } = useCallStore();
   const { acceptCall, rejectCall } = useCall();
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-
+  
   useEffect(() => {
-    async function playRingtone() {
-      if (isIncoming && !isActive) {
-        try {
-          const { sound: newSound } = await Audio.Sound.createAsync(
-            require('../assets/ringtone.mp3'),
-            { isLooping: true }
-          );
-          setSound(newSound);
-          await newSound.playAsync();
-        } catch (e) {
-          console.warn('Could not play ringtone', e);
-        }
-      } else {
-        if (sound) {
-          await sound.stopAsync();
-          sound.unloadAsync();
-          setSound(null);
-        }
-      }
+    if (isActive) {
+      Audio.requestPermissionsAsync().catch(console.error);
     }
-    playRingtone();
+  }, [isActive]);
 
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
-  }, [isIncoming, isActive]);
+  // We've removed Audio because Notifee handles the ringing natively!
 
   const handleAccept = () => {
     if (callId) acceptCall(callId);
@@ -149,7 +127,7 @@ export const CallModals = () => {
           <SafeAreaView style={styles.incomingSafeArea}>
             <View style={styles.incomingHeader}>
               <View style={styles.avatarPlaceholder}>
-                <Image source={require('../assets/images/default-avatar.png')} style={styles.avatar} contentFit="cover" />
+                <Ionicons name="person" size={40} color="white" />
               </View>
               <View style={styles.incomingInfo}>
                 <Text style={styles.incomingCallerName}>{callerName || "A Mother"}</Text>

@@ -5,9 +5,12 @@ services:
     image: livekit/livekit-server:latest
     command: --config /etc/livekit.yaml
     restart: unless-stopped
-    # Use host network mode for WebRTC UDP performance in production (Ubuntu)
-    # If running locally on Mac/Windows, you may need to map specific ports instead.
-    network_mode: "host"
+    env_file: .env
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+      - "50000-50050:50000-50050/udp"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml
     depends_on:

@@ -1,6 +1,10 @@
 import os
+from datetime import timedelta
 from livekit import api
 from livekit.api import AccessToken, VideoGrants
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # LIVEKIT_API_KEY and LIVEKIT_API_SECRET should be set in environment variables
 # If not set, LiveKit API uses environment variables automatically, but we can wrap it.
@@ -31,7 +35,7 @@ class LiveKitService:
         token.with_grants(grants)
         
         # Token valid for 1 hour
-        token.with_ttl("1h")
+        token.with_ttl(timedelta(hours=1))
         return token.to_jwt()
 
     @staticmethod
@@ -40,7 +44,7 @@ class LiveKitService:
         Create a room forcefully if needed, or update its settings.
         Using Livekit API.
         """
-        livekit_url = os.getenv('LIVEKIT_URL', 'http://localhost:7880')
+        livekit_url = os.getenv('LIVEKIT_URL', 'http://192.168.100.132:7880')
         api_key = os.getenv('LIVEKIT_API_KEY', 'devkey')
         api_secret = os.getenv('LIVEKIT_API_SECRET', 'secret')
         
@@ -59,7 +63,7 @@ class LiveKitService:
 
     @staticmethod
     async def delete_room(room_name: str):
-        livekit_url = os.getenv('LIVEKIT_URL', 'http://localhost:7880')
+        livekit_url = os.getenv('LIVEKIT_URL', 'http://192.168.100.132:7880')
         api_key = os.getenv('LIVEKIT_API_KEY', 'devkey')
         api_secret = os.getenv('LIVEKIT_API_SECRET', 'secret')
         
@@ -68,5 +72,7 @@ class LiveKitService:
             await lkapi.room.delete_room(
                 api.DeleteRoomRequest(room=room_name)
             )
+        except Exception as e:
+            print(f"Warning: Failed to delete room {room_name}: {e}")
         finally:
             await lkapi.aclose()

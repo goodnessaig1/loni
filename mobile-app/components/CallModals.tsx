@@ -48,9 +48,17 @@ const ActiveCallUI = () => {
   );
 };
 
+import { Audio } from 'expo-av';
+
 export const CallModals = () => {
   const { isOutgoing, isActive, callId, roomToken, endCall } = useCallStore();
   const { hangupCall } = useCall();
+
+  useEffect(() => {
+    if (isActive) {
+      Audio.requestPermissionsAsync().catch(console.error);
+    }
+  }, [isActive]);
 
   // Outgoing Call UI
   if (isOutgoing && !isActive && callId) {
