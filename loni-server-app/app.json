@@ -2,7 +2,7 @@
   "expo": {
     "name": "Loni Server",
     "slug": "loni-server-app",
-    "scheme": "loni",
+    "scheme": "loni-server",
     "version": "1.0.0",
     "web": {
       "favicon": "./assets/favicon.png"

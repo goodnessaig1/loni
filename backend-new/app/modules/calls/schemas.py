@@ -24,7 +24,6 @@ class CallResponse(BaseModel):
     ended_at: Optional[datetime] = None
     duration_seconds: int
     created_at: datetime
-    participants: List[CallParticipantSchema] = []
 
     class Config:
         from_attributes = True

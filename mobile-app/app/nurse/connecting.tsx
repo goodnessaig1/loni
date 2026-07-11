@@ -7,10 +7,20 @@ import { HelixaText } from '../../components/HelixaText';
 import { Feather } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCall } from '../../hooks/useCall';
+import { useCallStore } from '../../store/callStore';
 
 export default function ConnectingNurseScreen() {
   const router = useRouter();
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const { requestCall, hangupCall } = useCall();
+  const { isActive, callId, endCall } = useCallStore();
+
+  useEffect(() => {
+    if (isActive) {
+      router.back(); // Call was accepted, close this screen so CallModals can show
+    }
+  }, [isActive]);
 
   useEffect(() => {
     let soundObject: Audio.Sound | null = null;
@@ -41,13 +51,14 @@ export default function ConnectingNurseScreen() {
     }
     playSound();
 
-    const timeout = setTimeout(() => {
-      router.replace('/nurse/call');
-    }, 20000);
+    requestCall(undefined).catch((e) => {
+      console.error('Failed to request call', e);
+      router.back();
+    });
 
     return () => {
       isMounted = false;
-      clearTimeout(timeout);
+      isMounted = false;
       if (soundObject) {
         soundObject.stopAsync().then(() => soundObject?.unloadAsync());
       }
@@ -55,6 +66,8 @@ export default function ConnectingNurseScreen() {
   }, []);
 
   const handleCancel = () => {
+    if (callId) hangupCall(callId);
+    else endCall();
     router.back();
   };
 

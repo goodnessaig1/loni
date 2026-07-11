@@ -26,6 +26,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       console.log('[Push] Notification received in foreground:', notification);
       if (data && data.type === 'incoming_call') {
         useCallStore.getState().setIncomingCall(Number(data.call_id), data.caller_name as string, data.room_name as string);
+      } else if (data && data.type === 'call_accepted') {
+        apiClient.post(`/calls/${data.call_id}/join`).then(res => {
+          useCallStore.getState().setCallConnected(res.data.token);
+        }).catch(e => console.error("Failed to join accepted call", e));
       }
     });
 
@@ -34,6 +38,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       console.log('[Push] Notification clicked. Data:', data);
       if (data && data.type === 'incoming_call') {
         useCallStore.getState().setIncomingCall(Number(data.call_id), data.caller_name as string, data.room_name as string);
+      } else if (data && data.type === 'call_accepted') {
+        apiClient.post(`/calls/${data.call_id}/join`).then(res => {
+          useCallStore.getState().setCallConnected(res.data.token);
+        }).catch(e => console.error("Failed to join accepted call", e));
       }
     });
 

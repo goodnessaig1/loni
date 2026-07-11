@@ -21,6 +21,14 @@
           "cameraPermission": "Camera is required for video calls",
           "microphonePermission": "Microphone is required for audio calls"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "orientation": "portrait",

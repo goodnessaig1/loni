@@ -113,10 +113,12 @@ class CallService:
         if not call:
             raise HTTPException(status_code=404, detail="Call not found")
 
-        # In a real app, if broadcast to all nurses, one nurse rejecting doesn't end the call
-        # Unless she was the specifically targeted nurse.
-        # Simplified:
-        if call.receiver_id == user_id or not call.receiver_id:
+        # If broadcast to all nurses, one nurse rejecting doesn't end the call
+        if not call.receiver_id:
+            # Ignore rejection so other nurses can still answer
+            return call
+
+        if call.receiver_id == user_id:
             call.status = CallStatusEnum.REJECTED
             call.ended_at = datetime.now(timezone.utc)
             
