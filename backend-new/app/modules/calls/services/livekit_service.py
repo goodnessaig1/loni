@@ -44,7 +44,8 @@ class LiveKitService:
         api_key = os.getenv('LIVEKIT_API_KEY', 'devkey')
         api_secret = os.getenv('LIVEKIT_API_SECRET', 'secret')
         
-        async with api.LiveKitAPI(livekit_url, api_key, api_secret) as lkapi:
+        lkapi = api.LiveKitAPI(livekit_url, api_key, api_secret)
+        try:
             room = await lkapi.room.create_room(
                 api.CreateRoomRequest(
                     name=room_name,
@@ -53,6 +54,8 @@ class LiveKitService:
                 )
             )
             return room
+        finally:
+            await lkapi.aclose()
 
     @staticmethod
     async def delete_room(room_name: str):
@@ -60,7 +63,10 @@ class LiveKitService:
         api_key = os.getenv('LIVEKIT_API_KEY', 'devkey')
         api_secret = os.getenv('LIVEKIT_API_SECRET', 'secret')
         
-        async with api.LiveKitAPI(livekit_url, api_key, api_secret) as lkapi:
+        lkapi = api.LiveKitAPI(livekit_url, api_key, api_secret)
+        try:
             await lkapi.room.delete_room(
                 api.DeleteRoomRequest(room=room_name)
             )
+        finally:
+            await lkapi.aclose()
