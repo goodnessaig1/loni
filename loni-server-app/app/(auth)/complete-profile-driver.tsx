@@ -15,6 +15,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { DatePickerInput } from '../../components/DatePickerInput';
+import { UploadBox } from '../../components/UploadBox';
 
 export default function CompleteProfileDriverScreen() {
   const [fullName, setFullName] = useState('Sarah Chen');
@@ -23,24 +24,6 @@ export default function CompleteProfileDriverScreen() {
   
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [photoName, setPhotoName] = useState<string | null>(null);
-
-  const pickImage = async (
-    setUri: (uri: string) => void, 
-    setName: (name: string) => void, 
-    defaultName: string
-  ) => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setUri(result.assets[0].uri);
-      const filename = result.assets[0].uri.split('/').pop() || defaultName;
-      setName(filename);
-    }
-  };
 
   const handleContinue = () => {
     router.push('/(auth)/complete-profile-vehicle');
@@ -90,26 +73,7 @@ export default function CompleteProfileDriverScreen() {
         />
 
         <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Profile Photo *</HelixaText>
-          <TouchableOpacity 
-            style={styles.uploadBox}
-            onPress={() => pickImage(setPhotoUri, setPhotoName, 'photo.jpg')}
-          >
-            <Feather name='upload-cloud' size={24} color="#000" style={{ marginBottom: 8 }} />
-            <HelixaText style={styles.uploadText}>Tap to upload photo</HelixaText>
-            <View style={styles.plusBox}>
-              <Feather name="plus" size={16} color="#FFF" />
-            </View>
-          </TouchableOpacity>
-          {photoUri && (
-            <View style={styles.uploadedFileRow}>
-              <Feather name="file-text" size={20} color="#D62D88" style={{ marginRight: 12 }} />
-              <View>
-                <HelixaText style={styles.fileName}>{photoName}</HelixaText>
-                <HelixaText style={styles.fileSize}>200 KB</HelixaText>
-              </View>
-            </View>
-          )}
+        <UploadBox label="Profile Photo *" fileUri={photoUri} fileName={photoName} setUri={setPhotoUri} setName={setPhotoName} defaultFileName="photo.jpg" />
         </View>
 
         <View style={styles.buttonWrapper}>

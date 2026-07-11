@@ -14,14 +14,40 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
-import { useVerifyEmail, useResendOtp } from '../../hooks/useAuth';
+import { useVerifyEmail, useResendOtp, useAuth } from '../../hooks/useAuth';
+import { useEffect } from 'react';
 
 export default function VerifyScreen() {
-  const { email, nextRoute } = useLocalSearchParams<{ email?: string, nextRoute?: string }>();
+  const { email, nextRoute, otpType = 'email_verification' } = useLocalSearchParams<{ email?: string, nextRoute?: string, otpType?: string }>();
   const [code, setCode] = useState(['', '', '', '']);
   const { mutateAsync: verifyEmail, isPending: isVerifying } = useVerifyEmail();
   const { mutateAsync: resendOtp } = useResendOtp();
   const inputs = useRef<Array<TextInput | null>>([]);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      if (user.user_type === 'nurse') {
+        if (!user.nurse_profile) {
+          router.replace('/(auth)/complete-profile-nurse');
+        } else if (user.account_status === 'pending') {
+          router.replace('/(auth)/verification-progress');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } else if (user.user_type === 'driver') {
+        if (!user.driver_profile) {
+          router.replace('/(auth)/complete-profile-vehicle');
+        } else if (user.account_status === 'pending') {
+          router.replace('/(auth)/verification-progress');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } else {
+        router.replace('/(auth)/role-selection');
+      }
+    }
+  }, [user]);
 
   const handleCodeChange = (text: string, index: number) => {
     // Only allow numbers
@@ -51,12 +77,17 @@ export default function VerifyScreen() {
 
   const handleVerify = async () => {
     try {
-      // await verifyEmail({
-      //   email,
-      //   otp: code.join(''),
-      //   type: 'email_verification'
-      // });
-      router.push((nextRoute as any) || '/(auth)/role-selection');
+      if (otpType === 'reset_password') {
+        router.push({ pathname: nextRoute || '/', params: { email, otp: code.join('') } } as any);
+        return;
+      }
+
+      await verifyEmail({
+        email,
+        otp: code.join(''),
+        type: 'email_verification'
+      });
+      // Navigation is handled by the useEffect above when user context updates
     } catch (error: any) {
       console.error('Verification failed:', error.response?.data || error.message);
       alert(error.response?.data?.error || 'Verification failed');
@@ -67,7 +98,7 @@ export default function VerifyScreen() {
     try {
       await resendOtp({
         email,
-        type: 'email_verification'
+        type: otpType
       });
       alert('OTP Resent successfully!');
     } catch (error: any) {

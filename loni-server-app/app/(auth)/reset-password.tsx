@@ -16,17 +16,25 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useForgotPassword } from '../../hooks/useAuth';
 
 const ResetSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
 });
 
 export default function ResetPasswordScreen() {
-  const handleReset = (values: any, { setSubmitting }: any) => {
-    setTimeout(() => {
+  const { mutateAsync: forgotPassword } = useForgotPassword();
+
+  const handleReset = async (values: any, { setSubmitting, setFieldError }: any) => {
+    try {
+      await forgotPassword({ email: values.email });
+      router.push({ pathname: '/(auth)/verify', params: { email: values.email, nextRoute: '/(auth)/create-password', otpType: 'reset_password' } } as any);
+    } catch (error: any) {
+      console.error('Forgot password failed:', error.response?.data || error.message);
+      setFieldError('email', error.response?.data?.error || 'Failed to send reset code');
+    } finally {
       setSubmitting(false);
-      router.push({ pathname: '/(auth)/verify', params: { email: values.email, nextRoute: '/(auth)/create-password' } } as any);
-    }, 1500);
+    }
   };
 
   return (

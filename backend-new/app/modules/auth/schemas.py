@@ -13,6 +13,7 @@ class GenderEnum(str, Enum):
 
 class UserTypeEnum(str, Enum):
     nurse = "nurse"
+    driver = "driver"
     user = "user"
     rider = "rider"
     admin = "admin"
@@ -26,7 +27,8 @@ class RegisterRequest(BaseModel):
     name: str = Field(..., min_length=1)
     email: EmailStr
     password: str = Field(..., min_length=8)
-    status: StatusEnum
+    phone: Optional[str] = None
+    status: Optional[StatusEnum] = None
     trimester: Optional[str] = None
     pregnancyWeek: Optional[str] = None
     babyAge: Optional[str] = None

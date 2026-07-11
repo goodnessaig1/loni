@@ -16,7 +16,8 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
-import { useLogin } from '../../hooks/useAuth';
+import { useLogin, useAuth } from '../../hooks/useAuth';
+import { useEffect } from 'react';
 
 const LoginSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -26,6 +27,31 @@ const LoginSchema = Yup.object().shape({
 export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const { mutateAsync: loginUser } = useLogin();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      if (user.user_type === 'nurse') {
+        if (!user.nurse_profile) {
+          router.replace('/(auth)/complete-profile-nurse');
+        } else if (user.account_status === 'pending') {
+          router.replace('/(auth)/verification-progress');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } else if (user.user_type === 'driver') {
+        if (!user.driver_profile) {
+          router.replace('/(auth)/complete-profile-vehicle');
+        } else if (user.account_status === 'pending') {
+          router.replace('/(auth)/verification-progress');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } else {
+        router.replace('/(auth)/role-selection');
+      }
+    }
+  }, [user]);
 
   const handleLogin = async (values: any, { setSubmitting, setFieldError }: any) => {
     try {
@@ -33,10 +59,10 @@ export default function LoginScreen() {
         email: values.email,
         password: values.password,
       });
-      router.replace('/(tabs)');
+      // Navigation is now handled by the useEffect above
     } catch (error: any) {
       console.error('Login failed:', error.response?.data || error.message);
-      setFieldError('email', error.response?.data?.error || 'Login failed');
+      setFieldError('email', error.response?.data?.message || error.response?.data?.error || 'Login failed');
     } finally {
       setSubmitting(false);
     }

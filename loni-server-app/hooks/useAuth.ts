@@ -22,7 +22,7 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: async (data: any) => {
       const res = await apiClient.post('/auth/login', data);
-      await loginUser(res.data.data.token, res.data.data.user);
+      await loginUser(res.data.data.token, null);
       // Fetch user details via auth/me
       await refreshUser();
       return res.data;
@@ -120,6 +120,49 @@ export const useChangePassword = () => {
   return useMutation({
     mutationFn: async (data: any) => {
       const res = await apiClient.put('/users/me/password', data);
+      return res.data;
+    }
+  });
+};
+
+export const useUploadDocument = () => {
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await apiClient.post('/users/upload-document', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return res.data;
+    }
+  });
+};
+
+export const useCompleteNurseProfile = () => {
+  const { refreshUser } = useAuth();
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await apiClient.post('/users/profile/nurse', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      await refreshUser();
+      return res.data;
+    }
+  });
+};
+
+export const useCompleteDriverProfile = () => {
+  const { refreshUser } = useAuth();
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await apiClient.post('/users/profile/driver', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      await refreshUser();
       return res.data;
     }
   });

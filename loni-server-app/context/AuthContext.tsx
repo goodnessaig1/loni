@@ -16,12 +16,16 @@ export type User = {
   referralCode: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
+  user_type?: 'user' | 'nurse' | 'driver' | 'rider' | 'partner' | 'admin';
+  account_status?: 'pending' | 'active' | 'suspended';
+  nurse_profile?: any;
+  driver_profile?: any;
 };
 
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  loginUser: (token: string, user: User) => Promise<void>;
+  loginUser: (token: string, user?: User | null) => Promise<void>;
   logoutUser: () => Promise<void>;
   refreshUser: () => Promise<void>;
 };
@@ -57,9 +61,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     loadUser();
   }, []);
 
-  const loginUser = async (token: string, userData: User) => {
+  const loginUser = async (token: string, userData: User | null = null) => {
     await SecureStore.setItemAsync('userToken', token);
-    setUser(userData);
+    if (userData) {
+      setUser(userData);
+    }
   };
 
   const logoutUser = async () => {

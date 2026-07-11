@@ -16,6 +16,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { DatePickerInput } from '../../components/DatePickerInput';
 import { SelectModal } from '../../components/SelectModal';
+import { UploadBox } from '../../components/UploadBox';
 
 const VEHICLE_TYPES = ['Sedan', 'SUV', 'Hatchback', 'Minivan', 'Pickup'];
 
@@ -75,62 +76,31 @@ export default function CompleteProfileVehicleScreen() {
     vinUri !== null && 
     interiorUri !== null;
 
-  const pickImage = async (
-    setUri: (uri: string) => void, 
-    setName: (name: string) => void, 
-    defaultName: string
-  ) => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setUri(result.assets[0].uri);
-      const filename = result.assets[0].uri.split('/').pop() || defaultName;
-      setName(filename);
-    }
-  };
-
   const handleContinue = () => {
+    const vehicleData = {
+      vehicleType,
+      hasAC,
+      brand,
+      year,
+      model,
+      plate,
+      color: color === 'Other' ? customColor : color,
+      frontUri,
+      frontName,
+      backUri,
+      backName,
+      vinUri,
+      vinName,
+      interiorUri,
+      interiorName,
+    };
+    
     // Navigate to document upload step
-    router.push('/(auth)/complete-profile-documents');
+    router.push({
+      pathname: '/(auth)/complete-profile-documents',
+      params: { vehicleData: JSON.stringify(vehicleData) }
+    });
   };
-
-  const renderUploadBox = (
-    label: string, 
-    uri: string | null, 
-    name: string | null, 
-    setUri: (uri: string) => void, 
-    setName: (name: string) => void,
-    defaultFilename: string
-  ) => (
-    <View style={styles.formGroup}>
-      <HelixaText style={styles.label}>{label}</HelixaText>
-      <TouchableOpacity 
-        style={styles.uploadBox}
-        onPress={() => pickImage(setUri, setName, defaultFilename)}
-      >
-                <Feather name="upload-cloud" size={24} color="#000000" style={{ marginBottom: 8 }} />
-        
-        {/* <Feather name="cloud-upload" size={24} color="#000" style={{ marginBottom: 8 }} /> */}
-        <HelixaText style={styles.uploadText}>Tap to upload photo</HelixaText>
-        <View style={styles.plusBox}>
-          <Feather name="plus" size={16} color="#FFF" />
-        </View>
-      </TouchableOpacity>
-      {uri && (
-        <View style={styles.uploadedFileRow}>
-          <Feather name="file-text" size={20} color="#D62D88" style={{ marginRight: 12 }} />
-          <View>
-            <HelixaText style={styles.fileName}>{name}</HelixaText>
-            <HelixaText style={styles.fileSize}>200 KB</HelixaText>
-          </View>
-        </View>
-      )}
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -268,10 +238,10 @@ export default function CompleteProfileVehicleScreen() {
           </View>
         )}
 
-        {renderUploadBox('Vehicle Front View', frontUri, frontName, setFrontUri, setFrontName, 'front_view.jpg')}
-        {renderUploadBox('Vehicle Back View', backUri, backName, setBackUri, setBackName, 'back_view.jpg')}
-        {renderUploadBox('Vehicle VIN', vinUri, vinName, setVinUri, setVinName, 'vin.jpg')}
-        {renderUploadBox('Vehicle Interior', interiorUri, interiorName, setInteriorUri, setInteriorName, 'interior.jpg')}
+        <UploadBox label="Vehicle Front View" fileUri={frontUri} fileName={frontName} setUri={setFrontUri} setName={setFrontName} defaultFileName="front_view.jpg" />
+        <UploadBox label="Vehicle Back View" fileUri={backUri} fileName={backName} setUri={setBackUri} setName={setBackName} defaultFileName="back_view.jpg" />
+        <UploadBox label="Vehicle VIN" fileUri={vinUri} fileName={vinName} setUri={setVinUri} setName={setVinName} defaultFileName="vin.jpg" />
+        <UploadBox label="Vehicle Interior" fileUri={interiorUri} fileName={interiorName} setUri={setInteriorUri} setName={setInteriorName} defaultFileName="interior.jpg" />
 
         <View style={styles.buttonWrapper}>
           <Button 

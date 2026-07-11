@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy import delete
 from app.modules.users.models import User
 from app.modules.auth.models import Otp
@@ -13,7 +14,8 @@ from datetime import datetime, timedelta, timezone
 import random
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> dict:
-    result = await db.execute(select(User).where(User.email == email))
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -21,7 +23,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> dict
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     token = create_access_token(subject=user.id)
-    return {"token": token, "user": enrich_user_data(user)}
+    return {"token": token}
 
 async def register_new_user(db: AsyncSession, data: RegisterRequest) -> dict:
     result = await db.execute(select(User).where(User.email == data.email))
@@ -29,11 +31,13 @@ async def register_new_user(db: AsyncSession, data: RegisterRequest) -> dict:
     if existing_user:
         raise HTTPException(status_code=400, detail="User with this email already exists")
     
-    start_date = calculate_pregnancy_start_date(
-        status=data.status.value,
-        pregnancy_week=data.pregnancyWeek,
-        baby_age=data.babyAge
-    )
+    start_date = None
+    if data.status:
+        start_date = calculate_pregnancy_start_date(
+            status=data.status.value,
+            pregnancy_week=data.pregnancyWeek,
+            baby_age=data.babyAge
+        )
 
     new_user = User(
         id=generate_id(),
@@ -45,9 +49,9 @@ async def register_new_user(db: AsyncSession, data: RegisterRequest) -> dict:
         pregnancy_week=data.pregnancyWeek,
         pregnancy_start_date=start_date,
         baby_age=data.babyAge,
-        phone=None,
+        phone=data.phone,
         gender=data.gender,
-        user_type=data.userType,
+        user_type=data.userType or "user",
         referral_code=generate_id(8),
         referred_by=data.referredBy
     )

@@ -17,6 +17,9 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { UploadBox } from '../../components/UploadBox';
+
+import { useUploadDocument, useCompleteNurseProfile } from '../../hooks/useAuth';
 
 type Gender = 'Female' | 'Male' | null;
 
@@ -31,9 +34,46 @@ export default function CompleteProfileNurseScreen() {
   const [licenseName, setLicenseName] = useState<string>('license.pdf');
   const [idUri, setIdUri] = useState<string | null>(null);
   const [idName, setIdName] = useState<string>('id.pdf');
+  
+  const { mutateAsync: completeProfile, isPending } = useCompleteNurseProfile();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleContinue = () => {
-    router.push('/(auth)/review-profile-nurse'); 
+  const handleContinue = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('years_of_experience', yearsExperience);
+      formData.append('hospital_affiliation', '');
+      formData.append('gender', gender!);
+      formData.append('licenseNumber', licenseNumber);
+
+      formData.append('photo', {
+        uri: photoUri,
+        name: photoName,
+        type: 'image/jpeg',
+      } as any);
+
+      formData.append('license', {
+        uri: licenseUri,
+        name: licenseName,
+        type: 'image/jpeg',
+      } as any);
+
+      formData.append('id', {
+        uri: idUri,
+        name: idName,
+        type: 'image/jpeg',
+      } as any);
+      
+      await completeProfile(formData);
+      
+      router.push('/(auth)/review-profile-nurse'); 
+    } catch (error) {
+      console.error('Failed to complete profile', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const isFormValid = 
@@ -43,49 +83,6 @@ export default function CompleteProfileNurseScreen() {
     photoUri !== null && 
     licenseUri !== null && 
     idUri !== null;
-
-  const pickImage = async (setUri: (uri: string) => void, setName: (name: string) => void) => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const uri = result.assets[0].uri;
-      setUri(uri);
-      const uriParts = uri.split('/');
-      setName(uriParts[uriParts.length - 1] || 'uploaded_file.jpg');
-    }
-  };
-
-  const renderUploadBox = (title: string, fileUri: string | null, fileName: string, setUri: (uri: string) => void, setName: (name: string) => void) => (
-    <View style={styles.uploadSection}>
-      <HelixaText style={styles.inputLabel} weight="bold">{title}</HelixaText>
-      
-      <TouchableOpacity 
-        style={styles.uploadBox}
-        onPress={() => pickImage(setUri, setName)}
-        activeOpacity={0.7}
-      >
-        <Feather name="upload-cloud" size={24} color="#000000" style={styles.uploadIcon} />
-        <HelixaText style={styles.uploadText}>Tap to upload photo</HelixaText>
-        <View style={styles.uploadPlusButton}>
-          <Feather name="plus" size={16} color="#FFFFFF" />
-        </View>
-      </TouchableOpacity>
-
-      {fileUri && (
-        <View style={styles.uploadedFileBox}>
-          <Feather name="file-text" size={20} color="#D62D88" style={{ marginRight: 12 }} />
-          <View>
-            <HelixaText style={styles.uploadedFileName} weight="bold">{fileName}</HelixaText>
-            <HelixaText style={styles.uploadedFileSize}>200 KB</HelixaText>
-          </View>
-        </View>
-      )}
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -156,9 +153,9 @@ export default function CompleteProfileNurseScreen() {
           </View>
 
           {/* Uploads */}
-          {renderUploadBox('Profile Photo *', photoUri, photoName, setPhotoUri, setPhotoName)}
-          {renderUploadBox('Nursing License *', licenseUri, licenseName, setLicenseUri, setLicenseName)}
-          {renderUploadBox('Government ID *', idUri, idName, setIdUri, setIdName)}
+          <UploadBox label="Profile Photo *" fileUri={photoUri} fileName={photoName} setUri={setPhotoUri} setName={setPhotoName} />
+          <UploadBox label="Nursing License *" fileUri={licenseUri} fileName={licenseName} setUri={setLicenseUri} setName={setLicenseName} />
+          <UploadBox label="Government ID *" fileUri={idUri} fileName={idName} setUri={setIdUri} setName={setIdName} />
 
           <HelixaText style={styles.footerNote}>
             Documents must be clear, unexpired, and show your full name matching your profile. Verification typically takes 24-48 hours.
@@ -167,7 +164,8 @@ export default function CompleteProfileNurseScreen() {
           <Button 
             title="Continue"
             onPress={handleContinue}
-            disabled={!isFormValid}
+            disabled={!isFormValid || isSubmitting || isPending}
+            isLoading={isSubmitting || isPending}
             style={{ marginTop: 24 }}
           />
 

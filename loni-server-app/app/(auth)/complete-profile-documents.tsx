@@ -6,15 +6,20 @@ import {
   ScrollView,
   TouchableOpacity
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { UploadBox } from '../../components/UploadBox';
+import { useUploadDocument, useCompleteDriverProfile } from '../../hooks/useAuth';
 
 export default function CompleteProfileDocumentsScreen() {
+  const { vehicleData } = useLocalSearchParams();
+  const parsedVehicleData = vehicleData ? JSON.parse(vehicleData as string) : {};
+
   // Upload states
   const [licenseUri, setLicenseUri] = useState<string | null>(null);
   const [licenseName, setLicenseName] = useState<string | null>(null);
@@ -23,62 +28,48 @@ export default function CompleteProfileDocumentsScreen() {
   const [papersUri, setPapersUri] = useState<string | null>(null);
   const [papersName, setPapersName] = useState<string | null>(null);
 
+  const { mutateAsync: completeProfile, isPending } = useCompleteDriverProfile();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const isFormValid = licenseUri !== null && idUri !== null && papersUri !== null;
 
-  const pickImage = async (
-    setUri: (uri: string) => void, 
-    setName: (name: string) => void, 
-    defaultName: string
-  ) => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('vehicle_type', parsedVehicleData.vehicleType);
+      formData.append('has_ac', parsedVehicleData.hasAC === 'Yes' ? 'true' : 'false');
+      formData.append('vehicle_brand', parsedVehicleData.brand);
+      formData.append('vehicle_year', parsedVehicleData.year);
+      formData.append('vehicle_model', parsedVehicleData.model);
+      formData.append('plate_number', parsedVehicleData.plate);
+      formData.append('vehicle_color', parsedVehicleData.color);
+      formData.append('licenseNumber', ''); // The driver form didn't collect licenseNumber, leaving empty string to satisfy backend
 
-    if (!result.canceled) {
-      setUri(result.assets[0].uri);
-      const filename = result.assets[0].uri.split('/').pop() || defaultName;
-      setName(filename);
+      const appendFile = (key: string, uri: string | null, name: string | null) => {
+        if (uri && name) {
+          formData.append(key, { uri, name, type: 'image/jpeg' } as any);
+        }
+      };
+
+      appendFile('front_view', parsedVehicleData.frontUri, parsedVehicleData.frontName);
+      appendFile('back_view', parsedVehicleData.backUri, parsedVehicleData.backName);
+      appendFile('vin', parsedVehicleData.vinUri, parsedVehicleData.vinName);
+      appendFile('interior', parsedVehicleData.interiorUri, parsedVehicleData.interiorName);
+      appendFile('driver_license', licenseUri, licenseName);
+      appendFile('government_id', idUri, idName);
+      appendFile('vehicle_papers', papersUri, papersName);
+      
+      await completeProfile(formData);
+
+      router.push('/(auth)/verification-progress');
+    } catch (error) {
+      console.error('Failed to complete driver profile', error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
-
-  const handleSubmit = () => {
-    // Final step, submit and go to verification progress
-    router.push('/(auth)/verification-progress');
-  };
-
-  const renderUploadBox = (
-    label: string, 
-    uri: string | null, 
-    name: string | null, 
-    setUri: (uri: string) => void, 
-    setName: (name: string) => void,
-    defaultFilename: string
-  ) => (
-    <View style={styles.formGroup}>
-      <HelixaText style={styles.label}>{label}</HelixaText>
-      <TouchableOpacity 
-        style={styles.uploadBox}
-        onPress={() => pickImage(setUri, setName, defaultFilename)}
-      >
-        <Feather name="upload-cloud" size={24} color="#000" style={{ marginBottom: 8 }} />
-        <HelixaText style={styles.uploadText}>Tap to upload photo</HelixaText>
-        <View style={styles.plusBox}>
-          <Feather name="plus" size={16} color="#FFF" />
-        </View>
-      </TouchableOpacity>
-      {uri && (
-        <View style={styles.uploadedFileRow}>
-          <Feather name="file-text" size={20} color="#D62D88" style={{ marginRight: 12 }} />
-          <View>
-            <HelixaText style={styles.fileName}>{name}</HelixaText>
-            <HelixaText style={styles.fileSize}>200 KB</HelixaText>
-          </View>
-        </View>
-      )}
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -93,15 +84,16 @@ export default function CompleteProfileDocumentsScreen() {
         <CalText style={styles.heading}>Complete Your Profile</CalText>
         <HelixaText style={styles.subtext}>Document Upload</HelixaText>
 
-        {renderUploadBox("Driver's License", licenseUri, licenseName, setLicenseUri, setLicenseName, 'license.jpg')}
-        {renderUploadBox("Government ID", idUri, idName, setIdUri, setIdName, 'gov_id.jpg')}
-        {renderUploadBox("Vehicle Papers", papersUri, papersName, setPapersUri, setPapersName, 'vehicle_papers.jpg')}
+        <UploadBox label="Driver's License" fileUri={licenseUri} fileName={licenseName} setUri={setLicenseUri} setName={setLicenseName} defaultFileName="license.jpg" />
+        <UploadBox label="Government ID" fileUri={idUri} fileName={idName} setUri={setIdUri} setName={setIdName} defaultFileName="gov_id.jpg" />
+        <UploadBox label="Vehicle Papers" fileUri={papersUri} fileName={papersName} setUri={setPapersUri} setName={setPapersName} defaultFileName="vehicle_papers.jpg" />
 
         <View style={styles.buttonWrapper}>
           <Button 
             title="Submit for Review"
             onPress={handleSubmit}
-            disabled={!isFormValid}
+            disabled={!isFormValid || isSubmitting || isPending}
+            isLoading={isSubmitting || isPending}
           />
         </View>
 

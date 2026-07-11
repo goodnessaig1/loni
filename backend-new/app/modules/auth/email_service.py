@@ -479,3 +479,79 @@ def _send_partner_removal_partner_email_sync(to_email: str, inviter_name: str):
 
 async def send_partner_removal_partner_email(to_email: str, inviter_name: str):
     await asyncio.to_thread(_send_partner_removal_partner_email_sync, to_email, inviter_name)
+
+def _send_account_approved_email_sync(to_email: str, name: str, user_type: str):
+    html_content = f"""
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {{ font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f9fafb; }}
+            .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; }}
+            .header {{ text-align: center; padding: 30px 0 10px; }}
+            .header img {{ max-height: 50px; }}
+            .content {{ padding: 20px 30px 40px; text-align: center; color: #333333; line-height: 1.6; }}
+            .footer {{ background-color: #D62D88; padding: 25px; text-align: center; color: #ffffff; font-size: 14px; }}
+            .footer p {{ margin: 0; opacity: 0.9; }}
+            .title {{ font-size: 24px; color: #111827; margin-bottom: 20px; }}
+            .highlight {{ color: #D62D88; font-weight: bold; }}
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <img src="https://ik.imagekit.io/eqh0cjetc/amazon-image/Group%2013%201.png" alt="Loni Logo" />
+            </div>
+            <div class="content">
+              <div class="title">Congratulations, {name}! 🎉</div>
+              <p>Your account has been officially <span class="highlight">approved</span>.</p>
+              <p>We are thrilled to welcome you to Loni as a registered {user_type}. Your skills and dedication will play a vital role in our mission to support mothers through every urgent moment.</p>
+              <p>You can now log into your account and start receiving requests. Thank you for joining our community!</p>
+            </div>
+            <div class="footer">
+              <p>&copy; {datetime.now().year} Loni. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    """
+    
+    payload = {
+        "sender": {"name": "Loni App", "email": settings.BREVO_SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "subject": "Congratulations! Your Loni Account is Approved 🎉",
+        "htmlContent": html_content
+    }
+
+    if not settings.BREVO_API_KEY:
+        print("BREVO_API_KEY is not set. Skipping actual email send.")
+        return
+
+    data = json.dumps(payload).encode('utf-8')
+    req = urllib.request.Request(
+        'https://api.brevo.com/v3/smtp/email',
+        data=data,
+        headers={
+            'api-key': settings.BREVO_API_KEY,
+            'Content-Type': 'application/json'
+        },
+        method='POST'
+    )
+    import ssl
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(cafile=certifi.where())
+    except ImportError:
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    try:
+        with urllib.request.urlopen(req, context=ctx) as response:
+            response.read()
+        print(f"Approval email sent to {to_email}")
+    except urllib.error.URLError as e:
+        print(f"Error sending email: {e}")
+
+async def send_account_approved_email(to_email: str, name: str, user_type: str):
+    await asyncio.to_thread(_send_account_approved_email_sync, to_email, name, user_type)
+

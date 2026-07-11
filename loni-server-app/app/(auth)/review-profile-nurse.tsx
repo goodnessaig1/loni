@@ -12,8 +12,11 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function ReviewProfileNurseScreen() {
+  const { user } = useAuth();
+  
   const handleSubmit = () => {
     router.push('/(auth)/verification-progress');
   };
@@ -34,6 +37,10 @@ export default function ReviewProfileNurseScreen() {
     </View>
   );
 
+  const profilePhoto = user?.nurse_profile?.verification_documents?.photo || user?.profile_picture || 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80';
+  const licenseNumber = user?.nurse_profile?.verification_documents?.licenseNumber || 'N/A';
+  const experience = user?.nurse_profile?.years_of_experience ? `${user.nurse_profile.years_of_experience} years` : 'N/A';
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -46,21 +53,21 @@ export default function ReviewProfileNurseScreen() {
 
         <View style={styles.profileHeader}>
           <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80' }} // Placeholder nurse image
+            source={{ uri: profilePhoto }}
             style={styles.profileImage}
           />
           <View style={styles.profileInfo}>
-            <HelixaText style={styles.profileName} weight="bold">Sarah Chen</HelixaText>
+            <HelixaText style={styles.profileName} weight="bold">{user?.name || 'Sarah Chen'}</HelixaText>
             <HelixaText style={styles.profileRole}>Nurse</HelixaText>
           </View>
         </View>
 
         <View style={styles.infoContainer}>
-          <InfoRow value="Female" label="Gender" />
-          <InfoRow label="Phone" value="+1 (555) 234 - 5678" valueFirst={false} />
-          <InfoRow label="Email" value="Sarahchen@example.com" valueFirst={false} />
-          <InfoRow label="License No." value="RN-2024-08742" valueFirst={false} />
-          <InfoRow label="Experience" value="3 years" valueFirst={false} />
+          <InfoRow value={user?.gender || "Female"} label="Gender" />
+          <InfoRow label="Phone" value={user?.phone || "+1 (555) 234 - 5678"} valueFirst={false} />
+          <InfoRow label="Email" value={user?.email || "Sarahchen@example.com"} valueFirst={false} />
+          <InfoRow label="License No." value={licenseNumber} valueFirst={false} />
+          <InfoRow label="Experience" value={experience} valueFirst={false} />
         </View>
 
         <HelixaText style={styles.footerNote}>

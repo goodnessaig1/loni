@@ -6,14 +6,16 @@ class UserResponse(BaseModel):
     id: str
     name: str
     email: EmailStr
-    status: str
-    phone: Optional[str]
+    status: Optional[str] = None
+    account_status: str
+    phone: Optional[str] = None
     gender: str
     user_type: str
     is_email_verified: bool
     is_phone_verified: bool
-    profile_picture: Optional[str]
-    referral_code: str
+    profile_picture: Optional[str] = None
+    referral_code: Optional[str] = None
+    is_online: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -27,3 +29,33 @@ class UpdateContactPermissions(BaseModel):
 class ChangePasswordRequest(BaseModel):
     old_password: str
     new_password: str
+
+class NurseProfileRequest(BaseModel):
+    years_of_experience: Optional[int] = None
+    hospital_affiliation: Optional[str] = None
+    gender: Optional[str] = None
+    verification_documents: Optional[dict] = None
+
+class DriverProfileRequest(BaseModel):
+    vehicle_type: Optional[str] = None
+    has_ac: Optional[bool] = None
+    vehicle_brand: Optional[str] = None
+    vehicle_year: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    plate_number: Optional[str] = None
+    vehicle_color: Optional[str] = None
+    verification_documents: Optional[dict] = None
+
+class ToggleOnlineRequest(BaseModel):
+    is_online: bool
+
+class UpdateUserProfileRequest(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    gender: Optional[str] = None
+
+class UpdateNurseProfileRequest(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    hospital_affiliation: Optional[str] = None
+    years_of_experience: Optional[int] = None

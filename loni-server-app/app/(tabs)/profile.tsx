@@ -1,185 +1,153 @@
-import React, { useState } from 'react';
-import { ScrollView, View, StyleSheet, Dimensions } from 'react-native';
+import React from 'react';
+import {
+  View,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Dimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
-import * as ImagePicker from 'expo-image-picker';
-import Toast from 'react-native-toast-message';
-import { useAuth, useUploadProfilePicture } from '../../hooks/useAuth';
-import { ProfileHeader } from '../../components/profile/ProfileHeader';
-import { SupportPartnersCard } from '../../components/profile/SupportPartnersCard';
-import { ProfileSection } from '../../components/profile/ProfileSection';
-import { ProfileMenuItem } from '../../components/profile/ProfileMenuItem';
-import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
-import { ActionModal } from '../../components/ActionModal';
-import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
-
-const { width } = Dimensions.get('window');
+import { useAuth } from '../../hooks/useAuth';
 
 export default function ProfileScreen() {
   const { user, logoutUser } = useAuth();
-  const uploadMutation = useUploadProfilePicture();
   const router = useRouter();
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [isCancelSubVisible, setIsCancelSubVisible] = useState(false);
-  const [cancelStep, setCancelStep] = useState<1 | 2>(1);
-  const [isCanceling, setIsCanceling] = useState(false);
 
-  const firstName = user?.name ? user.name.split(' ')[0] : 'User';
-  let statusText = '';
-  if (user?.status === 'pregnant') {
-    statusText = user.trimester ? user.trimester : 'Pregnant';
-  } else if (user?.status === 'newMom') {
-    statusText = user.babyAge ? `Baby is ${user.babyAge} old` : 'New Mom';
-  }
+  const nurseProfile = (user as any)?.nurse_profile;
+  const firstName = user?.name ? user.name.split(' ')[0] : 'Nurse';
+  const licenseNumber = nurseProfile?.verification_documents?.licenseNumber ?? '—';
+  const yearsExp = nurseProfile?.years_of_experience ?? 0;
 
-  const handleLogout = async () => {
-    await logoutUser();
-    router.replace('/(auth)/login');
-  };
-
-  const handlePickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-
-        const formData = new FormData() as any;
-        formData.append('image', {
-          uri: asset.uri,
-          name: asset.fileName || 'profile.jpg',
-          type: asset.mimeType || 'image/jpeg'
-        });
-
-        uploadMutation.mutate(formData, {
-          onSuccess: () => {
-            Toast.show({
-              type: 'success',
-              text1: 'Success',
-              text2: 'Profile picture updated successfully!',
-            });
-          },
-          onError: () => {
-            Toast.show({
-              type: 'error',
-              text1: 'Error',
-              text2: 'Failed to upload profile picture.',
-            });
-          }
-        });
-      }
-    } catch (error) {
-      console.log('Error picking image:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to open image picker.',
-      });
-    }
+  const handleSignOut = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: () => logoutUser() },
+      ]
+    );
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Original decorative background */}
       <View style={styles.bgContainer}>
         <Image
-          source={require('../../assets/images/profile-bg.svg')}
+          source={require('../../assets/images/profile-bgn.png')}
           style={styles.bgImage}
           contentFit="cover"
         />
       </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <CalText style={styles.heading}>Profile</CalText>
 
-        <ProfileHeader
-          firstName={firstName}
-          trimester={statusText}
-          profilePicture={user?.profilePicture}
-          onPressAvatar={handlePickImage}
-          isUploading={uploadMutation.isPending}
-        />
+        {/* Profile card */}
+        <View style={styles.profileCard}>
+          {/* Top row: avatar + name / info */}
+          <View style={styles.profileTop}>
+            <Image
+              source={{
+                uri: user?.profilePicture ||
+                  'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=150&q=80',
+              }}
+              style={styles.avatar}
+            />
+            <View style={styles.profileInfo}>
+              <HelixaText style={styles.profileName} weight="bold">{firstName}</HelixaText>
+              <View style={styles.profileSubRow}>
+                <HelixaText style={styles.profileRole}>Nurse</HelixaText>
+                <HelixaText style={styles.dot}> • </HelixaText>
+                <HelixaText style={styles.licenseNumber}>
+                  {licenseNumber !== '—' ? `RN-${licenseNumber}` : '—'}
+                </HelixaText>
+              </View>
+            </View>
+          </View>
 
-        <View className='bg-white flex flex-col'>
-          <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
+          {/* Divider */}
+          <View style={styles.statsDivider} />
 
-          <ProfileSection>
-            <ProfileMenuItem icon="heart" title="Pregnancy Status" onPress={() => router.push('/pregnancy-status')} />
-            <ProfileMenuItem icon="users" title="Emergency Contacts" onPress={() => router.push('/profile/emergency-contacts')} isLast />
-          </ProfileSection>
+          {/* Stats row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <View style={styles.ratingRow}>
+                <MaterialCommunityIcons name="star" size={16} color="#F59E0B" />
+                <HelixaText style={styles.statValue} weight="bold">4.9</HelixaText>
+              </View>
+              <HelixaText style={styles.statLabel}>Rating</HelixaText>
+            </View>
 
-          <ProfileSection>
-            <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => router.push('/notification-settings')} />
-            <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={() => { setCancelStep(1); setIsCancelSubVisible(true); }} />
-            <ProfileMenuItem icon="shield" title="Privacy & Permissions" onPress={() => router.push('/profile/privacy-permissions')} isLast />
-          </ProfileSection>
+            <View style={styles.statSeparator} />
 
-          <ProfileSection backgroundColor="#FEE2E2">
-            <ProfileMenuItem icon="log-out" title="Sign Out" color="#EF4444" onPress={handleLogout} isLast />
-          </ProfileSection>
+            <View style={styles.statItem}>
+              <HelixaText style={styles.statValue} weight="bold">342</HelixaText>
+              <HelixaText style={styles.statLabel}>Calls</HelixaText>
+            </View>
+
+            <View style={styles.statSeparator} />
+
+            <View style={styles.statItem}>
+              <HelixaText style={styles.statValue} weight="bold">{yearsExp}</HelixaText>
+              <HelixaText style={styles.statLabel}>Years Exp</HelixaText>
+            </View>
+          </View>
         </View>
 
-      </ScrollView>
-
-      <InvitePartnerModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} />
-      
-      <ActionModal
-        visible={isCancelSubVisible}
-        onClose={() => setIsCancelSubVisible(false)}
-        title={cancelStep === 1 ? "Cancel Subscription?" : "Before you go..."}
-        description={cancelStep === 1 
-          ? "Your premium access will continue until the end of your billing period. You can resubscribe anytime."
-          : "Here is what you will miss without LoniPlus:"}
-        primaryButtonText={cancelStep === 1 ? "Continue to Cancel" : "I Understand, Cancel"}
-        onPrimaryPress={() => {
-          if (cancelStep === 1) {
-            setCancelStep(2);
-          } else {
-            setIsCancelSubVisible(false);
-            setCancelStep(1);
-            router.push('/profile/cancel-subscription');
-          }
-        }}
-        isPrimaryLoading={isCanceling}
-        secondaryButtonText="Keep Subscription"
-        onSecondaryPress={() => { setIsCancelSubVisible(false); setCancelStep(1); }}
-        icon={
-          cancelStep === 1 ? (
-             <Image 
-                source={require('../../assets/images/iconn.png')} 
-                style={{ width: 120, height: 120 }} 
-                contentFit="contain" 
-              />
-          ) : (
-             <View className="w-24 h-24 bg-[#D62D88] rounded-[32px] items-center justify-center shadow-md shadow-pink-200">
-               <MaterialCommunityIcons name="robot-outline" size={56} color="#FFF" />
-             </View>
-          )
-        }
-      >
-        {cancelStep === 2 && (
-          <View className="w-full pl-2 pr-4">
-            {[
-              'Unlimited nurse calls',
-              'Unlimited emergency rides',
-              'Request your preferred nurse',
-              'Faster ride dispatch',
-              'Enhanced recovery plans'
-            ].map((feature, idx) => (
-              <View key={idx} className="flex-row items-center mb-4">
-                <View className="w-5 h-5 rounded-full bg-[#E5E7EB] items-center justify-center mr-3">
-                  <Feather name="check" size={12} color="#6B7280" />
-                </View>
-                <HelixaText className="text-gray-500 text-[15px]">{feature}</HelixaText>
-              </View>
-            ))}
+        {/* Edit Profile */}
+        <TouchableOpacity 
+          style={styles.menuCard} 
+          activeOpacity={0.7}
+          onPress={() => router.push('/edit-profile')}
+        >
+          <View style={styles.menuRow}>
+            <Feather name="edit-2" size={20} color="#111827" style={styles.menuIcon} />
+            <HelixaText style={styles.menuLabel} weight="bold">Edit Profile</HelixaText>
           </View>
-        )}
-      </ActionModal>
+          <View style={styles.chevronBox}>
+            <Feather name="arrow-right" size={18} color="#111827" />
+          </View>
+        </TouchableOpacity>
+
+        {/* Settings + Support */}
+        <View style={styles.groupCard}>
+          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7}>
+            <Feather name="settings" size={20} color="#111827" style={styles.menuIcon} />
+            <HelixaText style={styles.menuLabel} weight="bold">Settings</HelixaText>
+            <View style={[styles.chevronBox, styles.chevronRight]}>
+              <Feather name="arrow-right" size={18} color="#111827" />
+            </View>
+          </TouchableOpacity>
+
+          <View style={styles.groupDivider} />
+
+          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7}>
+            <Feather name="help-circle" size={20} color="#111827" style={styles.menuIcon} />
+            <HelixaText style={styles.menuLabel} weight="bold">Support</HelixaText>
+            <View style={[styles.chevronBox, styles.chevronRight]}>
+              <Feather name="arrow-right" size={18} color="#111827" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Sign Out */}
+        <TouchableOpacity style={styles.signOutCard} onPress={handleSignOut} activeOpacity={0.8}>
+          <View style={styles.menuRow}>
+            <Feather name="log-out" size={20} color="#FA3532" style={styles.menuIcon} />
+            <HelixaText style={styles.signOutLabel} weight="bold">Sign Out</HelixaText>
+          </View>
+          <View style={styles.signOutChevron}>
+            <Feather name="arrow-right" size={18} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -202,9 +170,170 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 120, // space for tab bar
+    paddingHorizontal: 20,
+    paddingTop: 32,
+    paddingBottom: 140,
     zIndex: 1,
+  },
+  heading: {
+    fontSize: 28,
+    color: '#111827',
+    marginBottom: 20,
+  },
+
+  // Profile card
+  profileCard: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+  },
+  profileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 16,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    color: '#D62D88',
+    marginBottom: 4,
+  },
+  profileSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileRole: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  dot: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  licenseNumber: {
+    fontSize: 13,
+    color: '#15B300',
+  },
+  statsDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 16,
+  },
+
+  // Stats
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statSeparator: {
+    width: 1,
+    height: 36,
+    backgroundColor: '#E5E7EB',
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statValue: {
+    fontSize: 20,
+    color: '#111827',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 2,
+  },
+
+  // Single-item card
+  menuCard: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuIcon: {
+    marginRight: 14,
+  },
+  menuLabel: {
+    fontSize: 15,
+    color: '#111827',
+    flex: 1,
+  },
+  chevronBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chevronRight: {
+    marginLeft: 'auto',
+  },
+
+  // Grouped card
+  groupCard: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  groupMenuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  groupDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+
+  // Sign out
+  signOutCard: {
+    backgroundColor: '#FFE3E3',
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  signOutLabel: {
+    fontSize: 15,
+    color: '#FA3532',
+    flex: 1,
+  },
+  signOutChevron: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FA3532',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

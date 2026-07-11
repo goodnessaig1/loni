@@ -12,17 +12,20 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { VerificationIcon } from '../../components/VerificationIcon';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function VerificationProgressScreen() {
-  const handleCheckBack = () => {
-    // Go to home or sign in screen
-    router.replace('/(auth)/dashboard-nurse'); 
+  const { logoutUser } = useAuth();
+
+  const handleCheckBack = async () => {
+    await logoutUser();
+    router.replace('/(auth)'); 
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={handleCheckBack} style={styles.backButton}>
           <Feather name="chevron-left" size={28} color="black" />
         </Pressable>
       </View>

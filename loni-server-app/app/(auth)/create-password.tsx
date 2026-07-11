@@ -16,6 +16,8 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useLocalSearchParams } from 'expo-router';
+import { useResetPassword } from '../../hooks/useAuth';
 
 const PasswordSchema = Yup.object().shape({
   password: Yup.string()
@@ -27,14 +29,25 @@ const PasswordSchema = Yup.object().shape({
 });
 
 export default function CreatePasswordScreen() {
+  const { email, otp } = useLocalSearchParams<{ email: string, otp: string }>();
+  const { mutateAsync: resetPassword } = useResetPassword();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const handleCreatePassword = (values: any, { setSubmitting }: any) => {
-    setTimeout(() => {
-      setSubmitting(false);
+  const handleCreatePassword = async (values: any, { setSubmitting, setFieldError }: any) => {
+    try {
+      await resetPassword({
+        email,
+        otp,
+        newPassword: values.password
+      });
       router.replace('/(auth)/login');
-    }, 1500);
+    } catch (error: any) {
+      console.error('Password reset failed:', error.response?.data || error.message);
+      setFieldError('password', error.response?.data?.error || 'Failed to reset password');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
