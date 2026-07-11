@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks, Form
+from typing import Optional
 import cloudinary
 import cloudinary.uploader
 import asyncio
@@ -7,13 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.core.security import verify_password, get_password_hash
-from app.modules.users.schemas import UserResponse, UpdateContactPermissions, ChangePasswordRequest
+from app.modules.users.schemas import (
+    UpdateContactPermissions, ChangePasswordRequest,
+    ToggleOnlineRequest, UpdateNurseProfileRequest, UpdateUserProfileRequest
+)
 from app.core.database import get_db
 from app.api.deps import get_current_user
-from app.modules.users.models import User, EmergencyContact
+from app.modules.users.models import User, EmergencyContact, NurseProfile, DriverProfile, UserTypeEnum
 from app.modules.auth.schemas import (
-    StandardResponse, UpdateProfileRequest, AddPhoneRequest, 
-    VerifyPhoneRequest, EmergencyContactsRequest, InvitePartnerRequest
+    StandardResponse, UpdateProfileRequest,
+    EmergencyContactsRequest, InvitePartnerRequest
 )
 from app.modules.auth.email_service import (
     send_partner_invite_email,
@@ -290,5 +294,244 @@ async def upload_profile_picture(
     current_user.profile_picture = result.get("secure_url") # type: ignore
     db.add(current_user)
     await db.commit()
-    
     return {"success": True, "message": "Profile picture updated"}
+
+@router.post("/upload-document", response_model=StandardResponse)
+async def upload_document(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Upload to Cloudinary securely
+    result = await asyncio.to_thread(
+        cloudinary.uploader.upload,
+        file.file,
+        folder="loni/documents"
+    )
+    
+    url = result.get("secure_url")
+    return {"success": True, "message": "Document uploaded successfully", "data": {"url": url}}
+
+@router.post("/profile/nurse", response_model=StandardResponse)
+async def update_nurse_profile(
+    years_of_experience: str = Form(...),
+    hospital_affiliation: Optional[str] = Form(None),
+    gender: str = Form(...),
+    licenseNumber: str = Form(...),
+    photo: UploadFile = File(...),
+    license: UploadFile = File(...),
+    id: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Upload documents to Cloudinary concurrently
+    async def upload_single_doc(doc_file: UploadFile):
+        result = await asyncio.to_thread(
+            cloudinary.uploader.upload,
+            doc_file.file,
+            folder="loni/documents"
+        )
+        return result.get("secure_url")
+
+    photo_url, license_url, id_url = await asyncio.gather(
+        upload_single_doc(photo),
+        upload_single_doc(license),
+        upload_single_doc(id)
+    )
+
+    verification_documents = {
+        "photo": photo_url,
+        "license": license_url,
+        "id": id_url,
+        "licenseNumber": licenseNumber,
+        "gender": gender
+    }
+
+    # Check if profile already exists
+    stmt = select(NurseProfile).where(NurseProfile.user_id == current_user.id)
+    result = await db.execute(stmt)
+    profile = result.scalars().first()
+
+    if profile:
+        profile.years_of_experience = int(years_of_experience)
+        if hospital_affiliation is not None:
+            profile.hospital_affiliation = hospital_affiliation
+        profile.verification_documents = verification_documents
+    else:
+        profile = NurseProfile(
+            user_id=current_user.id,
+            years_of_experience=int(years_of_experience),
+            hospital_affiliation=hospital_affiliation or "",
+            verification_documents=verification_documents
+        )
+        db.add(profile)
+    
+    current_user.user_type = UserTypeEnum.nurse
+    current_user.gender = gender
+    db.add(current_user)
+    await db.commit()
+    return {"success": True, "message": "Nurse profile updated"}
+
+@router.post("/profile/driver", response_model=StandardResponse)
+async def update_driver_profile(
+    vehicle_type: str = Form(...),
+    has_ac: str = Form(...),
+    vehicle_brand: str = Form(...),
+    vehicle_year: str = Form(...),
+    vehicle_model: str = Form(...),
+    plate_number: str = Form(...),
+    vehicle_color: str = Form(...),
+    front_view: UploadFile = File(...),
+    back_view: UploadFile = File(...),
+    vin: UploadFile = File(...),
+    interior: UploadFile = File(...),
+    driver_license: UploadFile = File(...),
+    government_id: UploadFile = File(...),
+    vehicle_papers: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Upload documents to Cloudinary concurrently
+    async def upload_single_doc(doc_file: UploadFile):
+        result = await asyncio.to_thread(
+            cloudinary.uploader.upload,
+            doc_file.file,
+            folder="loni/documents"
+        )
+        return result.get("secure_url")
+
+    urls = await asyncio.gather(
+        upload_single_doc(front_view),
+        upload_single_doc(back_view),
+        upload_single_doc(vin),
+        upload_single_doc(interior),
+        upload_single_doc(driver_license),
+        upload_single_doc(government_id),
+        upload_single_doc(vehicle_papers)
+    )
+
+    verification_documents = {
+        "front_view": urls[0],
+        "back_view": urls[1],
+        "vin": urls[2],
+        "interior": urls[3],
+        "driver_license": urls[4],
+        "government_id": urls[5],
+        "vehicle_papers": urls[6]
+    }
+
+    has_ac_bool = has_ac.lower() == 'true'
+
+    # Check if profile already exists
+    stmt = select(DriverProfile).where(DriverProfile.user_id == current_user.id)
+    result = await db.execute(stmt)
+    profile = result.scalars().first()
+
+    if profile:
+        profile.vehicle_type = vehicle_type
+        profile.has_ac = has_ac_bool
+        profile.vehicle_brand = vehicle_brand
+        profile.vehicle_year = vehicle_year
+        profile.vehicle_model = vehicle_model
+        profile.plate_number = plate_number
+        profile.vehicle_color = vehicle_color
+        profile.verification_documents = verification_documents
+    else:
+        profile = DriverProfile(
+            user_id=current_user.id,
+            vehicle_type=vehicle_type,
+            has_ac=has_ac_bool,
+            vehicle_brand=vehicle_brand,
+            vehicle_year=vehicle_year,
+            vehicle_model=vehicle_model,
+            plate_number=plate_number,
+            vehicle_color=vehicle_color,
+            verification_documents=verification_documents
+        )
+        db.add(profile)
+
+    current_user.user_type = UserTypeEnum.driver
+    db.add(current_user)
+    await db.commit()
+    return {"success": True, "message": "Driver profile updated"}
+
+@router.patch("/online-status", response_model=StandardResponse)
+async def toggle_online_status(
+    data: ToggleOnlineRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Toggle the nurse or driver's online status.
+    Pass `is_online: true` to go online, `false` to go offline.
+    """
+    if current_user.user_type not in [UserTypeEnum.nurse, UserTypeEnum.driver]:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=403, detail="Only nurses and drivers can toggle online status")
+    
+    current_user.is_online = data.is_online
+    db.add(current_user)
+    await db.commit()
+    return {
+        "success": True,
+        "message": f"You are now {'online' if data.is_online else 'offline'}",
+        "data": {"is_online": data.is_online}
+    }
+
+@router.patch("/profile", response_model=StandardResponse)
+async def update_my_profile(
+    data: UpdateUserProfileRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update the current user's basic profile details (name, phone, gender).
+    """
+    if data.name is not None:
+        current_user.name = data.name
+    if data.phone is not None:
+        current_user.phone = data.phone
+    if data.gender is not None:
+        current_user.gender = data.gender
+    
+    db.add(current_user)
+    await db.commit()
+    return {"success": True, "message": "Profile updated successfully"}
+
+@router.patch("/nurse-profile", response_model=StandardResponse)
+async def update_nurse_profile(
+    data: UpdateNurseProfileRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update the current nurse's profile details including name, phone,
+    hospital affiliation, and years of experience.
+    """
+    if current_user.user_type != UserTypeEnum.nurse:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=403, detail="Only nurses can update nurse profile")
+    
+    # Update base user fields
+    if data.name is not None:
+        current_user.name = data.name
+    if data.phone is not None:
+        current_user.phone = data.phone
+    db.add(current_user)
+    
+    # Update nurse-specific fields
+    result = await db.execute(
+        select(NurseProfile).where(NurseProfile.user_id == current_user.id)
+    )
+    nurse_profile = result.scalar_one_or_none()
+    
+    if nurse_profile:
+        if data.hospital_affiliation is not None:
+            nurse_profile.hospital_affiliation = data.hospital_affiliation
+        if data.years_of_experience is not None:
+            nurse_profile.years_of_experience = data.years_of_experience
+        db.add(nurse_profile)
+    
+    await db.commit()
+    return {"success": True, "message": "Nurse profile updated successfully"}
+

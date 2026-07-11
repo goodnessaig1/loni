@@ -27,6 +27,7 @@ def enrich_user_data(user: User) -> dict:
         "name": user.name,
         "email": user.email,
         "status": user.status.value if user.status else None,
+        "account_status": user.account_status.value if user.account_status else "pending",
         "phone": user.phone,
         "gender": user.gender.value if user.gender else None,
         "user_type": user.user_type.value if user.user_type else None,
@@ -36,11 +37,30 @@ def enrich_user_data(user: User) -> dict:
         "referral_code": user.referral_code,
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+        "is_online": user.is_online if hasattr(user, 'is_online') and user.is_online is not None else False,
         "trimester": user.trimester,
         "pregnancy_week": user.pregnancy_week,
         "pregnancy_start_date": user.pregnancy_start_date.isoformat() if user.pregnancy_start_date else None,
         "baby_age": user.baby_age,
     }
+
+    if user.user_type and user.user_type.value == 'nurse' and hasattr(user, 'nurse_profile') and user.nurse_profile:
+        user_data["nurse_profile"] = {
+            "years_of_experience": user.nurse_profile.years_of_experience,
+            "hospital_affiliation": user.nurse_profile.hospital_affiliation,
+            "verification_documents": user.nurse_profile.verification_documents,
+        }
+    elif user.user_type and user.user_type.value == 'driver' and hasattr(user, 'driver_profile') and user.driver_profile:
+        user_data["driver_profile"] = {
+            "vehicle_type": user.driver_profile.vehicle_type,
+            "has_ac": user.driver_profile.has_ac,
+            "vehicle_brand": user.driver_profile.vehicle_brand,
+            "vehicle_year": user.driver_profile.vehicle_year,
+            "vehicle_model": user.driver_profile.vehicle_model,
+            "plate_number": user.driver_profile.plate_number,
+            "vehicle_color": user.driver_profile.vehicle_color,
+            "verification_documents": user.driver_profile.verification_documents,
+        }
     
     if user.pregnancy_start_date:
         now = datetime.now(timezone.utc)

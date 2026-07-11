@@ -123,6 +123,16 @@ export default function ConversationScreen() {
   
   const [inputText, setInputText] = useState('');
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    if (offsetY > 200) {
+      setShowScrollToBottom(true);
+    } else {
+      setShowScrollToBottom(false);
+    }
+  };
   
   // Real AI hook with pagination
   const { 
@@ -146,12 +156,13 @@ export default function ConversationScreen() {
     hasInitialized.current = true;
 
     const start = async () => {
-      const title = optionTitle || 'Support Chat';
-      const newSessionId = await initializeSession(title, existingSessionId);
-      
-      // If we created a BRAND NEW session with an optionTitle context, trigger the first message
-      if (!existingSessionId && newSessionId && optionTitle) {
-        await sendMessage(`I need some help or information regarding: ${optionTitle}`, newSessionId);
+      if (existingSessionId) {
+        await initializeSession('', existingSessionId);
+      } else if (optionTitle) {
+        const newSessionId = await initializeSession(optionTitle);
+        if (newSessionId) {
+          await sendMessage(`I need some help or information regarding: ${optionTitle}`, newSessionId);
+        }
       }
     };
     start();
@@ -170,8 +181,16 @@ export default function ConversationScreen() {
     // In an inverted list, index 0 is the bottom. Scroll to bottom smoothly.
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     
-    // Send it off to our streaming AI backend
-    await sendMessage(textToSend);
+    let activeSessionId = sessionId;
+    if (!activeSessionId) {
+      const shortTitle = textToSend.length > 35 ? textToSend.substring(0, 35) + '...' : textToSend;
+      activeSessionId = await initializeSession(shortTitle);
+    }
+    
+    if (activeSessionId) {
+      // Send it off to our streaming AI backend
+      await sendMessage(textToSend, activeSessionId);
+    }
   };
 
   const handleLoadMore = () => {
@@ -281,7 +300,15 @@ export default function ConversationScreen() {
                 {['Pregnancy Support ?', 'Recovery Support ?', 'Emotional Support ?', 'Emergency Guidance ?'].map((option, idx) => (
                   <TouchableOpacity 
                     key={idx}
-                    onPress={() => sendMessage(`I need some help or information regarding: ${option}`)}
+                    onPress={async () => {
+                      let activeSessionId = sessionId;
+                      if (!activeSessionId) {
+                        activeSessionId = await initializeSession(option);
+                      }
+                      if (activeSessionId) {
+                        sendMessage(`I need some help or information regarding: ${option}`, activeSessionId);
+                      }
+                    }}
                     className="bg-white rounded-[16px] py-4 px-2 mb-3 items-center justify-center shadow-sm"
                     style={{ width: '48%' }}
                   >
@@ -301,6 +328,8 @@ export default function ConversationScreen() {
               renderItem={renderMessage}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 20, paddingBottom: 24 }}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
               onEndReached={handleLoadMore}
               onEndReachedThreshold={0.5}
               ListFooterComponent={
@@ -315,6 +344,20 @@ export default function ConversationScreen() {
                 ) : null
               }
             />
+          )}
+
+          {/* Scroll to Bottom Button */}
+          {showScrollToBottom && (
+            <TouchableOpacity
+              className="absolute right-6 bg-white/90 rounded-full w-10 h-10 items-center justify-center shadow-md z-50"
+              style={{ bottom: 130 }}
+              onPress={() => {
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+                setShowScrollToBottom(false);
+              }}
+            >
+              <Feather name="arrow-down" size={20} color="black" />
+            </TouchableOpacity>
           )}
 
           {/* Input Area */}
