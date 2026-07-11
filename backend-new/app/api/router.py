@@ -12,3 +12,6 @@ api_router.include_router(users_router, prefix="/users", tags=["users"])
 api_router.include_router(health_router, prefix="/health", tags=["health"])
 api_router.include_router(ai_chat_router, prefix="/ai-chat", tags=["ai-chat"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
+
+from app.modules.notifications.router import router as notifications_router
+api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])

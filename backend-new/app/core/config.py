@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: Optional[str] = None
     CLOUDINARY_API_SECRET: Optional[str] = None
     
+    # Firebase
+    FIREBASE_SERVICE_ACCOUNT: Optional[str] = None
+    
     MONGODB_URI: str = "mongodb://localhost:27017"
 
     OPENAI_API_KEY: str = ""

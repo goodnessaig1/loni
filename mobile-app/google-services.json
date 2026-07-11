@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "985847686474",
+    "project_id": "loni-766da",
+    "storage_bucket": "loni-766da.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:985847686474:android:8b8138e3be448aae89cdb3",
+        "android_client_info": {
+          "package_name": "com.loni.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCfKsxbjmXngZRy4EPqXsxZI7RthLs730E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
