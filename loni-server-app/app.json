@@ -13,7 +13,8 @@
     "plugins": [
       "expo-font",
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,14 +28,16 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.loni.server"
+      "package": "com.loni.server",
+      "googleServicesFile": "./google-services.json"
     }
   }
 }

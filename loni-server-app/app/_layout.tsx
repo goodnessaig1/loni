@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { EmergencyContactsProvider } from '../context/EmergencyContactsContext';
+import { NotificationProvider } from '../context/NotificationContext';
 
 import '../global.css';
 
@@ -28,15 +29,17 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <EmergencyContactsProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
-          <StatusBar style="auto" />
-          <Toast />
-        </EmergencyContactsProvider>
+        <NotificationProvider>
+          <EmergencyContactsProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+            <StatusBar style="auto" />
+            <Toast />
+          </EmergencyContactsProvider>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

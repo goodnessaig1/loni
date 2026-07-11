@@ -6,6 +6,9 @@ from app.core.config import settings
 from app.api.router import api_router
 from app.core import mongo_db
 from motor.motor_asyncio import AsyncIOMotorClient
+import firebase_admin
+from firebase_admin import credentials
+import json
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -21,6 +24,16 @@ async def startup_db_client():
     mongo_db.client = AsyncIOMotorClient(settings.MONGODB_URI, tlsCAFile=certifi.where())
     mongo_db.db = mongo_db.client["loni_ai_chat"]
     print("Connected to MongoDB")
+    
+    if settings.FIREBASE_SERVICE_ACCOUNT:
+        try:
+            if not firebase_admin._apps:
+                cert_dict = json.loads(settings.FIREBASE_SERVICE_ACCOUNT)
+                cred = credentials.Certificate(cert_dict)
+                firebase_admin.initialize_app(cred)
+                print("Firebase Admin initialized successfully.")
+        except Exception as e:
+            print(f"Error initializing Firebase Admin: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
