@@ -1,3 +1,4 @@
+import '@livekit/react-native';
 import 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
