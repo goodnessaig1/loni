@@ -53,8 +53,6 @@ const ActiveCallUI = () => {
   const { endCall, callId, remoteParticipant, connectedAt, status, setConnected, setReconnecting, setConnectionQuality } = useCallStore();
   const { hangupCall } = useCall();
   const [duration, setDuration] = useState(0);
-  const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
-  const [showOutputPicker, setShowOutputPicker] = useState(false);
 
   useEffect(() => {
     console.log(LOG, 'ActiveCallUI mounted - wiring LiveKit room event listeners');
@@ -223,18 +221,21 @@ const ActiveCallUI = () => {
     }
   };
 
-  const handleOutputPress = async () => {
-    if (Platform.OS === 'ios') {
-      // iOS doesn't expose per-device selection to apps beyond
-      // default/force_speaker - the native route picker is the correct UX
-      // for choosing Bluetooth/wired/AirPlay there.
-      await showNativeAudioRoutePicker();
-      return;
+  const [isSpeaker, setIsSpeaker] = useState(false);
+
+  const toggleSpeaker = async () => {
+    try {
+      const next = !isSpeaker;
+      console.log(LOG, 'toggleSpeaker ->', next ? 'speaker' : 'earpiece');
+      if (Platform.OS === 'ios') {
+        await selectAudioOutput(next ? 'force_speaker' : 'default');
+      } else {
+        await selectAudioOutput(next ? 'speaker' : 'earpiece');
+      }
+      setIsSpeaker(next);
+    } catch (e) {
+      console.error(LOG, 'Failed to toggle speaker', e);
     }
-    const outputs = await listAudioOutputs();
-    console.log(LOG, 'Available audio outputs:', outputs);
-    setAudioOutputs(outputs);
-    setShowOutputPicker(true);
   };
 
   const statusLabel =
@@ -256,8 +257,11 @@ const ActiveCallUI = () => {
             <Text style={styles.callOngoingText}>{status === 'RECONNECTING' ? 'Reconnecting' : 'Call Ongoing'}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={styles.topMuteBtn} onPress={handleOutputPress}>
-              <Feather name="volume-2" size={20} color="white" />
+            <TouchableOpacity 
+              style={[styles.topMuteBtn, isSpeaker && styles.topMutedBtn]} 
+              onPress={toggleSpeaker}
+            >
+              <Feather name="volume-2" size={20} color={isSpeaker ? "#4A6970" : "white"} />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.topMuteBtn, !isMicrophoneEnabled && styles.topMutedBtn]}
@@ -288,32 +292,6 @@ const ActiveCallUI = () => {
           )}
         </View>
 
-        {/* Audio output picker (Android) */}
-        {showOutputPicker && (
-          <View style={styles.outputPicker}>
-            {audioOutputs.map((deviceId) => (
-              <TouchableOpacity
-                key={deviceId}
-                style={styles.outputOption}
-                onPress={async () => {
-                  await selectAudioOutput(deviceId);
-                  setShowOutputPicker(false);
-                }}
-              >
-                <Feather
-                  name={deviceId === 'bluetooth' ? 'bluetooth' : deviceId === 'speaker' ? 'volume-2' : deviceId === 'headset' ? 'headphones' : 'phone-call'}
-                  size={18}
-                  color="white"
-                />
-                <Text style={styles.outputOptionText}>{deviceId}</Text>
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.outputOption} onPress={() => setShowOutputPicker(false)}>
-              <Feather name="x" size={18} color="white" />
-              <Text style={styles.outputOptionText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {/* Bottom Actions */}
         <View style={styles.bottomActions}>

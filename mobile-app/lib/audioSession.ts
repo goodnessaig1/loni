@@ -43,7 +43,7 @@ export async function startCallAudioSession(): Promise<boolean> {
     // (per the SDK's own doc comment on AudioSession.configureAudio).
     await AudioSession.configureAudio({
       android: {
-        preferredOutputList: ['speaker', 'earpiece', 'headset', 'bluetooth'],
+        preferredOutputList: ['earpiece', 'speaker', 'headset', 'bluetooth'],
         audioTypeOptions: {
           manageAudioFocus: true,
           audioMode: 'inCommunication',
@@ -54,7 +54,7 @@ export async function startCallAudioSession(): Promise<boolean> {
         },
       },
       ios: {
-        defaultOutput: 'speaker',
+        defaultOutput: 'earpiece',
       },
     });
     await AudioSession.startAudioSession();

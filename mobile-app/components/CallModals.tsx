@@ -47,8 +47,6 @@ const ActiveCallUI = () => {
   const { endCall, callId, remoteParticipant, connectedAt, status, setConnected, setReconnecting, setConnectionQuality } = useCallStore();
   const { hangupCall } = useCall();
   const [duration, setDuration] = useState(0);
-  const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
-  const [showOutputPicker, setShowOutputPicker] = useState(false);
 
   useEffect(() => {
     console.log(LOG, 'ActiveCallUI mounted - wiring LiveKit room event listeners');
@@ -203,15 +201,21 @@ const ActiveCallUI = () => {
     }
   };
 
-  const handleOutputPress = async () => {
-    if (Platform.OS === 'ios') {
-      await showNativeAudioRoutePicker();
-      return;
+  const [isSpeaker, setIsSpeaker] = useState(false);
+
+  const toggleSpeaker = async () => {
+    try {
+      const next = !isSpeaker;
+      console.log(LOG, 'toggleSpeaker ->', next ? 'speaker' : 'earpiece');
+      if (Platform.OS === 'ios') {
+        await selectAudioOutput(next ? 'force_speaker' : 'default');
+      } else {
+        await selectAudioOutput(next ? 'speaker' : 'earpiece');
+      }
+      setIsSpeaker(next);
+    } catch (e) {
+      console.error(LOG, 'Failed to toggle speaker', e);
     }
-    const outputs = await listAudioOutputs();
-    console.log(LOG, 'Available audio outputs:', outputs);
-    setAudioOutputs(outputs);
-    setShowOutputPicker(true);
   };
 
   const statusLabel =
@@ -232,29 +236,12 @@ const ActiveCallUI = () => {
       )}
       <Text style={styles.status}>{statusLabel}</Text>
 
-      {showOutputPicker && (
-        <View style={styles.outputPicker}>
-          {audioOutputs.map((deviceId) => (
-            <TouchableOpacity
-              key={deviceId}
-              style={styles.outputOption}
-              onPress={async () => {
-                await selectAudioOutput(deviceId);
-                setShowOutputPicker(false);
-              }}
-            >
-              <Text style={styles.outputOptionText}>{deviceId}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity style={styles.outputOption} onPress={() => setShowOutputPicker(false)}>
-            <Text style={styles.outputOptionText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.muteBtn} onPress={handleOutputPress}>
-          <Text style={styles.btnText}>Speaker</Text>
+        <TouchableOpacity 
+          style={[styles.muteBtn, isSpeaker && styles.mutedBtn]} 
+          onPress={toggleSpeaker}
+        >
+          <Text style={styles.btnText}>{isSpeaker ? "Speaker On" : "Speaker Off"}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
