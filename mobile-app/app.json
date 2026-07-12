@@ -36,7 +36,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/withLiveKitAndroid.js"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",

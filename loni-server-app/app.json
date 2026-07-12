@@ -40,7 +40,8 @@
           "apsEnvironment": "development"
         }
       ],
-      "./plugins/withNotifeeAndroid.js"
+      "./plugins/withNotifeeAndroid.js",
+      "./plugins/withLiveKitAndroid.js"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
