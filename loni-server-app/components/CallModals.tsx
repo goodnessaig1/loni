@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, Dimensions, Platform } from 'react-native';
-import { Audio } from 'expo-av';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, Dimensions, Platform, AppState } from 'react-native';
 import { useCallStore, ConnectionQuality } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
 import { LiveKitRoom, useRoomContext, useLocalParticipant } from '@livekit/react-native';
@@ -15,126 +14,111 @@ import {
   selectAudioOutput,
   showNativeAudioRoutePicker,
 } from '../lib/audioSession';
+import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
+import {
+  PermissionStatus,
+  getMicrophonePermissionStatus,
+  requestMicrophonePermission,
+  openAppSettings,
+} from '../lib/permissions';
 
 const { width, height } = Dimensions.get('window');
 const LOG = '[Call/Nurse]';
 
+function useCallLogger() {
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      const store = useCallStore.getState();
+      if (store.status === 'IDLE') return;
+      if (next === 'background') {
+        console.log(LOG, 'Background Transition - app backgrounded during call, status=', store.status);
+      } else if (next === 'active') {
+        console.log(LOG, 'Foreground Transition - app foregrounded during call, status=', store.status);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+}
+
 /**
- * Issue 1/2 fix (real root cause of "connected but no audio"): every stage
- * of the pipeline is now logged so a break at any point is immediately
- * visible, and the actual missing piece - AudioSession.startAudioSession()
- * - is now called (see lib/audioSession.ts for the full root-cause
- * explanation, confirmed against the SDK's own source).
- *
- * Issue 3 fix: the timer is keyed SOLELY off `callStore.connectedAt`,
- * which is set from exactly one canonical source of truth: the backend's
- * `call_state: CONNECTED` WebSocket event, itself only sent once the
- * LiveKit webhook confirms BOTH participants have joined
- * (backend webhook_router.py sets `Call.started_at` there - this is the
- * single timestamp both clients compute `now - startedAt` from, matching
- * "the backend records it once, both clients receive the same value").
- * The local `RoomEvent.ParticipantConnected` listener below ALSO calls
- * `setConnected()` as a low-latency optimization (no server round trip),
- * but `setConnected()` is idempotent - it only records `connectedAt` the
- * FIRST time it's called and ignores every call after, so whichever
- * signal (local event or server webhook) arrives first wins and the other
- * is a no-op. Neither client ever computes its own independent start time.
- *
- * Issue 5 fix: reconnection is entirely handled by LiveKit's own Room
- * object (ICE restart under the hood, same participant SID) - this
- * component never calls `room.connect()` again and `<LiveKitRoom>` never
- * unmounts/remounts during a reconnect, so there is no path here that
- * could create a second room or a duplicate participant. `Reconnecting`/
- * `Reconnected` only toggle UI state and never touch `connectedAt`.
+ * Issue 12 fix: only RoomEvent.ConnectionStateChanged was handled before.
+ * Issue 3 fix: timer now keys off callStore.connectedAt (set from
+ * ParticipantConnected locally + the backend's webhook-driven `call_state`
+ * WS event - see mobile-app/components/CallModals.tsx for the full
+ * rationale, identical here).
+ * Issue 6/7 fix: this screen used to hardcode "🤰 2nd Trimester" for
+ * EVERY caller regardless of who was actually calling. Now reads
+ * `remoteParticipant.trimester` / `.pregnancy_week`, populated by the
+ * backend from the real Mother's profile (see backend
+ * app/modules/calls/services/call_service.py::_participant_info).
+ * Issue 7 (re-render audit): converted to granular Zustand selectors -
+ * this previously destructured the whole store and re-rendered on every
+ * single field change, including ones this component doesn't render
+ * (e.g. connectionQuality ticking).
  */
 const ActiveCallUI = () => {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
-  const { endCall, callId, remoteParticipant, connectedAt, status, setConnected, setReconnecting, setConnectionQuality } = useCallStore();
+  const callId = useCallStore((s) => s.callId);
+  const remoteParticipant = useCallStore((s) => s.remoteParticipant);
+  const connectedAt = useCallStore((s) => s.connectedAt);
+  const status = useCallStore((s) => s.status);
+  const setConnected = useCallStore((s) => s.setConnected);
+  const setReconnecting = useCallStore((s) => s.setReconnecting);
+  const setConnectionQuality = useCallStore((s) => s.setConnectionQuality);
+  const endCall = useCallStore((s) => s.endCall);
   const { hangupCall } = useCall();
   const [duration, setDuration] = useState(0);
+  const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
+  const [selectedOutput, setSelectedOutput] = useState('earpiece');
+  const [showOutputPicker, setShowOutputPicker] = useState(false);
 
   useEffect(() => {
     console.log(LOG, 'ActiveCallUI mounted - wiring LiveKit room event listeners');
 
-    // --- Room-level connection lifecycle -----------------------------
     const onConnected = () => {
-      console.log(LOG, 'Room Connected. localParticipant=', localParticipant?.identity, 'sid=', room.localParticipant?.sid);
+      console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
     };
     const onParticipantConnected = (participant: any) => {
-      console.log(LOG, 'Remote Participant Connected:', participant?.identity, 'sid=', participant?.sid);
+      console.log(LOG, 'Participant Joined:', participant?.identity ?? '(already present)');
       if (room.remoteParticipants.size >= 1 && room.state === ConnectionState.Connected) {
         setConnected();
       }
     };
     const onParticipantDisconnected = (participant: any) => {
-      console.log(LOG, 'Remote Participant Disconnected:', participant?.identity);
+      console.log(LOG, 'Participant Left:', participant?.identity);
     };
     const onReconnecting = () => {
-      console.warn(LOG, 'Room Reconnecting - network interruption detected, audio will pause until restored. Timer is NOT reset.');
+      console.warn(LOG, 'Reconnection started - audio paused, timer NOT reset.');
       setReconnecting();
     };
     const onReconnected = () => {
-      console.log(LOG, 'Room Reconnected - audio/subscriptions restored automatically by LiveKit. Timer unaffected.');
+      console.log(LOG, 'Reconnection succeeded - audio/subscriptions restored automatically.');
       setConnected();
     };
     const onDisconnected = (reason: any) => {
-      console.log(LOG, 'Room Disconnected. reason=', reason);
+      console.log(LOG, 'Call Ended (room disconnected). reason=', reason);
       endCall('ENDED');
     };
-
-    // --- Track publish/subscribe pipeline (Issue 1/2's core checklist) ---
     const onLocalTrackPublished = (publication: any) => {
-      console.log(
-        LOG,
-        'Local Track Published: kind=', publication?.kind,
-        'source=', publication?.source,
-        'trackSid=', publication?.trackSid,
-        'muted=', publication?.isMuted
-      );
-    };
-    const onLocalTrackUnpublished = (publication: any) => {
-      console.log(LOG, 'Local Track Unpublished:', publication?.trackSid);
-    };
-    const onTrackPublished = (publication: any, participant: any) => {
-      console.log(LOG, 'Remote Track Published by', participant?.identity, ': kind=', publication?.kind, 'sid=', publication?.trackSid);
+      console.log(LOG, 'Audio Published: kind=', publication?.kind, 'source=', publication?.source, 'sid=', publication?.trackSid);
     };
     const onTrackSubscribed = (track: any, publication: any, participant: any) => {
-      console.log(
-        LOG,
-        'Remote Track Subscribed: kind=', track?.kind,
-        'from=', participant?.identity,
-        'sid=', publication?.trackSid
-      );
-      if (track.kind === Track.Kind.Audio) {
-        console.log(LOG, 'Remote Track Playing (audio auto-attaches to native output once subscribed on RN - no manual attach() needed).');
-      }
+      console.log(LOG, 'Audio Subscribed: from=', participant?.identity, 'sid=', publication?.trackSid);
     };
     const onTrackSubscriptionFailed = (trackSid: string, participant: any) => {
-      console.error(LOG, 'Track Subscription FAILED for', trackSid, 'from', participant?.identity, '- remote audio will not be heard.');
+      console.error(LOG, 'Track Subscription FAILED for', trackSid, 'from', participant?.identity);
     };
     const onTrackMuted = (publication: any, participant: any) => {
-      const who = participant?.isLocal ? 'local (Microphone Muted)' : `remote (${participant?.identity})`;
-      console.log(LOG, 'Track Muted -', who, 'kind=', publication?.kind);
+      console.log(LOG, participant?.isLocal ? 'Microphone Muted' : `Remote muted: ${participant?.identity}`);
     };
     const onTrackUnmuted = (publication: any, participant: any) => {
-      const who = participant?.isLocal ? 'local (Microphone Enabled)' : `remote (${participant?.identity})`;
-      console.log(LOG, 'Track Unmuted -', who, 'kind=', publication?.kind);
+      console.log(LOG, participant?.isLocal ? 'Microphone Enabled' : `Remote unmuted: ${participant?.identity}`);
     };
     const onMediaDevicesError = (error: Error) => {
-      // Fires when getUserMedia() fails - i.e. local microphone track
-      // creation itself failed (permission revoked mid-call, device busy,
-      // etc.). This is the exact event to catch failures at the
-      // "Local microphone track creation" stage Issue 1 asks about.
       console.error(LOG, 'MediaDevicesError - local track creation failed:', error?.message || error);
     };
     const onAudioPlaybackStatusChanged = () => {
-      // LiveKit attempts to auto-play subscribed audio; if platform
-      // policy blocks it, `room.canPlaybackAudio` goes false and calling
-      // `room.startAudio()` (must happen after a user gesture on some
-      // platforms) resumes it. On native mobile this is rare compared to
-      // browsers, but costs nothing to handle defensively.
-      console.log(LOG, 'Audio Playback Status Changed. canPlaybackAudio=', room.canPlaybackAudio);
       if (!room.canPlaybackAudio) {
         console.warn(LOG, 'Audio playback blocked by platform - attempting room.startAudio() to resume.');
         room.startAudio().catch((e) => console.error(LOG, 'room.startAudio() failed:', e));
@@ -146,8 +130,15 @@ const ActiveCallUI = () => {
           quality === LKConnectionQuality.Excellent ? 'excellent' :
           quality === LKConnectionQuality.Good ? 'good' :
           quality === LKConnectionQuality.Poor ? 'poor' : 'unknown';
-        console.log(LOG, 'Connection Quality Changed:', mapped);
         setConnectionQuality(mapped);
+      }
+    };
+    // Issue 12: auto-refresh the picker's list whenever a device
+    // connects/disconnects, so it's never stale when opened.
+    const onMediaDevicesChanged = () => {
+      console.log(LOG, 'Audio Device Changed - refreshing available outputs');
+      if (Platform.OS === 'android') {
+        listAudioOutputs().then(setAudioOutputs);
       }
     };
 
@@ -158,8 +149,6 @@ const ActiveCallUI = () => {
     room.on(RoomEvent.Reconnected, onReconnected);
     room.on(RoomEvent.Disconnected, onDisconnected);
     room.on(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
-    room.on(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
-    room.on(RoomEvent.TrackPublished, onTrackPublished);
     room.on(RoomEvent.TrackSubscribed, onTrackSubscribed);
     room.on(RoomEvent.TrackSubscriptionFailed, onTrackSubscriptionFailed);
     room.on(RoomEvent.TrackMuted, onTrackMuted);
@@ -167,16 +156,12 @@ const ActiveCallUI = () => {
     room.on(RoomEvent.MediaDevicesError, onMediaDevicesError);
     room.on(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
     room.on(RoomEvent.ConnectionQualityChanged, onQualityChanged);
+    room.on(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
 
-    // Catch the case where the remote participant (and their tracks)
-    // already joined before this listener attached (fast-accept race).
-    onParticipantConnected(undefined);
-    if (!room.canPlaybackAudio) {
-      onAudioPlaybackStatusChanged();
-    }
+    onParticipantConnected(undefined as any);
+    if (!room.canPlaybackAudio) onAudioPlaybackStatusChanged();
 
     return () => {
-      console.log(LOG, 'ActiveCallUI unmounting - removing all room event listeners');
       room.off(RoomEvent.Connected, onConnected);
       room.off(RoomEvent.ParticipantConnected, onParticipantConnected);
       room.off(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
@@ -184,8 +169,6 @@ const ActiveCallUI = () => {
       room.off(RoomEvent.Reconnected, onReconnected);
       room.off(RoomEvent.Disconnected, onDisconnected);
       room.off(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
-      room.off(RoomEvent.LocalTrackUnpublished, onLocalTrackUnpublished);
-      room.off(RoomEvent.TrackPublished, onTrackPublished);
       room.off(RoomEvent.TrackSubscribed, onTrackSubscribed);
       room.off(RoomEvent.TrackSubscriptionFailed, onTrackSubscriptionFailed);
       room.off(RoomEvent.TrackMuted, onTrackMuted);
@@ -193,14 +176,26 @@ const ActiveCallUI = () => {
       room.off(RoomEvent.MediaDevicesError, onMediaDevicesError);
       room.off(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
       room.off(RoomEvent.ConnectionQualityChanged, onQualityChanged);
+      room.off(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
     };
   }, [room]);
+
+  // Issue 4: Android foreground service around the connected window only.
+  useEffect(() => {
+    if (status === 'CONNECTED') {
+      startCallForegroundService('Call in progress', `Connected with ${remoteParticipant?.name || 'Mother'}`);
+    }
+    return () => {
+      stopCallForegroundService();
+    };
+  }, [status === 'CONNECTED']);
 
   useEffect(() => {
     if (!connectedAt) {
       setDuration(0);
       return;
     }
+    console.log(LOG, 'Timer Started at', new Date(connectedAt).toISOString());
     const tick = () => setDuration(Math.max(0, Math.floor((Date.now() - connectedAt) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
@@ -215,27 +210,25 @@ const ActiveCallUI = () => {
 
   const toggleMicrophone = () => {
     if (localParticipant) {
-      const next = !isMicrophoneEnabled;
-      console.log(LOG, 'toggleMicrophone ->', next ? 'Microphone Enabled' : 'Microphone Muted');
-      localParticipant.setMicrophoneEnabled(next);
+      localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
     }
   };
 
-  const [isSpeaker, setIsSpeaker] = useState(false);
+  const outputIcon = (deviceId: string) => {
+    if (deviceId === 'bluetooth') return 'bluetooth';
+    if (deviceId === 'headset') return 'headphones';
+    if (deviceId === 'speaker') return 'volume-2';
+    return 'phone-call';
+  };
 
-  const toggleSpeaker = async () => {
-    try {
-      const next = !isSpeaker;
-      console.log(LOG, 'toggleSpeaker ->', next ? 'speaker' : 'earpiece');
-      if (Platform.OS === 'ios') {
-        await selectAudioOutput(next ? 'force_speaker' : 'default');
-      } else {
-        await selectAudioOutput(next ? 'speaker' : 'earpiece');
-      }
-      setIsSpeaker(next);
-    } catch (e) {
-      console.error(LOG, 'Failed to toggle speaker', e);
+  const handleOutputPress = async () => {
+    if (Platform.OS === 'ios') {
+      await showNativeAudioRoutePicker();
+      return;
     }
+    const outputs = await listAudioOutputs();
+    setAudioOutputs(outputs);
+    setShowOutputPicker((v) => !v);
   };
 
   const statusLabel =
@@ -257,11 +250,8 @@ const ActiveCallUI = () => {
             <Text style={styles.callOngoingText}>{status === 'RECONNECTING' ? 'Reconnecting' : 'Call Ongoing'}</Text>
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity 
-              style={[styles.topMuteBtn, isSpeaker && styles.topMutedBtn]} 
-              onPress={toggleSpeaker}
-            >
-              <Feather name="volume-2" size={20} color={isSpeaker ? "#4A6970" : "white"} />
+            <TouchableOpacity style={styles.topMuteBtn} onPress={handleOutputPress}>
+              <Feather name={outputIcon(selectedOutput) as any} size={20} color="white" />
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.topMuteBtn, !isMicrophoneEnabled && styles.topMutedBtn]}
@@ -292,6 +282,30 @@ const ActiveCallUI = () => {
           )}
         </View>
 
+        {/* Audio output picker (Android) */}
+        {showOutputPicker && (
+          <View style={styles.outputPicker}>
+            {audioOutputs.map((deviceId) => (
+              <TouchableOpacity
+                key={deviceId}
+                style={[styles.outputOption, selectedOutput === deviceId && styles.outputOptionSelected]}
+                onPress={async () => {
+                  await selectAudioOutput(deviceId);
+                  setSelectedOutput(deviceId);
+                  setShowOutputPicker(false);
+                }}
+              >
+                <Feather name={outputIcon(deviceId) as any} size={18} color="white" />
+                <Text style={styles.outputOptionText}>{deviceId}</Text>
+                {selectedOutput === deviceId && <Feather name="check" size={16} color="white" style={{ marginLeft: 'auto' }} />}
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity style={styles.outputOption} onPress={() => setShowOutputPicker(false)}>
+              <Feather name="x" size={18} color="white" />
+              <Text style={styles.outputOptionText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Bottom Actions */}
         <View style={styles.bottomActions}>
@@ -321,36 +335,64 @@ const ActiveCallUI = () => {
 const CONNECT_TIMEOUT_MS = 20000;
 
 export const CallModals = () => {
-  const { isIncoming, isActive, status, remoteParticipant, callId, roomToken, livekitUrl, endCall } = useCallStore();
+  // Issue 7: granular selectors instead of one big destructure.
+  const isIncoming = useCallStore((s) => s.isIncoming);
+  const isActive = useCallStore((s) => s.isActive);
+  const status = useCallStore((s) => s.status);
+  const remoteParticipant = useCallStore((s) => s.remoteParticipant);
+  const callId = useCallStore((s) => s.callId);
+  const roomToken = useCallStore((s) => s.roomToken);
+  const livekitUrl = useCallStore((s) => s.livekitUrl);
+  const endCall = useCallStore((s) => s.endCall);
   const { acceptCall, rejectCall, hangupCall } = useCall();
-  const [micGranted, setMicGranted] = useState(false);
+  const [micStatus, setMicStatus] = useState<PermissionStatus>('undetermined');
   const [audioSessionReady, setAudioSessionReady] = useState(false);
   const [connectTimedOut, setConnectTimedOut] = useState(false);
 
+  useCallLogger();
+
+  const micGranted = micStatus === 'granted';
+
   useEffect(() => {
-    // Issue 13 fix: request (and gate connecting on) mic permission BEFORE
+    // Issue 13 fix: gate connecting on mic permission BEFORE
     // <LiveKitRoom connect={true}> mounts, instead of racing it.
-    if (isActive && roomToken) {
-      console.log(LOG, 'Requesting microphone permission...');
-      Audio.requestPermissionsAsync()
+    //
+    // Production permission requirement: onboarding (app/(auth)/permissions.tsx)
+    // and a launch-time bootstrap for existing users (NotificationContext)
+    // both already resolve microphone permission long before any call
+    // starts - especially important here since the Nurse has to *accept*
+    // an incoming call immediately. This reads the cached status first
+    // instead of always calling requestPermissionsAsync(), which is what
+    // used to make the dialog pop up while a call was already ringing.
+    // requestMicrophonePermission() is only invoked as a fallback for the
+    // genuinely-undetermined case, and itself no-ops rather than
+    // re-prompting if the OS has already permanently denied access -
+    // that's surfaced as 'blocked' so the UI can point to Settings instead
+    // of a dead-end "Microphone Required" screen.
+    if (!isActive || !roomToken) {
+      setMicStatus('undetermined');
+      return;
+    }
+    let cancelled = false;
+    getMicrophonePermissionStatus().then((status) => {
+      if (cancelled) return;
+      if (status !== 'undetermined') {
+        setMicStatus(status);
+        return;
+      }
+      requestMicrophonePermission()
         .then((res) => {
-          console.log(LOG, 'Microphone permission status:', res.granted ? 'GRANTED' : 'DENIED');
-          setMicGranted(res.granted);
+          if (!cancelled) setMicStatus(res);
         })
         .catch((e) => {
           console.error(LOG, 'Microphone permission request failed', e);
-          setMicGranted(false);
+          if (!cancelled) setMicStatus('denied');
         });
-    } else {
-      setMicGranted(false);
-    }
+    });
+    return () => { cancelled = true; };
   }, [isActive, roomToken]);
 
   useEffect(() => {
-    // Issue 1 fix: activate the native audio session BEFORE connecting to
-    // the room (per the SDK's explicit requirement - see
-    // lib/audioSession.ts). Gated on mic permission so we don't request
-    // audio focus before we even know if we'll be allowed to use the mic.
     if (!micGranted || !isActive || !roomToken) {
       setAudioSessionReady(false);
       return;
@@ -359,40 +401,17 @@ export const CallModals = () => {
     startCallAudioSession().then((ok) => {
       if (!cancelled) setAudioSessionReady(ok);
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [micGranted, isActive, roomToken]);
-
-  useEffect(() => {
-    // Issue 7 fix: release the audio session (audio focus, native
-    // AudioManager mode) the moment the call is no longer active, not just
-    // implicitly whenever the native module happens to get garbage
-    // collected. Runs whenever this component leaves the "active call"
-    // state for any reason (hangup, remote end, failure, timeout).
-    if (!isActive) {
-      stopCallAudioSession();
-    }
-    return () => {
-      // Also covers unmount of CallModals itself (e.g. app backgrounded
-      // hard enough to tear down the root layout - shouldn't normally
-      // happen, but this is a correct, cheap safety net).
-      if (!useCallStore.getState().isActive) {
-        stopCallAudioSession();
-      }
-    };
-  }, [isActive]);
 
   useEffect(() => {
     setConnectTimedOut(false);
     if (!isActive || !roomToken || status === 'CONNECTED') return;
 
     const timer = setTimeout(() => {
-      // Re-check at fire time - the call may have connected or ended in
-      // the interim (setTimeout captures state at schedule time only).
       const current = useCallStore.getState();
       if (current.callId === callId && current.status !== 'CONNECTED' && current.isActive) {
-        console.error(LOG, 'LiveKit did not reach CONNECTED within', CONNECT_TIMEOUT_MS, 'ms - check logs above for which pipeline stage stalled.');
+        console.error(LOG, 'Connection timed out after', CONNECT_TIMEOUT_MS, 'ms');
         setConnectTimedOut(true);
       }
     }, CONNECT_TIMEOUT_MS);
@@ -462,8 +481,6 @@ export const CallModals = () => {
   // Active Connected Call UI
   if (isActive && roomToken) {
     if (!livekitUrl) {
-      // Issue 9 fix: no more hardcoded LAN-IP fallback - see mobile-app's
-      // CallModals.tsx for the identical rationale.
       console.error(LOG, 'No livekitUrl from server - cannot connect.');
       return (
         <Modal visible animationType="fade" transparent>
@@ -482,7 +499,19 @@ export const CallModals = () => {
         <Modal visible animationType="fade" transparent>
           <SafeAreaView style={styles.incomingSafeArea}>
             <Text style={styles.incomingCallerName}>Microphone Required</Text>
-            <Text style={styles.connectingText}>Please allow microphone access to continue the call.</Text>
+            <Text style={styles.connectingText}>
+              {micStatus === 'blocked'
+                ? 'Microphone access is turned off for this app. Enable it in Settings to continue.'
+                : 'Please allow microphone access to continue the call.'}
+            </Text>
+            {micStatus === 'blocked' && (
+              <TouchableOpacity
+                style={{ backgroundColor: '#3b82f6', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24, marginBottom: 16 }}
+                onPress={openAppSettings}
+              >
+                <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Open Settings</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={() => {
               if (callId) hangupCall(callId); else endCall('ENDED');
             }}>
@@ -494,27 +523,16 @@ export const CallModals = () => {
     }
 
     if (!audioSessionReady) {
-      // Issue 1 fix: don't mount <LiveKitRoom> (and start publishing/
-      // subscribing tracks) until the native audio session is actually
-      // active - publishing before this was ready is exactly the
-      // "connected but silent" scenario this whole audit is about.
       return (
         <Modal visible animationType="fade" transparent>
           <SafeAreaView style={styles.incomingSafeArea}>
             <Text style={styles.incomingCallerName}>Preparing Audio...</Text>
-            <Text style={styles.connectingText}>Setting up the call audio session.</Text>
           </SafeAreaView>
         </Modal>
       );
     }
 
     if (connectTimedOut) {
-      // Issue 9: signaling worked (we got a token) but the actual
-      // WebRTC/media connection never completed - almost always a network
-      // path problem (LiveKit's node_ip/TURN unreachable from this
-      // device), not a bug in the call state machine. Unmounting
-      // <LiveKitRoom> here stops the stalled connection attempt instead of
-      // leaving it retrying forever in the background.
       return (
         <Modal visible animationType="fade" transparent>
           <SafeAreaView style={styles.incomingSafeArea}>
@@ -646,7 +664,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.85)',
     borderRadius: 16,
     padding: 8,
-    minWidth: 180,
+    minWidth: 200,
   },
   outputOption: {
     flexDirection: 'row',
@@ -654,6 +672,10 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 10,
     paddingHorizontal: 14,
+  },
+  outputOptionSelected: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 10,
   },
   outputOptionText: {
     color: 'white',

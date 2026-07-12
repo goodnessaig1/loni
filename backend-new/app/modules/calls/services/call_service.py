@@ -170,6 +170,29 @@ class CallService:
 
     @staticmethod
     async def accept_call(db: AsyncSession, call_id: int, nurse_id: str):
+        """
+        Issue 1/2 fix (latency audit): the caller's "Accepted" notification
+        previously waited on a full LiveKit REST API round trip
+        (`create_room()`, typically 50-300ms, more under load/cold start)
+        before firing at all - the exact "noticeable delay before the
+        caller is notified" this issue describes. That ordering existed to
+        protect against a real failure mode (both sides told "accepted"
+        with no server-side room to join if `create_room()` fails), but it
+        traded worst-case correctness for best-case latency on every single
+        call.
+
+        Fixed by re-ordering: the DB transition to ACCEPTED and the
+        caller's notification now happen FIRST, immediately after the
+        (fast, local) database commit. Room creation happens after that,
+        overlapping with the caller's own notification-processing +
+        `POST /join` round trip instead of blocking ahead of it - by the
+        time the caller's client actually requests a token, the room has
+        almost always already been created in the background. The failure
+        mode is still fully handled: if room creation does fail, BOTH
+        sides are explicitly told `call_failed` (not left silently hanging
+        on "Connecting..."), which is strictly better than blocking every
+        successful call to protect against a comparatively rare failure.
+        """
         # Database transaction level lock (Pessimistic Locking)
         # Prevents race conditions when multiple nurses press Accept
         stmt = select(Call).where(Call.id == call_id).with_for_update()
@@ -189,26 +212,17 @@ class CallService:
 
         caller = await _load_user(db, call.caller_id)
 
-        # Create the LiveKit room BEFORE flipping status to ACCEPTED. If
-        # this throws (LiveKit unreachable, bad credentials, etc.) the call
-        # stays RINGING and the caller keeps ringing/can retry, instead of
-        # both sides being told "accepted" and then hanging forever on
-        # "Connecting..." with no server-side room to join (Issue 2's
-        # silent-failure mode).
-        try:
-            await LiveKitService.create_room(call.room_name)
-        except Exception as e:
-            logger.error("Failed to create LiveKit room for call %s: %s", call.id, e)
-            call.status = CallStatusEnum.FAILED
-            call.ended_at = datetime.now(timezone.utc)
-            db.add(CallEvent(call_id=call.id, event_type="CallFailed", payload={"reason": str(e)}))
-            await db.commit()
-            data = {"call_id": str(call.id), "status": CallStatusEnum.FAILED.value}
-            asyncio.create_task(_emit(call.caller_id, "call_failed", "Call Failed", "Could not start the call.", data))
-            raise HTTPException(status_code=502, detail="Could not start the call room. Please try again.")
-
-        call.status = CallStatusEnum.CONNECTING
+        # --- Step 1: commit ACCEPTED + notify the caller immediately ---
+        call.status = CallStatusEnum.ACCEPTED
         call.receiver_id = nurse_id
+        # Issue 3: AnsweredAt recorded exactly once, right here - the
+        # single moment the Nurse's accept is durably persisted. Both
+        # clients receive this same timestamp verbatim in the payload
+        # below (kept distinct from `started_at`, which is set later by
+        # the LiveKit webhook once media actually begins - see
+        # webhook_router.py - since "answered" and "media flowing" are
+        # different real-world moments and both are independently useful
+        # for call history).
         call.answered_at = datetime.now(timezone.utc)
 
         participant = CallParticipant(
@@ -217,26 +231,66 @@ class CallService:
             role=ParticipantRoleEnum.RECEIVER
         )
         db.add(participant)
-
         db.add(CallEvent(call_id=call.id, event_type="CallAccepted", payload={"nurse_id": nurse_id}))
-        db.add(CallEvent(call_id=call.id, event_type="CallConnecting"))
 
         await db.commit()
         await db.refresh(call)
+        logger.info("Call %s ACCEPTED by nurse=%s at %s", call.id, nurse_id, call.answered_at.isoformat())
 
         nurse_info = _participant_info(nurse)
         livekit_url = LiveKitService.get_public_url()
-        data = {
+        accepted_data = {
             "call_id": str(call.id),
             "room_name": call.room_name,
-            "status": CallStatusEnum.CONNECTING.value,
+            "status": CallStatusEnum.ACCEPTED.value,
             "receiver": nurse_info.model_dump(),
             "livekit_url": livekit_url,
+            "answered_at": call.answered_at.isoformat(),
         }
-        # Tell the caller instantly (this is the notification Issue 1 is about)
+        # This is THE fix for Issue 1 - fires the instant the commit above
+        # lands, with zero dependency on LiveKit. The caller's UI can show
+        # "accepted" + nurse info right away; the media connection (Issue
+        # 2: "do not wait for LiveKit to finish connecting before updating
+        # the caller") proceeds independently below and afterward on the
+        # client side via its own POST /join call.
         asyncio.create_task(_emit(
-            call.caller_id, "call_accepted", "Call Accepted", f"{nurse_info.name} accepted your call.", data
+            call.caller_id, "call_accepted", "Call Accepted", f"{nurse_info.name} accepted your call.", accepted_data
         ))
+
+        # --- Step 2: create the LiveKit room (overlaps with the caller
+        # processing the notification above and calling POST /join) ---
+        try:
+            await LiveKitService.create_room(call.room_name)
+        except Exception as e:
+            logger.error("Failed to create LiveKit room for call %s: %s", call.id, e)
+            fail_stmt = select(Call).where(Call.id == call_id).with_for_update()
+            fail_result = await db.execute(fail_stmt)
+            call = fail_result.scalar_one_or_none()
+            call.status = CallStatusEnum.FAILED
+            call.ended_at = datetime.now(timezone.utc)
+            db.add(CallEvent(call_id=call.id, event_type="CallFailed", payload={"reason": str(e)}))
+            await db.commit()
+            data = {"call_id": str(call.id), "status": CallStatusEnum.FAILED.value}
+            # Both sides need to hear about this now, since the caller was
+            # already told "accepted" a moment ago.
+            asyncio.create_task(_emit(call.caller_id, "call_failed", "Call Failed", "Could not start the call.", data))
+            asyncio.create_task(_emit(nurse_id, "call_failed", "Call Failed", "Could not start the call.", data))
+            raise HTTPException(status_code=502, detail="Could not start the call room. Please try again.")
+
+        # Issue 4 (state machine): persist CONNECTING for accurate call
+        # history/admin visibility. Not broadcast as its own WS event -
+        # both clients already derive their own local CONNECTING state the
+        # moment they successfully obtain a room token (Nurse: from this
+        # very HTTP response below; Mother: from her own POST /join
+        # response after processing `call_accepted` above), so a dedicated
+        # broadcast here would be a redundant round trip with no UI benefit.
+        connecting_stmt = select(Call).where(Call.id == call_id).with_for_update()
+        connecting_result = await db.execute(connecting_stmt)
+        call = connecting_result.scalar_one_or_none()
+        call.status = CallStatusEnum.CONNECTING
+        db.add(CallEvent(call_id=call.id, event_type="CallConnecting"))
+        await db.commit()
+        await db.refresh(call)
 
         caller_info = _participant_info(caller) if caller else None
         return call, caller_info

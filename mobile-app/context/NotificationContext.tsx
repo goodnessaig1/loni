@@ -7,6 +7,7 @@ import { apiClient } from '../api/client';
 import { connectCallSocket, disconnectCallSocket } from '../api/socket';
 import { applyServerCallEvent } from '../lib/callEvents';
 import { setupCallKeep } from '../lib/callKeepService';
+import { requestMicrophonePermission } from '../lib/permissions';
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -87,6 +88,23 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }
 
     initPush();
+  }, [user]);
+
+  useEffect(() => {
+    // Proactive microphone permission: app/(auth)/permissions.tsx already
+    // requests this during signup, but that onboarding screen is only ever
+    // shown to brand-new, unauthenticated users - existing accounts that
+    // registered before this flow existed (or a token that just never
+    // expires) skip it entirely and would otherwise hit the old "prompt
+    // appears mid-call" behavior on their next call. requestMicrophonePermission
+    // is a safe no-op if already granted/blocked, so calling it here, once
+    // per app launch as soon as a user is authenticated, closes that gap
+    // without ever showing a duplicate or unwanted dialog.
+    if (user) {
+      requestMicrophonePermission().catch((e) =>
+        console.error('[Permissions] Microphone bootstrap failed', e)
+      );
+    }
   }, [user]);
 
   useEffect(() => {

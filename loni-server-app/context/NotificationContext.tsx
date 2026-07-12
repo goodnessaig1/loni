@@ -10,6 +10,7 @@ import { applyServerCallEvent, acceptCallDirect, rejectCallDirect } from '../lib
 import { useCallStore } from '../store/callStore';
 import { setupCallKeep } from '../lib/callKeepService';
 import { setupVoipPush } from '../lib/voipPush';
+import { requestMicrophonePermission } from '../lib/permissions';
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -155,6 +156,25 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }
 
     initPush();
+  }, [user]);
+
+  useEffect(() => {
+    // Proactive microphone permission: app/(auth)/permissions.tsx already
+    // requests this during signup, but that onboarding screen is only ever
+    // shown to brand-new, unauthenticated users - existing Nurse accounts
+    // that registered before this flow existed skip it entirely and would
+    // otherwise hit the old "prompt appears mid-call" behavior on their
+    // next incoming call. This is especially important on this app, since
+    // the Nurse is the one who has to *accept* calls immediately -
+    // requestMicrophonePermission is a safe no-op if already
+    // granted/blocked, so calling it here, once per app launch as soon as
+    // a user is authenticated, closes that gap without ever showing a
+    // duplicate or unwanted dialog.
+    if (user) {
+      requestMicrophonePermission().catch((e) =>
+        console.error('[Permissions] Microphone bootstrap failed', e)
+      );
+    }
   }, [user]);
 
   useEffect(() => {

@@ -45,6 +45,7 @@ registerGlobals();
  */
 import { setupCallKeep, displayIncomingCall, reportCallEnded } from './lib/callKeepService';
 import { setupVoipPush } from './lib/voipPush';
+import { registerCallForegroundService } from './lib/callForegroundService';
 
 // PushKit VoIP registration must happen at module scope, before the app
 // finishes bootstrapping, so a fully-killed app relaunched by a VoIP push
@@ -53,6 +54,12 @@ setupVoipPush();
 // CallKeep setup is safe to call multiple times (guarded internally) and
 // must run before any `displayIncomingCall` call below could fire.
 setupCallKeep().catch((e) => console.error('[CallKeep] setup failed at boot', e));
+// Issue 4 fix: must register the foreground service runner before any
+// active-call screen tries to start it (components/CallModals.tsx calls
+// startCallForegroundService once the call connects) - see
+// lib/callForegroundService.ts for why this exists independently of
+// CallKeep's own (currently disabled) foreground service.
+registerCallForegroundService();
 
 // Handle background/killed-state FCM messages (Android's incoming_call
 // path, and the fallback path for any call event on either platform when

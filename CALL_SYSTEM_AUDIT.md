@@ -275,3 +275,77 @@ Everything that can be done as source code is done — the full CallKit/Connecti
 4. **Real TURN/domain setup.** Set `DOMAIN`, `PUBLIC_IP`, `LIVEKIT_PUBLIC_URL` to real values once there's a public host for LiveKit; the code and config no longer have any hardcoded blocker, but the actual DNS/cert/VPS provisioning is an infra task outside this codebase.
 5. **Horizontal scaling of the WS layer.** `ws_manager.py`'s `ConnectionManager` is in-process only; if the FastAPI backend is ever run with >1 worker/container, swap it for the Redis pub/sub the LiveKit `docker-compose.yml` already runs, so a broadcast reaches a user regardless of which worker holds their socket.
 6. **Load/soak test** the ring-timeout watchdog and webhook-driven state machine, and the CallKeep native UI under real interruption scenarios (an actual cellular call arriving mid-VoIP-call, airplane mode toggling, etc.), before shipping.
+
+---
+
+## Round 3: production-grade polish pass (accept latency, background survival, unified UI, re-renders, audio picker)
+
+**Backend (`backend-new/`)**
+
+- `app/modules/calls/services/call_service.py` — `accept_call()` reordered. Previously: set status → `await LiveKitService.create_room()` (a real network round trip to the LiveKit Docker container) → *then* notify the caller. Any latency or hiccup in room creation directly delayed the Mother's "call accepted" push/WS event, which is what the ring-out UI is waiting on. Now: status flips to `ACCEPTED`, `answered_at` is stamped (once, here — this is the single source of truth the timer reads from), the DB commit happens, and the caller is notified via `asyncio.create_task` — all *before* `create_room()` is even called. Room creation now happens after the caller already knows the call was accepted; if it fails, both the caller and the nurse get a `call_failed` event (previously only the caller did, leaving the nurse's screen stuck).
+
+**Both apps — Android background call survival (Issue 4)**
+
+- New `lib/callForegroundService.ts` in both apps, using `notifee.registerForegroundService()` with `AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MICROPHONE`. This is independent of (and unaffected by) the `EXPO_PUBLIC_ENABLE_CALLKEEP` kill switch — Android will suspend the mic/audio pipeline and can kill the activity a few seconds after the app is backgrounded unless a foreground service is actively running for the duration of the call. Started when `status === 'CONNECTED'`, stopped on call end, in both `components/CallModals.tsx` files.
+- `mobile-app` didn't have `@notifee/react-native` at all before (only the Nurse app did) — added the dependency and a copy of `plugins/withNotifeeAndroid.js`, since the Mother's own outgoing/active call needs the same background guarantee the Nurse's incoming call already had.
+- Both `app.json`s: added `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MICROPHONE` Android permissions (required for a `MICROPHONE`-typed foreground service on modern Android targeting API 34+).
+- Both `index.js`: `registerCallForegroundService()` called at boot, before any screen can try to start the service.
+
+**`mobile-app` — unified call screen (Issue 6)**
+
+- `components/CallModals.tsx` rewritten as a single `<Modal>` that switches its *internal content* by state (failed / mic-required / preparing-audio / connect-timeout / connected `<LiveKitRoom>` / outgoing-ringing), instead of the previous pattern of `app/nurse/connecting.tsx` rendering its own full screen with its own ringback/cancel UI, which then got replaced by a *different* component's UI once the call connected. That hand-off was the visible "screen flash / multiple transitions" symptom.
+- `app/nurse/connecting.tsx` reduced to a trigger-only route: calls `requestCall()` once, then immediately backs out of the navigation stack. It renders nothing. CallModals (mounted once, globally, in `_layout.tsx`) is now the only thing that ever draws the outgoing-call UI.
+
+**Both apps — re-render audit (Issue 7)**
+
+- `components/CallModals.tsx` in both apps: replaced whole-store destructuring (`const { status, remoteParticipant, ... } = useCallStore()`, which re-renders on *any* store field changing) with per-field selectors (`const status = useCallStore((s) => s.status)`, etc.), so a change to one field — e.g. a mid-call `remoteParticipant` update — doesn't force an unrelated timer display to re-render too.
+
+**Both apps — hospital affiliation display (Issue 8) and duplicated-implementation cleanup (Issue 9)**
+
+- The data was already being fetched into `remoteParticipant`/`callerInfo` in both apps but wasn't rendered prominently. Both `CallModals.tsx` files now show it with an icon, sourced from the same participant object both apps already populate from the backend — no new data source introduced. `mobile-app/app/nurse/call.tsx` and `rating.tsx` remain confirmed-dead (nothing navigates to them, hardcoded mock data) — left in place, not deleted, since deletion wasn't explicitly requested.
+
+**Both apps — audio output selector (Issue 12) and logging (Issue 14)**
+
+- Audio picker enhanced with per-device icons (bluetooth/headset/speaker/earpiece via Feather icons), highlighting of the currently-selected output, and auto-refresh on LiveKit's `MediaDevicesChanged` event (previously only populated once on mount).
+- Added a `useCallLogger()` hook (`AppState.addEventListener('change', ...)`) logging background/foreground transitions, plus full `RoomEvent` coverage (`Connected`, `ParticipantConnected/Disconnected`, `Reconnecting/Reconnected`, `TrackSubscriptionFailed`, `ConnectionQualityChanged`, etc.) — previously only a handful of events were logged.
+
+**Verified but not changed (Issues 3, 5, 10, 11, 13)** — re-read rather than rebuilt, per the "don't redesign" constraint:
+
+- **Issue 3 (timer sync)**: `answered_at` is now the single stamp point (see backend change above); both apps' timers already derived elapsed time from a server timestamp rather than a local `setInterval` start, so this was consistent once the backend stopped racing itself.
+- **Issue 5 (background incoming calls)**: already handled by CallKeep + PushKit VoIP (iOS) and CallKeep self-managed `ConnectionService` + notifee full-screen fallback (Android) from Round 2 — foreground service (this round) closes the remaining "call drops after ~1 min backgrounded" gap for Android.
+- **Issue 10/11 (mute, speaker routing)**: `room.localParticipant.setMicrophoneEnabled()` and `lib/audioSession.ts`'s `selectAudioOutput`/`showNativeAudioRoutePicker` were already correct; no changes needed beyond the picker UI polish above.
+- **Issue 13 (performance)**: addressed via the re-render audit (Issue 7) and the unified-screen consolidation (Issue 6) — no separate profiling changes made.
+
+---
+
+## Round 4: proactive microphone permission during onboarding (not on first call)
+
+**Root cause**: `Audio.requestPermissionsAsync()` (from `expo-av`) was only ever called inside `components/CallModals.tsx`, gated on `isActive && roomToken` — i.e. the very first time either app asked for microphone access was mid-call-setup, for both the Mother (outgoing) and Nurse (incoming/accept) sides. `app/(auth)/permissions.tsx` (byte-identical in both apps) already sat in the signup flow with cards for Notifications/Location/Emergency Contacts, but every card — including the one for Notifications — was 100% cosmetic: `onPress` just flipped local React state, no permission API was ever called. Microphone wasn't listed on that screen at all. Real notification permission was actually requested separately and silently, later, by `NotificationContext`'s `initPush()` effect.
+
+**New: `lib/permissions.ts`** (identical file, both apps) — a centralized permission manager wrapping `expo-av` (microphone) and `expo-notifications` (notifications), normalizing both into one `'granted' | 'denied' | 'blocked' | 'undetermined'` status. `blocked` means the OS has permanently denied and won't show its own dialog again (`canAskAgain: false`) — the only way out is `openAppSettings()` (`Linking.openSettings()`). `requestMicrophonePermission()`/`requestNotificationPermission()` both check current status first and only trigger a real native prompt when still `undetermined`, so they're safe to call from multiple places without ever double-prompting. Bluetooth is exposed as `getBluetoothPermissionStatus()` returning `'granted'` unconditionally, documented in-file: both apps only *route* audio to already-paired devices (`lib/audioSession.ts`), never scan for or connect to new ones, so no runtime `BLUETOOTH_CONNECT`/`BLUETOOTH_SCAN` permission is actually needed today — this function exists so that fact is recorded in one place rather than being a silent gap.
+
+**`app/(auth)/permissions.tsx`** (both apps) — Notifications and Microphone cards now call the real request functions in that order (matching the product's expected flow); a `useEffect` on mount also re-reads current status so revisiting the screen (or granting from Settings and coming back) reflects reality instead of resetting to "not granted". A `blocked` status changes the button to "Open Settings" instead of "Grant Permission". Location and Emergency Contacts cards are untouched (unrelated to calling, no permission API exists for them yet).
+
+**Existing-user gap**: the onboarding stack (`(auth)`) is only ever shown to unauthenticated users — once someone has a session token, `app/index.tsx` sends them straight to `(tabs)` and they'd never see the new Microphone card. Fixed with a bootstrap effect added to `context/NotificationContext.tsx` (both apps, right next to the existing `initPush()` effect): as soon as `user` becomes truthy, `requestMicrophonePermission()` fires once. It's a no-op for anyone already `granted`/`blocked`, so this only actually prompts existing accounts that predate this change.
+
+**`components/CallModals.tsx`** (both apps) — the mic-request effect (gated on `isActive && roomToken`) now calls `getMicrophonePermissionStatus()` (read-only, never prompts) first; it only falls through to `requestMicrophonePermission()` for the genuinely-`undetermined` edge case (e.g. a session that hasn't hit the bootstrap effect yet). In normal operation — onboarding or the bootstrap already resolved it — this is a same-tick synchronous-feeling read, so a call starts or is accepted with no dialog in the way. The existing "Microphone Required" gating screen is kept as a safety net (denied/revoked mid-session) and now branches on `blocked` to show an "Open Settings" button instead of a dead-end retry loop.
+
+**No native/manifest changes needed** — `NSMicrophoneUsageDescription` (iOS) and `android.permission.RECORD_AUDIO` were already declared via the `@config-plugins/react-native-webrtc` plugin in both `app.json`s and already present in both apps' generated native projects. This round is JS-only; a Metro/JS reload is sufficient, no `expo prebuild` or native rebuild required.
+
+---
+
+## Round 5: fixed the crash on call accept (both apps) — notifee foreground-service type mismatch
+
+**Symptom**: on a real device, the instant a call reached CONNECTED after Accept, both apps crashed - not a JS red-screen, an unconditional native crash with no catchable error.
+
+**Root cause, confirmed by unzipping the actual AAR** (`node_modules/@notifee/react-native/android/libs/app/notifee/core/*/core-*.aar`, `AndroidManifest.xml` inside it): notifee's own bundled `ForegroundService` component is declared as
+
+```xml
+<service android:name="app.notifee.core.ForegroundService" android:foregroundServiceType="shortService" />
+```
+
+`shortService` is an Android 14+ (API 34+) type meant for tasks under ~3 minutes - unrelated to microphone/calls. Round 3's `lib/callForegroundService.ts`, however, starts that exact same service requesting `AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MICROPHONE` the moment a call connects. Both apps target API 35 (Expo SDK 54's default), and on API 34+ the OS requires the type passed to `startForeground()` to be a subset of what that `Service`'s manifest entry declares - a mismatch throws a fatal `MissingForegroundServiceTypeException` at the OS level, which cannot be caught by any JS `try/catch`. This explains why it looked like an instant, simultaneous crash on both apps: both run the identical `callForegroundService.ts` against the identical notifee AAR, triggered by the identical `status === 'CONNECTED'` condition.
+
+**Fix**: `plugins/withNotifeeAndroid.js` (both apps) now does two things instead of one - it still injects notifee's local Maven repo into `build.gradle`, and it now also uses `withAndroidManifest` to re-declare `app.notifee.core.ForegroundService` in the app's own generated `AndroidManifest.xml` with `android:foregroundServiceType="microphone"` and `tools:replace="android:foregroundServiceType"` (plus `AndroidConfig.Manifest.ensureToolsAvailable()` to add the `xmlns:tools` namespace the `tools:replace` attribute requires). Android's manifest merger gives the app module's own manifest priority over a library/AAR manifest for the same component, and `tools:replace` is what tells it to resolve the attribute conflict with the app's value instead of erroring at build time. Verified by running the plugin's exact mod logic against the real generated `mobile-app/android/app/src/main/AndroidManifest.xml` and confirming the output XML contains the corrected `<service>` tag with both attributes present.
+
+**This requires a native rebuild** (`npx expo prebuild --clean` + a fresh native build for both apps) - it edits `AndroidManifest.xml`, which only regenerates from `app.json`/config plugins during prebuild, not on a JS/Metro reload.

@@ -2,6 +2,7 @@ import { registerGlobals } from '@livekit/react-native';
 import { registerRootComponent } from 'expo';
 import { ExpoRoot } from 'expo-router';
 import messaging from '@react-native-firebase/messaging';
+import { registerCallForegroundService } from './lib/callForegroundService';
 
 /**
  * `@livekit/react-native`'s docs are explicit: "Must be called before
@@ -19,6 +20,16 @@ import messaging from '@react-native-firebase/messaging';
  * module gets a chance to touch LiveKit.
  */
 registerGlobals();
+
+/**
+ * Issue 4 fix: "call does not continue when app is closed/backgrounded".
+ * Must register this runner before components/CallModals.tsx's active
+ * call screen tries to start it (once the call connects) - see
+ * lib/callForegroundService.ts for the full explanation. The Mother's
+ * outgoing/active call needs the exact same background-survival guarantee
+ * as the Nurse's incoming call does.
+ */
+registerCallForegroundService();
 
 /**
  * Issue 1/2 fix: this file did not exist at all. mobile-app's package.json

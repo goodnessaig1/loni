@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Pressable, 
-  StyleSheet, 
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Pressable,
+  StyleSheet,
   ScrollView,
   Platform
 } from 'react-native';
@@ -11,13 +11,62 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import {
+  PermissionStatus,
+  getNotificationPermissionStatus,
+  requestNotificationPermission,
+  getMicrophonePermissionStatus,
+  requestMicrophonePermission,
+  openAppSettings,
+} from '../../lib/permissions';
 
+/**
+ * Production permission requirement: request microphone access here, during
+ * onboarding, instead of waiting for the user's first call. This screen
+ * previously "granted" all three of its cards (Location, Notifications,
+ * Emergency Contacts) by just flipping local React state - none of them
+ * called a real permission API, and Microphone wasn't even listed. The
+ * actual mic prompt only ever fired later, inside components/CallModals.tsx,
+ * gated on a call already being in progress - which is exactly the
+ * "permission dialog interrupts my first call" problem this screen now
+ * exists to prevent. Notifications and Microphone are now real, requested in
+ * that order (matching the product's expected onboarding sequence), via the
+ * centralized lib/permissions.ts. Location and Emergency Contacts are
+ * unrelated to voice calling and are left as they were.
+ */
 export default function PermissionsScreen() {
   const [locationGranted, setLocationGranted] = useState(false);
-  const [notificationsGranted, setNotificationsGranted] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>('undetermined');
+  const [micStatus, setMicStatus] = useState<PermissionStatus>('undetermined');
   const [contactsGranted, setContactsGranted] = useState(false);
 
-  const canContinue = locationGranted && notificationsGranted;
+  useEffect(() => {
+    // If the user backgrounded the app to grant permission from a previous
+    // "blocked" state, or is revisiting this screen, reflect the real
+    // current status instead of always starting from "not granted".
+    getNotificationPermissionStatus().then(setNotificationStatus);
+    getMicrophonePermissionStatus().then(setMicStatus);
+  }, []);
+
+  const canContinue = locationGranted && notificationStatus === 'granted' && micStatus === 'granted';
+
+  async function handleGrantNotifications() {
+    if (notificationStatus === 'blocked') {
+      openAppSettings();
+      return;
+    }
+    const result = await requestNotificationPermission();
+    setNotificationStatus(result);
+  }
+
+  async function handleGrantMicrophone() {
+    if (micStatus === 'blocked') {
+      openAppSettings();
+      return;
+    }
+    const result = await requestMicrophonePermission();
+    setMicStatus(result);
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -37,40 +86,6 @@ export default function PermissionsScreen() {
         </View>
 
         <View style={styles.cardsContainer}>
-          {/* Location Access */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.cardIcon}>
-                <Feather name="map-pin" size={20} color="#4B5563" />
-              </View>
-              <View style={styles.cardTextContent}>
-                <View style={styles.cardTitleRow}>
-                  <HelixaText style={styles.cardTitle} weight="bold">Location Access</HelixaText>
-                  <View style={styles.requiredBadge}>
-                    <HelixaText style={styles.requiredText}>Required</HelixaText>
-                  </View>
-                </View>
-                <HelixaText style={styles.cardDescription}>
-                  Required for emergency ride dispatch and tracking.
-                </HelixaText>
-              </View>
-            </View>
-            
-            <Pressable 
-              style={[styles.grantButton, locationGranted && styles.grantedButton]}
-              onPress={() => setLocationGranted(true)}
-            >
-              {locationGranted ? (
-                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-                  <HelixaText style={styles.grantedText}>Permission Granted.</HelixaText>
-                  <Feather name="check" size={16} color="#D62D88" />
-                </View>
-              ) : (
-                <HelixaText style={styles.grantText}>Grant Permission</HelixaText>
-              )}
-            </Pressable>
-          </View>
-
           {/* Notifications */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -89,12 +104,84 @@ export default function PermissionsScreen() {
                 </HelixaText>
               </View>
             </View>
-            
-            <Pressable 
-              style={[styles.grantButton, notificationsGranted && styles.grantedButton]}
-              onPress={() => setNotificationsGranted(true)}
+
+            <Pressable
+              style={[styles.grantButton, notificationStatus === 'granted' && styles.grantedButton]}
+              onPress={handleGrantNotifications}
             >
-              {notificationsGranted ? (
+              {notificationStatus === 'granted' ? (
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+                  <HelixaText style={styles.grantedText}>Permission Granted.</HelixaText>
+                  <Feather name="check" size={16} color="#D62D88" />
+                </View>
+              ) : notificationStatus === 'blocked' ? (
+                <HelixaText style={styles.grantText}>Open Settings</HelixaText>
+              ) : (
+                <HelixaText style={styles.grantText}>Grant Permission</HelixaText>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Microphone */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardIcon}>
+                <Feather name="mic" size={20} color="#4B5563" />
+              </View>
+              <View style={styles.cardTextContent}>
+                <View style={styles.cardTitleRow}>
+                  <HelixaText style={styles.cardTitle} weight="bold">Microphone</HelixaText>
+                  <View style={styles.requiredBadge}>
+                    <HelixaText style={styles.requiredText}>Required</HelixaText>
+                  </View>
+                </View>
+                <HelixaText style={styles.cardDescription}>
+                  Needed so a voice call can start the moment you tap Call - no waiting on a prompt.
+                </HelixaText>
+              </View>
+            </View>
+
+            <Pressable
+              style={[styles.grantButton, micStatus === 'granted' && styles.grantedButton]}
+              onPress={handleGrantMicrophone}
+            >
+              {micStatus === 'granted' ? (
+                <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
+                  <HelixaText style={styles.grantedText}>Permission Granted.</HelixaText>
+                  <Feather name="check" size={16} color="#D62D88" />
+                </View>
+              ) : micStatus === 'blocked' ? (
+                <HelixaText style={styles.grantText}>Open Settings</HelixaText>
+              ) : (
+                <HelixaText style={styles.grantText}>Grant Permission</HelixaText>
+              )}
+            </Pressable>
+          </View>
+
+          {/* Location Access */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <View style={styles.cardIcon}>
+                <Feather name="map-pin" size={20} color="#4B5563" />
+              </View>
+              <View style={styles.cardTextContent}>
+                <View style={styles.cardTitleRow}>
+                  <HelixaText style={styles.cardTitle} weight="bold">Location Access</HelixaText>
+                  <View style={styles.requiredBadge}>
+                    <HelixaText style={styles.requiredText}>Required</HelixaText>
+                  </View>
+                </View>
+                <HelixaText style={styles.cardDescription}>
+                  Required for emergency ride dispatch and tracking.
+                </HelixaText>
+              </View>
+            </View>
+
+            <Pressable
+              style={[styles.grantButton, locationGranted && styles.grantedButton]}
+              onPress={() => setLocationGranted(true)}
+            >
+              {locationGranted ? (
                 <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
                   <HelixaText style={styles.grantedText}>Permission Granted.</HelixaText>
                   <Feather name="check" size={16} color="#D62D88" />
@@ -120,8 +207,8 @@ export default function PermissionsScreen() {
                 </HelixaText>
               </View>
             </View>
-            
-            <Pressable 
+
+            <Pressable
               style={[styles.grantButton, contactsGranted && styles.grantedButton]}
               onPress={() => setContactsGranted(true)}
             >
@@ -137,7 +224,7 @@ export default function PermissionsScreen() {
           </View>
         </View>
 
-        <Pressable 
+        <Pressable
           style={[styles.continueButton, canContinue ? styles.continueButtonActive : styles.continueButtonDisabled]}
           disabled={!canContinue}
           onPress={() => router.push('/(auth)/emergency-contacts')}
