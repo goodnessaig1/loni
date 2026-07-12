@@ -1,3 +1,7 @@
+// NOTE: the actual `registerGlobals()` call LiveKit requires lives in
+// index.js (the true JS entry point) - a bare `import '@livekit/react-native'`
+// here loads the module but does NOT register the WebRTC globals it
+// needs. See the comment in index.js for the full explanation.
 import '@livekit/react-native';
 import 'react-native-reanimated';
 import { Stack } from 'expo-router';

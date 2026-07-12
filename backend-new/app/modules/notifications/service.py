@@ -8,9 +8,18 @@ from app.modules.notifications.voip_service import VoIPPushService, is_configure
 
 class NotificationService:
     @staticmethod
-    def send_push_notification(tokens: Union[str, List[str]], title: str, body: str, data: Optional[Dict[str, Any]] = None):
+    async def send_push_notification(tokens: Union[str, List[str]], title: str, body: str, data: Optional[Dict[str, Any]] = None):
         """
         Send a generic push notification via Firebase Admin SDK.
+
+        Prunes permanently-dead tokens from Mongo when FCM reports one as
+        unregistered - production log evidence: "Failed to send to token
+        ...: Requested entity was not found" repeating on every single call
+        for the same stale token (app reinstalled/uninstalled, token
+        rotated, etc.) forever, since nothing ever removed it from the
+        `devices` collection. Left unpruned, every future call to that user
+        pays for a doomed FCM request and the failure noise makes real
+        problems harder to spot in the logs.
         """
         if not tokens:
             return
@@ -91,9 +100,26 @@ class NotificationService:
             print(f"Push response: {response.success_count} messages were sent successfully")
             if response.failure_count > 0:
                 responses = response.responses
+                dead_tokens = []
                 for idx, resp in enumerate(responses):
                     if not resp.success:
                         print(f"Failed to send to token {tokens[idx]}: {resp.exception}")
+                        # Firebase's "unregistered" condition (app
+                        # uninstalled, token rotated, etc.) surfaces either
+                        # as a specific exception class or, depending on
+                        # SDK version, just this exact message text - check
+                        # both rather than depend on one exact class name
+                        # we can't verify against the installed SDK version
+                        # here.
+                        is_unregistered = isinstance(
+                            resp.exception, getattr(messaging, "UnregisteredError", ())
+                        ) or "Requested entity was not found" in str(resp.exception)
+                        if is_unregistered:
+                            dead_tokens.append(tokens[idx])
+
+                if dead_tokens:
+                    result = await mongo_db.db["devices"].delete_many({"token": {"$in": dead_tokens}})
+                    print(f"Pruned {result.deleted_count} dead device token(s) after FCM reported them unregistered")
         except Exception as e:
             print(f"Error sending push notification via Firebase: {e}")
 
@@ -136,7 +162,7 @@ class NotificationService:
             ]
 
         if fcm_tokens:
-            NotificationService.send_push_notification(fcm_tokens, title, body, data)
+            await NotificationService.send_push_notification(fcm_tokens, title, body, data)
 
     @staticmethod
     async def register_device(user_id: str, device_id: str, device_type: str, token: str):

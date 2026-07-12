@@ -148,10 +148,22 @@ const ActiveCallUI = () => {
   );
 };
 
+// If LiveKit hasn't reached CONNECTED within this window after the room
+// token is issued, something is wrong at the network/media layer (most
+// likely Issue 9: LiveKit's node_ip/TURN not reachable from this device's
+// network) rather than just "taking a while". Signaling succeeding but
+// media never completing is exactly what an unreachable ICE candidate
+// looks like from the client's point of view - it doesn't error, it just
+// never finishes. Surfacing this as a clear failure after a bounded wait
+// is far better than an infinite "Connecting..." spinner with zero
+// feedback, which is what happened before this fix.
+const CONNECT_TIMEOUT_MS = 20000;
+
 export const CallModals = () => {
   const { isOutgoing, isActive, callId, roomToken, livekitUrl, status, remoteParticipant, endCall } = useCallStore();
   const { hangupCall } = useCall();
   const [micGranted, setMicGranted] = useState(false);
+  const [connectTimedOut, setConnectTimedOut] = useState(false);
 
   useEffect(() => {
     // Issue 13 fix: permission used to be requested inside a `useEffect`
@@ -170,6 +182,21 @@ export const CallModals = () => {
       setMicGranted(false);
     }
   }, [isActive, roomToken]);
+
+  useEffect(() => {
+    setConnectTimedOut(false);
+    if (!isActive || !roomToken || status === 'CONNECTED') return;
+
+    const timer = setTimeout(() => {
+      const current = useCallStore.getState();
+      if (current.callId === callId && current.status !== 'CONNECTED' && current.isActive) {
+        console.error('[CallModals] LiveKit did not reach CONNECTED within', CONNECT_TIMEOUT_MS, 'ms - likely a network/TURN issue (Issue 9).');
+        setConnectTimedOut(true);
+      }
+    }, CONNECT_TIMEOUT_MS);
+
+    return () => clearTimeout(timer);
+  }, [isActive, roomToken, callId, status === 'CONNECTED']);
 
   // Outgoing Call UI (Mother is calling, waiting for accept)
   if (isOutgoing && !isActive && callId) {
@@ -222,6 +249,30 @@ export const CallModals = () => {
               if (callId) hangupCall(callId); else endCall('ENDED');
             }}>
               <Text style={styles.btnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      );
+    }
+
+    if (connectTimedOut) {
+      // Issue 9: signaling worked (we got a token) but the actual
+      // WebRTC/media connection never completed - almost always a network
+      // path problem (LiveKit's node_ip/TURN unreachable from this
+      // device), not a bug in the call state machine. Unmounting
+      // <LiveKitRoom> here stops the stalled connection attempt instead of
+      // leaving it retrying forever in the background.
+      return (
+        <Modal visible animationType="fade" transparent>
+          <View style={styles.outgoingContainer}>
+            <Text style={styles.title}>Connection Failed</Text>
+            <Text style={styles.status}>
+              Could not establish a call connection. This usually means the call server isn't reachable from your network.
+            </Text>
+            <TouchableOpacity style={styles.hangupBtn} onPress={() => {
+              if (callId) hangupCall(callId); else endCall('FAILED');
+            }}>
+              <Text style={styles.btnText}>Close</Text>
             </TouchableOpacity>
           </View>
         </Modal>

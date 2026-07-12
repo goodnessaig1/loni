@@ -1,8 +1,29 @@
+import { registerGlobals } from '@livekit/react-native';
 import { registerRootComponent } from 'expo';
 import { ExpoRoot } from 'expo-router';
 import messaging from '@react-native-firebase/messaging';
 import notifee, { AndroidImportance, AndroidCategory, AndroidVisibility, EventType } from '@notifee/react-native';
 import { Platform } from 'react-native';
+
+/**
+ * `@livekit/react-native`'s docs are explicit: "Must be called before
+ * using LiveKit." `app/_layout.tsx` previously only had a bare
+ * `import '@livekit/react-native'` (a side-effect import that loads the
+ * module but does NOT call this function - confirmed by reading the
+ * installed package's actual source, node_modules/@livekit/react-native/
+ * lib/commonjs/index.js). Without it, `react-native-webrtc`'s globals
+ * (RTCPeerConnection etc.) never get installed into the JS global scope,
+ * so `livekit-client` has no way to create a WebRTC connection at all -
+ * signaling still succeeds (you get a token, the room "exists"), but
+ * `room.connect()` can never actually complete, which is exactly the
+ * "stuck on Connecting" symptom this was silently causing. Not a network/
+ * TURN/node_ip issue - the WebRTC stack was never initialized in the first
+ * place. Called here, at the very top of the true JS entry point, so it
+ * runs before any other module (including ones that might construct a
+ * LiveKit Room during their own import-time side effects) gets a chance
+ * to touch LiveKit.
+ */
+registerGlobals();
 
 /**
  * Issue 4/5 fix, "make it ring like a real phone call no matter what":

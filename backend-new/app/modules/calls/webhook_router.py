@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, Request, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from livekit.api import WebhookReceiver
+from livekit.api import WebhookReceiver, TokenVerifier
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -22,9 +22,22 @@ def get_webhook_receiver():
     # something the app depends on. Now reads from the single Settings
     # source of truth (app/core/config.py), which pydantic-settings loads
     # from .env explicitly regardless of import order.
+    #
+    # Real bug caught in production logs: `WebhookReceiver(api_key,
+    # api_secret)` throws `TypeError: WebhookReceiver.__init__() takes 2
+    # positional arguments but 3 were given`. Unlike the LiveKit Node SDK
+    # (`new WebhookReceiver(apiKey, apiSecret)`), the Python SDK's
+    # WebhookReceiver takes a single `TokenVerifier` instance, not raw
+    # key/secret strings directly - the credentials get wrapped in that
+    # object first. This was silently breaking every webhook delivery with
+    # a 400, which meant `Call.status` never reached CONNECTED via the
+    # webhook path and `started_at` never got set server-side (the call
+    # timer was surviving only on the client-side
+    # RoomEvent.ParticipantConnected fallback in CallModals.tsx).
     if not settings.LIVEKIT_API_KEY or not settings.LIVEKIT_API_SECRET:
         raise HTTPException(status_code=500, detail="LiveKit credentials missing")
-    return WebhookReceiver(settings.LIVEKIT_API_KEY, settings.LIVEKIT_API_SECRET)
+    verifier = TokenVerifier(settings.LIVEKIT_API_KEY, settings.LIVEKIT_API_SECRET)
+    return WebhookReceiver(verifier)
 
 
 TERMINAL = (

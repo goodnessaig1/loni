@@ -28,6 +28,20 @@ export type ServerCallEventType =
   | 'call_missed'
   | 'call_failed';
 
+// Guards against the exact race this fixes: `call_accepted` is delivered
+// over BOTH the WebSocket and FCM by design (see backend's `_emit()`), and
+// the old guard only blocked re-entry once `store.status` reached
+// CONNECTING/CONNECTED - but `store.setAccepted()` sets status to
+// 'ACCEPTED' first, synchronously, before the `await apiClient.post(...)`
+// below even starts. A second delivery arriving in that window saw status
+// still 'ACCEPTED' (not blocked by the old check) and fired a second
+// POST /join for the same call - confirmed in production logs
+// (`POST /api/v1/calls/29/join` appeared twice back to back). A dedicated
+// in-flight set is more robust than widening the status check further,
+// since it doesn't depend on exactly which store field happens to be set
+// at exactly which point in the async flow.
+const joinInFlight = new Set<number>();
+
 function toParticipant(raw: any): ParticipantInfo | null {
   if (!raw) return null;
   return {
@@ -60,8 +74,12 @@ export async function applyServerCallEvent(type: string, data: any) {
       // The accept event does NOT carry a token for the caller (only the
       // nurse who called POST /accept gets one back synchronously) - the
       // caller must exchange it for a token via POST /join. Guard against
-      // doing this twice if both the WS and the push deliver the event.
-      if (store.status === 'CONNECTING' || store.status === 'CONNECTED') return;
+      // doing this twice if both the WS and the push deliver the event
+      // (see joinInFlight's comment above for why status alone isn't
+      // sufficient here).
+      if (store.status === 'ACCEPTED' || store.status === 'CONNECTING' || store.status === 'CONNECTED') return;
+      if (joinInFlight.has(callId)) return;
+      joinInFlight.add(callId);
       store.setAccepted({ remote: toParticipant(data.receiver) });
       try {
         const res = await apiClient.post(`/calls/${callId}/join`);
@@ -73,6 +91,8 @@ export async function applyServerCallEvent(type: string, data: any) {
         });
       } catch (e) {
         console.error('[callEvents] Failed to join accepted call', e);
+      } finally {
+        joinInFlight.delete(callId);
       }
       return;
     }
