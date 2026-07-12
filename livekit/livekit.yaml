@@ -26,7 +26,7 @@ rtc:
   # firewalls) fall back to the TURN relay configured below - which is why
   # getting TURN right matters just as much as node_ip.
   use_external_ip: false
-  node_ip: 192.168.100.132 # <-- CHANGE PER ENVIRONMENT. See comment above.
+  node_ip: 192.168.100.8 # <-- CHANGE PER ENVIRONMENT. See comment above.
   enable_loopback_candidate: false
 redis:
   address: "redis:6379"
@@ -60,6 +60,6 @@ turn:
 webhook:
   api_key: devkey
   urls:
-    - http://192.168.100.132:8000/api/v1/livekit/webhook # <-- must match LIVEKIT_URL's host reachable from the LiveKit container
+    - http://192.168.100.8:8000/api/v1/livekit/webhook # <-- must match LIVEKIT_URL's host reachable from the LiveKit container
 keys:
   devkey: "super_secret_livekit_key_32_chars_long!"
