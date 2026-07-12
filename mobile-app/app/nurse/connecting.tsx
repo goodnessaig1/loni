@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
@@ -14,7 +14,7 @@ export default function ConnectingNurseScreen() {
   const router = useRouter();
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const { requestCall, hangupCall } = useCall();
-  const { isActive, callId, endCall } = useCallStore();
+  const { isActive, status, callId, endCall } = useCallStore();
 
   useEffect(() => {
     if (isActive) {
@@ -23,14 +23,42 @@ export default function ConnectingNurseScreen() {
   }, [isActive]);
 
   useEffect(() => {
+    // Issue 8 fix: previously this screen only reacted to `isActive`
+    // becoming true (accepted). If the nurse declined, or the ring timed
+    // out server-side (see backend's `_ring_timeout_watchdog`), or the
+    // call failed, this screen had no idea and would sit here forever
+    // with the ringback tone looping until the Mother manually cancelled.
+    const terminal: (typeof status)[] = ['REJECTED', 'TIMEOUT', 'FAILED', 'CANCELLED', 'MISSED', 'ENDED'];
+    if (terminal.includes(status)) {
+      router.back();
+    }
+  }, [status]);
+
+  useEffect(() => {
     let soundObject: Audio.Sound | null = null;
     let isMounted = true;
 
     async function playSound() {
+      // Issue 5 fix: now that hooks/useCall.ts's requestCall() calls
+      // RNCallKeep.startCall() (lib/callKeepService.ts), iOS provides a
+      // REAL system ringback tone via CallKit automatically - playing our
+      // own bundled tone on top of it would double up. Android's
+      // self-managed ConnectionService (via CallKeep) does NOT auto-play a
+      // ringback tone for outgoing calls (that remains an app
+      // responsibility even with telecom integration), so the bundled
+      // tone is still used there - this is the "custom audio only where
+      // required" split Issue 5 asks for.
+      if (Platform.OS === 'ios') return;
+
       try {
+        // `staysActiveInBackground: true` (Issue 13): a call in progress
+        // must keep playing audio in the background/locked-screen like any
+        // real phone call - previously `false` here killed the ringback
+        // (and, after LiveKit connects, live call audio) the instant the
+        // screen locked or the app backgrounded.
         await Audio.setAudioModeAsync({
           playsInSilentModeIOS: true,
-          staysActiveInBackground: false,
+          staysActiveInBackground: true,
         });
 
         const { sound } = await Audio.Sound.createAsync(
@@ -57,7 +85,6 @@ export default function ConnectingNurseScreen() {
     });
 
     return () => {
-      isMounted = false;
       isMounted = false;
       if (soundObject) {
         soundObject.stopAsync().then(() => soundObject?.unloadAsync());

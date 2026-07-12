@@ -2,37 +2,56 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useCallStore } from '../store/callStore';
-import { apiClient } from '../api/client';
+import { useCall } from '../hooks/useCall';
 
 const { width, height } = Dimensions.get('window');
 
+/**
+ * Issue 2 / Issue 4 fix: this screen previously called
+ * POST /calls/{id}/join directly on Accept. `/join` does NOT run the
+ * accept state machine at all - it never sets Call.status=ACCEPTED, never
+ * creates the LiveKit room, never sets receiver_id, and never notifies the
+ * caller. If a Nurse ever landed on this specific screen and pressed
+ * Accept, the call would silently never actually get accepted server-side:
+ * the Nurse would connect to an ad-hoc auto-created LiveKit room alone
+ * while the Mother's app waited forever for a `call_accepted` event that
+ * was never sent. It also read caller info from raw route params instead
+ * of the shared store, so it never got the real name/trimester data
+ * (Issue 6) `applyServerCallEvent` puts in the store.
+ *
+ * In the primary flow, `components/CallModals.tsx` (mounted globally in
+ * `app/_layout.tsx`) already renders an equivalent incoming-call UI
+ * reactively whenever `callStore.isIncoming` is true, which is how a
+ * foregrounded app - or one that was just woken and cold-started via the
+ * notifee full-screen intent, see NotificationContext.tsx's
+ * `getInitialNotification()` handling - shows the incoming call. This
+ * route is kept only as an explicit deep-link target (and now uses the
+ * same store + useCall()->POST /accept path CallModals uses) rather than
+ * a second, divergent implementation.
+ */
 export default function IncomingCallScreen() {
   const router = useRouter();
-  const { call_id, caller_name, room_name, profile_picture } = useLocalSearchParams<{ call_id: string, caller_name: string, room_name: string, profile_picture?: string }>();
-  const setCallConnected = useCallStore(state => state.setCallConnected);
-  const endCall = useCallStore(state => state.endCall);
+  const { callId, remoteParticipant } = useCallStore();
+  const { acceptCall, rejectCall } = useCall();
 
   const handleAccept = async () => {
+    if (!callId) { router.replace('/'); return; }
     try {
-      const res = await apiClient.post(`/calls/${call_id}/join`);
-      setCallConnected(res.data.token);
-      router.replace('/'); 
+      await acceptCall(callId);
     } catch (e) {
-      console.error("Failed to accept call", e);
+      console.error('Failed to accept call', e);
+    } finally {
       router.replace('/');
     }
   };
 
   const handleDecline = async () => {
-    try {
-      await apiClient.post(`/calls/${call_id}/end`);
-    } catch (e) {
-      console.error("Failed to decline call", e);
+    if (callId) {
+      await rejectCall(callId);
     }
-    endCall();
     router.replace('/');
   };
 
@@ -43,9 +62,9 @@ export default function IncomingCallScreen() {
     >
       <View style={styles.header}>
         <View style={styles.avatarContainer}>
-          {profile_picture ? (
+          {remoteParticipant?.profile_picture ? (
             <Image
-              source={{ uri: profile_picture }}
+              source={{ uri: remoteParticipant.profile_picture }}
               style={styles.avatar}
               contentFit="cover"
             />
@@ -56,8 +75,12 @@ export default function IncomingCallScreen() {
           )}
         </View>
         <View style={styles.callerInfo}>
-          <Text style={styles.callerName}>{caller_name || 'Unknown Caller'}</Text>
-          <Text style={styles.statusText}>connecting...</Text>
+          <Text style={styles.callerName}>{remoteParticipant?.name || 'Unknown Caller'}</Text>
+          {!!remoteParticipant?.trimester && (
+            <Text style={styles.statusText}>
+              {remoteParticipant.trimester}{remoteParticipant.pregnancy_week ? ` · ${remoteParticipant.pregnancy_week}` : ''}
+            </Text>
+          )}
         </View>
       </View>
 

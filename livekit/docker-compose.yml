@@ -29,6 +29,22 @@ services:
     network_mode: "host"
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    # Issue 9: turnserver.conf had static-auth-secret=YOUR_COTURN_SECRET and
+    # external-ip=YOUR_PUBLIC_IP as literal, un-substituted placeholders -
+    # coturn was reading that literal string as the secret, which could
+    # never match the credentials LiveKit computes from COTURN_SECRET in
+    # .env. The TURN relay (the fallback that rescues connectivity for any
+    # device that can't reach node_ip directly - i.e. most real phones on
+    # cellular/NAT) was therefore silently non-functional. CLI flags below
+    # override the same keys from the mounted config file and are filled
+    # from this directory's .env, so there's exactly one place to configure
+    # these values instead of two files that can drift out of sync.
+    command: >
+      -c /etc/coturn/turnserver.conf
+      --external-ip=${PUBLIC_IP}
+      --static-auth-secret=${COTURN_SECRET}
+      --realm=${DOMAIN}
+      --server-name=${DOMAIN}
 
   # Caddy reverse proxy for automatic SSL termination of WebSocket/API
   caddy:

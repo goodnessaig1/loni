@@ -1,38 +1,88 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, Dimensions } from 'react-native';
-import { useCallStore } from '../store/callStore';
+import { Audio } from 'expo-av';
+import { useCallStore, ConnectionQuality } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
 import { LiveKitRoom, useRoomContext, useLocalParticipant } from '@livekit/react-native';
-import { RoomEvent } from 'livekit-client';
+import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, Track } from 'livekit-client';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
+/**
+ * Issue 12 fix: only RoomEvent.ConnectionStateChanged was handled before.
+ * Issue 3 fix: timer now keys off callStore.connectedAt (set from
+ * ParticipantConnected locally + the backend's webhook-driven `call_state`
+ * WS event - see mobile-app/components/CallModals.tsx for the full
+ * rationale, identical here).
+ * Issue 6/7 fix: this screen used to hardcode "🤰 2nd Trimester" for
+ * EVERY caller regardless of who was actually calling. Now reads
+ * `remoteParticipant.trimester` / `.pregnancy_week`, populated by the
+ * backend from the real Mother's profile (see backend
+ * app/modules/calls/services/call_service.py::_participant_info).
+ */
 const ActiveCallUI = () => {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
-  const { endCall, callId, callerName } = useCallStore();
+  const { endCall, callId, remoteParticipant, connectedAt, status, setConnected, setReconnecting, setConnectionQuality } = useCallStore();
   const { hangupCall } = useCall();
-  const [connected, setConnected] = useState(room.state === 'connected');
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {
-    const onConnStateChanged = () => setConnected(room.state === 'connected');
-    room.on(RoomEvent.ConnectionStateChanged, onConnStateChanged);
-    return () => { room.off(RoomEvent.ConnectionStateChanged, onConnStateChanged); };
+    const onParticipantConnected = () => {
+      if (room.remoteParticipants.size >= 1 && room.state === ConnectionState.Connected) {
+        setConnected();
+      }
+    };
+    const onReconnecting = () => setReconnecting();
+    const onReconnected = () => setConnected();
+    const onQualityChanged = (quality: LKConnectionQuality, participant: any) => {
+      if (participant?.sid === localParticipant?.sid) {
+        const mapped: ConnectionQuality =
+          quality === LKConnectionQuality.Excellent ? 'excellent' :
+          quality === LKConnectionQuality.Good ? 'good' :
+          quality === LKConnectionQuality.Poor ? 'poor' : 'unknown';
+        setConnectionQuality(mapped);
+      }
+    };
+    const onTrackSubscribed = (track: any) => {
+      if (track.kind === Track.Kind.Audio) {
+        console.log('[LiveKit] Remote audio track subscribed');
+      }
+    };
+    const onDisconnected = () => endCall('ENDED');
+
+    room.on(RoomEvent.ParticipantConnected, onParticipantConnected);
+    room.on(RoomEvent.Reconnecting, onReconnecting);
+    room.on(RoomEvent.Reconnected, onReconnected);
+    room.on(RoomEvent.ConnectionQualityChanged, onQualityChanged);
+    room.on(RoomEvent.TrackSubscribed, onTrackSubscribed);
+    room.on(RoomEvent.Disconnected, onDisconnected);
+
+    onParticipantConnected();
+
+    return () => {
+      room.off(RoomEvent.ParticipantConnected, onParticipantConnected);
+      room.off(RoomEvent.Reconnecting, onReconnecting);
+      room.off(RoomEvent.Reconnected, onReconnected);
+      room.off(RoomEvent.ConnectionQualityChanged, onQualityChanged);
+      room.off(RoomEvent.TrackSubscribed, onTrackSubscribed);
+      room.off(RoomEvent.Disconnected, onDisconnected);
+    };
   }, [room]);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (connected) {
-      interval = setInterval(() => {
-        setDuration(prev => prev + 1);
-      }, 1000);
+    if (!connectedAt) {
+      setDuration(0);
+      return;
     }
+    const tick = () => setDuration(Math.max(0, Math.floor((Date.now() - connectedAt) / 1000)));
+    tick();
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [connected]);
+  }, [connectedAt]);
 
   const formatDuration = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -46,6 +96,15 @@ const ActiveCallUI = () => {
     }
   };
 
+  const statusLabel =
+    status === 'CONNECTED' ? formatDuration(duration) :
+    status === 'RECONNECTING' ? 'Reconnecting...' :
+    'Connecting...';
+
+  const trimesterLabel = remoteParticipant?.trimester
+    ? `🤰 ${remoteParticipant.trimester}${remoteParticipant.pregnancy_week ? ` · ${remoteParticipant.pregnancy_week}` : ''}`
+    : null;
+
   return (
     <LinearGradient colors={['#D8B4A0', '#4A6970', '#0B192C']} style={styles.fullScreen}>
       <SafeAreaView style={styles.activeSafeArea}>
@@ -53,10 +112,10 @@ const ActiveCallUI = () => {
         <View style={styles.topBar}>
           <View style={styles.callOngoingPill}>
             <Feather name="bar-chart-2" size={16} color="white" />
-            <Text style={styles.callOngoingText}>Call Ongoing</Text>
+            <Text style={styles.callOngoingText}>{status === 'RECONNECTING' ? 'Reconnecting' : 'Call Ongoing'}</Text>
           </View>
-          <TouchableOpacity 
-            style={[styles.topMuteBtn, !isMicrophoneEnabled && styles.topMutedBtn]} 
+          <TouchableOpacity
+            style={[styles.topMuteBtn, !isMicrophoneEnabled && styles.topMutedBtn]}
             onPress={toggleMicrophone}
           >
             <Feather name={isMicrophoneEnabled ? "mic" : "mic-off"} size={20} color={isMicrophoneEnabled ? "white" : "#ef4444"} />
@@ -74,18 +133,20 @@ const ActiveCallUI = () => {
 
         {/* Caller Details */}
         <View style={styles.callerDetails}>
-          <Text style={styles.durationText}>{formatDuration(duration)}</Text>
-          <Text style={styles.activeCallerName}>{callerName || "A Mother"}</Text>
-          <View style={styles.trimesterBadge}>
-            <Text style={styles.trimesterText}>🤰 2nd Trimester</Text>
-          </View>
+          <Text style={styles.durationText}>{statusLabel}</Text>
+          <Text style={styles.activeCallerName}>{remoteParticipant?.name || "A Mother"}</Text>
+          {trimesterLabel && (
+            <View style={styles.trimesterBadge}>
+              <Text style={styles.trimesterText}>{trimesterLabel}</Text>
+            </View>
+          )}
         </View>
 
         {/* Bottom Actions */}
         <View style={styles.bottomActions}>
           <TouchableOpacity style={styles.endCallBtn} onPress={() => {
               if (callId) hangupCall(callId);
-              else endCall();
+              else endCall('ENDED');
           }}>
             <MaterialIcons name="call-end" size={24} color="white" />
             <Text style={styles.endCallText}>End Call</Text>
@@ -97,19 +158,31 @@ const ActiveCallUI = () => {
   );
 };
 
-import { Audio } from 'expo-av';
-
 export const CallModals = () => {
-  const { isIncoming, isActive, callerName, callId, roomToken } = useCallStore();
-  const { acceptCall, rejectCall } = useCall();
-  
-  useEffect(() => {
-    if (isActive) {
-      Audio.requestPermissionsAsync().catch(console.error);
-    }
-  }, [isActive]);
+  const { isIncoming, isActive, remoteParticipant, callId, roomToken, livekitUrl, endCall } = useCallStore();
+  const { acceptCall, rejectCall, hangupCall } = useCall();
+  const [micGranted, setMicGranted] = useState(false);
 
-  // We've removed Audio because Notifee handles the ringing natively!
+  useEffect(() => {
+    // Issue 13 fix: request (and gate connecting on) mic permission BEFORE
+    // <LiveKitRoom connect={true}> mounts, instead of racing it.
+    if (isActive && roomToken) {
+      Audio.requestPermissionsAsync()
+        .then((res) => setMicGranted(res.granted))
+        .catch((e) => {
+          console.error('Microphone permission request failed', e);
+          setMicGranted(false);
+        });
+    } else {
+      setMicGranted(false);
+    }
+  }, [isActive, roomToken]);
+
+  // Issue 5: ringing is handled entirely by notifee's native full-screen
+  // call notification (see index.js) while backgrounded, and by the
+  // system notification sound/vibration even in foreground - no custom
+  // audio file is played here, matching "use the platform's native call
+  // experience" (Issue 5's requirement).
 
   const handleAccept = () => {
     if (callId) acceptCall(callId);
@@ -119,7 +192,7 @@ export const CallModals = () => {
     if (callId) rejectCall(callId);
   };
 
-  // Incoming Call UI
+  // Incoming Call UI (Issue 6: real caller info, not "Mother Calling")
   if (isIncoming && !isActive && callId) {
     return (
       <Modal visible animationType="slide" transparent>
@@ -127,11 +200,19 @@ export const CallModals = () => {
           <SafeAreaView style={styles.incomingSafeArea}>
             <View style={styles.incomingHeader}>
               <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={40} color="white" />
+                {remoteParticipant?.profile_picture ? (
+                  <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.avatar} contentFit="cover" />
+                ) : (
+                  <Ionicons name="person" size={40} color="white" />
+                )}
               </View>
               <View style={styles.incomingInfo}>
-                <Text style={styles.incomingCallerName}>{callerName || "A Mother"}</Text>
-                <Text style={styles.connectingText}>connecting...</Text>
+                <Text style={styles.incomingCallerName}>{remoteParticipant?.name || "Unknown Caller"}</Text>
+                {!!remoteParticipant?.trimester && (
+                  <Text style={styles.connectingText}>
+                    {remoteParticipant.trimester}{remoteParticipant.pregnancy_week ? ` · ${remoteParticipant.pregnancy_week}` : ''}
+                  </Text>
+                )}
               </View>
             </View>
 
@@ -158,14 +239,50 @@ export const CallModals = () => {
 
   // Active Connected Call UI
   if (isActive && roomToken) {
+    if (!livekitUrl) {
+      // Issue 9 fix: no more hardcoded LAN-IP fallback - see mobile-app's
+      // CallModals.tsx for the identical rationale.
+      console.error('[CallModals] No livekitUrl from server - cannot connect.');
+      return (
+        <Modal visible animationType="fade" transparent>
+          <View style={styles.incomingSafeArea}>
+            <Text style={styles.incomingCallerName}>Call Failed</Text>
+            <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={() => endCall('FAILED')}>
+              <MaterialIcons name="call-end" size={32} color="white" />
+            </TouchableOpacity>
+          </View>
+        </Modal>
+      );
+    }
+
+    if (!micGranted) {
+      return (
+        <Modal visible animationType="fade" transparent>
+          <SafeAreaView style={styles.incomingSafeArea}>
+            <Text style={styles.incomingCallerName}>Microphone Required</Text>
+            <Text style={styles.connectingText}>Please allow microphone access to continue the call.</Text>
+            <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={() => {
+              if (callId) hangupCall(callId); else endCall('ENDED');
+            }}>
+              <MaterialIcons name="call-end" size={32} color="white" />
+            </TouchableOpacity>
+          </SafeAreaView>
+        </Modal>
+      );
+    }
+
     return (
       <Modal visible animationType="fade">
-        <LiveKitRoom 
-          serverUrl={process.env.EXPO_PUBLIC_LIVEKIT_URL || 'ws://192.168.100.132:7880'} 
-          token={roomToken} 
-          connect={true} 
-          audio={true} 
+        <LiveKitRoom
+          serverUrl={livekitUrl}
+          token={roomToken}
+          connect={true}
+          audio={true}
           video={false}
+          options={{
+            adaptiveStream: true,
+            dynacast: true,
+          }}
         >
           <ActiveCallUI />
         </LiveKitRoom>

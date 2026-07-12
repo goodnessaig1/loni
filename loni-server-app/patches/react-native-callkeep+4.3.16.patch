@@ -1,0 +1,34 @@
+diff --git a/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java b/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java
+--- a/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java
++++ b/node_modules/react-native-callkeep/android/src/main/java/io/wazo/callkeep/RNCallKeepModule.java
+@@ -434,7 +434,17 @@
+         this.hasListeners = false;
+     }
+
+-    @ReactMethod
++    // Patched (see patches/react-native-callkeep+4.3.16.patch): this 3-arg
++    // overload used to also carry @ReactMethod, which put TWO native
++    // methods on the JS bridge under the same name ("displayIncomingCall").
++    // The legacy bridge disambiguated by argument count at call time, but
++    // New Architecture's TurboModule interop parses @ReactMethod methods
++    // by name only and throws "Module exports two methods to JavaScript
++    // with the same name" the instant ANY property on this module is
++    // accessed - breaking the whole RNCallKeep module, not just this
++    // method. The JS wrapper (index.js's `displayIncomingCall`) always
++    // calls the 4-arg overload on Android, so this one is dead from JS and
++    // safe to keep as a plain (non-@ReactMethod) Java helper.
+     public void displayIncomingCall(String uuid, String number, String callerName) {
+         this.displayIncomingCall(uuid, number, callerName, false, null);
+     }
+@@ -483,7 +493,10 @@
+         conn.onAnswer();
+     }
+
+-    @ReactMethod
++    // Patched (see patches/react-native-callkeep+4.3.16.patch): same
++    // duplicate-@ReactMethod issue as displayIncomingCall above. The JS
++    // wrapper (index.js's `startCall`) always calls the 4-arg overload on
++    // Android, so this 3-arg one is dead from JS.
+     public void startCall(String uuid, String number, String callerName) {
+         this.startCall(uuid, number, callerName, false, null);
+     }
