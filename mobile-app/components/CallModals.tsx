@@ -368,7 +368,7 @@ export const CallModals = () => {
   if (isActive && roomToken) {
     if (!livekitUrl) {
       // Issue 9 fix: previously fell back to a hardcoded developer LAN IP
-      // (`ws://192.168.100.8:7880`) baked into source, which silently
+      // (`ws://192.168.100.136:7880`) baked into source, which silently
       // "worked" on one WiFi network and silently failed everywhere else.
       // The URL now always comes from the backend's CallActionResponse
       // (LiveKitService.get_public_url()) - if it's missing, that's a real

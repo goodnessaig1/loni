@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRoom, useParticipant, useTracks } from '@livekit/react-native';
 import { Room, RoomEvent, Track, TrackEvent } from 'livekit-client';
 
-const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'ws://192.168.100.8:7880';
+const LIVEKIT_URL = process.env.EXPO_PUBLIC_LIVEKIT_URL || 'ws://192.168.100.136:7880';
 
 export const useLiveKit = (token: string | null) => {
   const [room, setRoom] = useState<Room | null>(null);

@@ -26,7 +26,7 @@ rtc:
   # firewalls) fall back to the TURN relay configured below - which is why
   # getting TURN right matters just as much as node_ip.
   use_external_ip: false
-  node_ip: 192.168.100.8 # <-- CHANGE PER ENVIRONMENT. See comment above.
+  node_ip: 192.168.100.136 # <-- CHANGE PER ENVIRONMENT. See comment above.
   enable_loopback_candidate: false
 redis:
   address: "redis:6379"
@@ -57,9 +57,19 @@ turn:
 # The URL below was also wrong before (pointed at /api/v1/calls/webhook,
 # which doesn't exist) - the webhook router is mounted at prefix
 # "/livekit" in app/api/router.py, so the real path is /api/v1/livekit/webhook.
+#
+# `host.docker.internal` (not the LAN IP) - on Docker Desktop for Mac/
+# Windows this is a stable, built-in alias that always resolves to the
+# host machine from inside any container, regardless of what the host's
+# LAN IP currently is. This is what stops the webhook URL from needing to
+# be updated every time your IP changes (see scripts/update-lan-ip.sh for
+# the couple of values that genuinely still do need it). On Linux Docker
+# (no Docker Desktop), this alias isn't automatic - add
+# `extra_hosts: ["host.docker.internal:host-gateway"]` to the `livekit`
+# service in docker-compose.yml if you ever deploy there.
 webhook:
   api_key: devkey
   urls:
-    - http://192.168.100.8:8000/api/v1/livekit/webhook # <-- must match LIVEKIT_URL's host reachable from the LiveKit container
+    - http://host.docker.internal:8000/api/v1/livekit/webhook
 keys:
   devkey: "super_secret_livekit_key_32_chars_long!"
