@@ -45,7 +45,8 @@
       ],
       "./plugins/withNotifeeAndroid.js",
       "./plugins/withLiveKitAndroid.js",
-      "./plugins/withCallKeepAndroid.js"
+      "./plugins/withCallKeepAndroid.js",
+      "./plugins/withMainActivityLocked.js"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",

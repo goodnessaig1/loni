@@ -61,9 +61,7 @@ setupCallKeep().catch((e) => console.error('[CallKeep] setup failed at boot', e)
 // CallKeep's own (currently disabled) foreground service.
 registerCallForegroundService();
 
-// Handle background/killed-state FCM messages (Android's incoming_call
-// path, and the fallback path for any call event on either platform when
-// the app isn't fully killed).
+// Handle background/killed-state FCM messages
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   console.log('Background message received:', remoteMessage?.data?.type);
 
@@ -71,74 +69,52 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     const callId = Number(remoteMessage.data.call_id);
     const callerName = remoteMessage.data.caller_name || 'Someone';
 
-    // Bug found via real-device/emulator testing: `displayIncomingCall()`
-    // (lib/callKeepService.ts) calls a `void` native bridge method on
-    // Android - it has no way to know whether Telecom actually accepted and
-    // displayed the call, only whether the JS->native call was made without
-    // throwing. The Java side silently no-ops (just logs a warning) if the
-    // self-managed phone account isn't registered/enabled yet - which is
-    // the default state on first run, and is especially unreliable on
-    // emulators/AVDs, where the "enable calling account" system prompt
-    // doesn't always surface the way it does on real hardware. The
-    // previous `usedCallKeep` gate treated "the bridge call didn't throw"
-    // as "the user is now seeing an incoming call", and skipped the notifee
-    // fallback whenever that was wrongly true - the exact "nothing rings in
-    // the background, the call is only visible once I open the app" bug
-    // this comment is replacing. notifee's full-screen notification is the
-    // one path in this app that's actually been proven to work reliably
-    // (real-device screenshots, this bug report's own "I see the call once
-    // I open the app" confirms the underlying FCM delivery + store
-    // hydration is fine) - so it's now unconditional. CallKeep is called
-    // best-effort alongside it; when Telecom does successfully take the
-    // self-managed call, its own system call UI simply layers on top - a
-    // possible brief double-surface is a far smaller problem than the call
-    // not ringing at all.
-    if (Platform.OS === 'android' && callId) {
+    if (callId) {
       try {
         await setupCallKeep();
         displayIncomingCall(callId, callerName);
       } catch (e) {
-        console.error('[CallKeep] displayIncomingCall failed - notifee will still ring', e);
+        console.error('[CallKeep] displayIncomingCall failed', e);
       }
     }
 
-    const channelId = await notifee.createChannel({
-      id: 'calls_v2',
-      name: 'Incoming Calls',
-      vibration: true,
-      importance: AndroidImportance.HIGH,
-      sound: 'default',
-    });
-
-    await notifee.displayNotification({
-      id: `incoming-${remoteMessage.data.call_id}`,
-      title: 'Incoming Call',
-      body: `${callerName} is calling`,
-      data: remoteMessage.data,
-      android: {
-        channelId,
-        category: AndroidCategory.CALL,
-        visibility: AndroidVisibility.PUBLIC,
+    if (Platform.OS === 'android') {
+      const channelId = await notifee.createChannel({
+        id: 'calls_v3_ringtone',
+        name: 'Incoming Calls (Ringtone)',
+        vibration: true,
         importance: AndroidImportance.HIGH,
-        fullScreenAction: { id: 'default' },
-        actions: [
-          { title: 'Decline', pressAction: { id: 'decline' } },
-          { title: 'Accept', pressAction: { id: 'accept' } },
-        ],
-      },
-    });
+        sound: 'content://settings/system/ringtone', // Attempt to use system ringtone
+      });
+
+      await notifee.displayNotification({
+        id: `incoming-${remoteMessage.data.call_id}`,
+        title: 'Incoming Call',
+        body: `Tap to answer call from ${callerName}`,
+        data: remoteMessage.data,
+        android: {
+          channelId,
+          category: AndroidCategory.CALL,
+          visibility: AndroidVisibility.PUBLIC,
+          importance: AndroidImportance.HIGH,
+          // Launch the app's MainActivity immediately if locked
+          fullScreenAction: { id: 'default', mainComponent: 'loni-server-app' },
+          // Removed standard Accept/Decline actions to force the user to interact
+          // with the full-screen native React Native UI (just like WhatsApp).
+          // Android 12+ Heads-Up will just be a tap-to-open banner if unlocked.
+          pressAction: { id: 'default' },
+        },
+      });
+    }
   } else if (remoteMessage.data && ['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(remoteMessage.data.type)) {
-    // Issue 4/8: clear/end a still-ringing call if it was resolved before
-    // the Nurse acted on it (Mother cancelled, another nurse in a
-    // broadcast call answered first, or it timed out).
     const callId = remoteMessage.data.call_id ? Number(remoteMessage.data.call_id) : null;
     if (callId) {
       try {
         reportCallEnded(callId);
-      } catch (e) {
-        console.error('[CallKeep] reportCallEnded failed', e);
+      } catch (e) {}
+      if (Platform.OS === 'android') {
+        await notifee.cancelNotification(`incoming-${callId}`).catch(() => {});
       }
-      await notifee.cancelNotification(`incoming-${callId}`).catch(() => {});
     }
   }
 });
