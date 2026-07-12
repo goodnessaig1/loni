@@ -349,3 +349,58 @@ Everything that can be done as source code is done — the full CallKit/Connecti
 **Fix**: `plugins/withNotifeeAndroid.js` (both apps) now does two things instead of one - it still injects notifee's local Maven repo into `build.gradle`, and it now also uses `withAndroidManifest` to re-declare `app.notifee.core.ForegroundService` in the app's own generated `AndroidManifest.xml` with `android:foregroundServiceType="microphone"` and `tools:replace="android:foregroundServiceType"` (plus `AndroidConfig.Manifest.ensureToolsAvailable()` to add the `xmlns:tools` namespace the `tools:replace` attribute requires). Android's manifest merger gives the app module's own manifest priority over a library/AAR manifest for the same component, and `tools:replace` is what tells it to resolve the attribute conflict with the app's value instead of erroring at build time. Verified by running the plugin's exact mod logic against the real generated `mobile-app/android/app/src/main/AndroidManifest.xml` and confirming the output XML contains the corrected `<service>` tag with both attributes present.
 
 **This requires a native rebuild** (`npx expo prebuild --clean` + a fresh native build for both apps) - it edits `AndroidManifest.xml`, which only regenerates from `app.json`/config plugins during prebuild, not on a JS/Metro reload.
+
+---
+
+## Round 6: root-caused and fixed the real reason CallKeep was disabled, re-enabled native call UI
+
+The prior "third, undiagnosed CallKeep crash" that led to shipping with `EXPO_PUBLIC_ENABLE_CALLKEEP=false` (the screenshot showing a plain notifee notification banner instead of a real call screen) is now root-caused and fixed - not by disabling anything further, but by finding the actual missing native wiring.
+
+**Root cause, confirmed against `react-native-callkeep`'s own official install docs** (`docs/android-installation.md` - not bundled in the npm package, fetched directly from the `react-native-webrtc/react-native-callkeep` GitHub repo): self-managed `ConnectionService` mode requires the consuming app to manually declare, in its own `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.BIND_TELECOM_CONNECTION_SERVICE"/>
+<service android:name="io.wazo.callkeep.VoiceConnectionService"
+    android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+    android:foregroundServiceType="microphone">
+  <intent-filter>
+    <action android:name="android.telecom.ConnectionService" />
+  </intent-filter>
+</service>
+```
+
+`react-native-callkeep` ships **no Android Expo config plugin at all** (confirmed - no `app.plugin.js` in the package; the only plugin that existed, `withCallKeepIOS.js`, is iOS-only entitlements). Neither the library's own bundled `AndroidManifest.xml` (which only declares `<uses-permission>` entries) nor either app's generated manifest ever declared this `<service>` - confirmed by grepping both for `VoiceConnectionService` and finding nothing. `CK.setup({ android: { selfManaged: true } })` calls `TelecomManager.registerPhoneAccount()`, and `displayIncomingCall()`/`startCall()` call `telecomManager.addNewIncomingCall()`/`.placeCall()` - all of which hand off to Android's Telecom subsystem, which then needs to bind to `VoiceConnectionService` to actually run the call. With no manifest entry to bind to, Telecom has nothing to route to - a well-documented cause of a hard crash at exactly the moment a call is accepted or placed, on **both** apps (mobile-app calls `CK.setup`/`CK.startCall` for outgoing calls, loni-server-app calls it for incoming calls - both against the same unpatched library).
+
+Also missing, per the library's README ("Android Self Managed Mode" section): the `READ_CALL_LOG` permission, required specifically for self-managed mode and not present in the library's own manifest either. And, separately from the crash: `hasPhoneAccount()` (which gates `displayIncomingCall`/`startCall`/etc. - they silently no-op rather than throw if it's false) requires `CALL_PHONE`, `RECORD_AUDIO`, and `READ_PHONE_NUMBERS`/`READ_PHONE_STATE` to already be runtime-granted, and nothing in either app ever requested them - so even after the crash was fixed, the native call UI would have kept silently doing nothing.
+
+**Fix, all verified against real generated files, not just written and hoped for:**
+
+- New `plugins/withCallKeepAndroid.js` (both apps) - adds the `BIND_TELECOM_CONNECTION_SERVICE` permission and the `VoiceConnectionService` `<service>`/intent-filter declaration via `withAndroidManifest`, same pattern as Round 5's notifee fix.
+- `android.permission.READ_CALL_LOG` added to both `app.json`'s `android.permissions`.
+- New `requestCallKeepAndroidPermissions()` in `lib/permissions.ts` (both apps) - uses React Native's built-in `PermissionsAndroid.requestMultiple` (no new dependency) for `CALL_PHONE`, `READ_PHONE_NUMBERS`/`READ_PHONE_STATE` (branches on API level), and `READ_CALL_LOG`. Called from `setupCallKeep()` in both `lib/callKeepService.ts` files, before `CK.setup()`.
+- `loni-server-app/lib/callKeepService.ts` also now listens for `showIncomingCallUi` and `createIncomingConnectionFailed` - self-managed-mode-specific events the app previously never handled at all (logged for visibility; notifee's notification already renders independently of these, so no functional gap, but their absence made a Telecom-level rejection invisible/silent).
+- **Verification**: ran the plugin's exact logic against both apps' real generated `AndroidManifest.xml` and confirmed the output. Then went further - ran an actual `npx expo prebuild --platform android` in a sandboxed environment for both apps (not just a dry-run simulation) and confirmed the final, real generated manifests contain the `BIND_TELECOM_CONNECTION_SERVICE` permission, the correctly-configured `VoiceConnectionService` service block, and `READ_CALL_LOG`, with no plugin errors or manifest-merge conflicts with Round 5's notifee fix (both plugins coexist correctly). A full Gradle build wasn't possible in this sandbox (no network access to the Gradle distribution, no Android SDK) - that step still needs to happen on a real machine/CI.
+- `EXPO_PUBLIC_ENABLE_CALLKEEP` flipped back to `true` in both apps' `.env` now that the actual root cause is fixed with verified evidence, not a guess.
+
+**This requires `npx expo prebuild --clean` + a fresh native build on both apps** - manifest and permission changes, not JS.
+
+**If it still crashes or misbehaves on a real device**: capture `adb logcat *:S RNCallKeep:V AndroidRuntime:E ActivityManager:E` during the crash and share that output - every fix in this project's CallKeep history so far has come from reading actual source/docs against a real symptom, not from guessing at a fourth possible cause blind.
+
+**What's still unverified (needs a real device, this sandbox can't test it):**
+
+- Whether `hasPhoneAccount()` actually returns `true` after the new runtime permission requests - Android may still show its own "select phone account" or "enable calling account" system prompt (driven by the `alertTitle`/`alertDescription`/`cancelButton`/`okButton` options already passed to `CK.setup()`) on first run, which the user needs to accept once.
+- iOS CallKit: the code path (`setup()`, `displayIncomingCall`, `startCall`, event listeners) has been in place since Round 2 and wasn't touched this round because the reported crash was Android-only and the root cause found was Android-specific (self-managed `ConnectionService` manifest wiring has no iOS equivalent - CallKit doesn't need anything like it). iOS VoIP push (`lib/voipPush.ts`, `backend-new/app/modules/notifications/voip_service.py`) still needs real Apple Developer credentials (`APNS_VOIP_AUTH_KEY`/`APNS_KEY_ID`/`APNS_TEAM_ID` in `backend-new/.env`, currently unset) and a physical iOS device to test at all - VoIP pushes don't work in the Simulator.
+- The notifee fallback notification's ringtone (`sound: 'default'` on the `calls_v2` channel, `index.js`) uses the phone's default *notification* sound, not its *ringtone* - a real, if secondary, gap versus "the device's native incoming call ringtone" when CallKeep is the one actually driving the call (which it now should be, most of the time). Not changed this round; flagged here as a known remaining gap rather than guessed at.
+- Battery-optimization exemption prompting (`Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) - not implemented. Most calling apps prompt for this once during onboarding since OEM battery managers (especially Samsung/Xiaomi/Huawei) can kill background call-handling processes despite a correctly-configured foreground service. Would need a small native module or `expo-intent-launcher`; flagged as a recommended follow-up rather than added speculatively.
+
+---
+
+## Round 7: fixed a regression Round 6 introduced - background incoming calls showed nothing at all until the app was opened
+
+**Symptom, reported after testing Round 6 on an emulator**: no incoming-call UI while backgrounded/killed - not the native CallKit UI, not even the notifee fallback. Opening the app afterward showed the call fine.
+
+**Root cause**: `loni-server-app/index.js`'s FCM background handler used to always fall back to notifee's full-screen notification unless CallKeep had "handled" the call - gated on `usedCallKeep = !!displayIncomingCall(callId, callerName)`. `displayIncomingCall()` (`lib/callKeepService.ts`) calls a `void` native bridge method on Android with no return value indicating success - the JS wrapper returns a non-null UUID as soon as the native module loads, regardless of whether Telecom's self-managed `ConnectionService` actually accepted and displayed anything. The Java implementation silently no-ops (just logs a warning, doesn't throw) when the self-managed phone account isn't registered/enabled yet - which is the default state on first run, and is particularly unreliable on emulators/AVDs where the "enable calling account" system flow doesn't always surface the way it does on real hardware. Net effect: as soon as Round 6 re-enabled CallKeep, `usedCallKeep` became `true` purely because the bridge call didn't throw, the notifee fallback was skipped, and if Telecom's side silently failed to show anything (as it reliably does pre-account-registration), the result was no UI at all - exactly the reported symptom, and a straightforward explanation for why it regressed exactly when CallKeep was turned back on.
+
+**Fix**: removed the `usedCallKeep` gate entirely. CallKeep is now called best-effort (still useful when it works - native lock-screen UI, system ringtone, Telecom integration), but notifee's full-screen notification is unconditional, since it's the one path in this project that's actually been proven reliable end to end (this is also literally the mechanism the very first screenshot in this conversation showed working, before CallKeep was ever turned on). A real device where CallKeep succeeds may briefly show both the Telecom call UI and the notifee notification - a minor cosmetic overlap, not a functional problem, and a much smaller risk than calls not ringing at all.
+
+**This is a pure JS change** (`index.js`) - a Metro/JS reload picks it up, no `expo prebuild` or native rebuild required, unlike Round 6's manifest fix.

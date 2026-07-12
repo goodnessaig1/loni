@@ -1,6 +1,6 @@
 import { Audio } from 'expo-av';
 import * as Notifications from 'expo-notifications';
-import { Linking } from 'react-native';
+import { Linking, PermissionsAndroid, Platform } from 'react-native';
 
 /**
  * Centralized permission manager.
@@ -77,6 +77,51 @@ export async function requestNotificationPermission(): Promise<PermissionStatus>
   if (!current.canAskAgain) return 'blocked';
   const res = await Notifications.requestPermissionsAsync();
   return mapExpoStatus(res as unknown as ExpoPermissionResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Android CallKeep (self-managed ConnectionService) permissions
+// ---------------------------------------------------------------------------
+
+/**
+ * `react-native-callkeep`'s Android side gates almost everything behind its
+ * own `hasPhoneAccount()` check, which requires `hasPermissions()` to be
+ * true - and that checks `CALL_PHONE`, `RECORD_AUDIO`, and
+ * `READ_PHONE_NUMBERS` (API 30+) or `READ_PHONE_STATE` (below API 30) via
+ * plain `ContextCompat.checkSelfPermission` (confirmed by reading
+ * node_modules/react-native-callkeep/android/.../RNCallKeepModule.java).
+ * None of these are ever requested anywhere in this app's JS - so even
+ * after the manifest fix (plugins/withCallKeepAndroid.js) resolves the
+ * crash, `displayIncomingCall`/`startCall`/etc. would keep silently no-op'ing
+ * forever (they log a warning and return rather than throw) because
+ * `hasPhoneAccount()` would never return true. `READ_CALL_LOG` is also
+ * required specifically for self-managed mode per the library's own README
+ * ("Android Self Managed Mode" section) and is declared in app.json but,
+ * like the others, still needs a runtime grant on Android 6+.
+ *
+ * Uses React Native's built-in `PermissionsAndroid.requestMultiple` (no new
+ * dependency) rather than expo-av/expo-notifications since none of these
+ * map to an Expo permissions module. Called once from
+ * `lib/callKeepService.ts`'s `setupCallKeep()`, before `CK.setup()` - a
+ * no-op safe to call repeatedly, same pattern as the rest of this file.
+ */
+export async function requestCallKeepAndroidPermissions(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+
+  const phoneNumberPermission =
+    Platform.Version >= 30
+      ? PermissionsAndroid.PERMISSIONS.READ_PHONE_NUMBERS
+      : PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE;
+
+  try {
+    await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.CALL_PHONE,
+      phoneNumberPermission,
+      PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+    ]);
+  } catch (e) {
+    console.error('[Permissions] CallKeep Android permission request failed', e);
+  }
 }
 
 // ---------------------------------------------------------------------------

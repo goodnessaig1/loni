@@ -44,7 +44,8 @@
         }
       ],
       "./plugins/withNotifeeAndroid.js",
-      "./plugins/withLiveKitAndroid.js"
+      "./plugins/withLiveKitAndroid.js",
+      "./plugins/withCallKeepAndroid.js"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -85,7 +86,8 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.USE_FULL_SCREEN_INTENT",
         "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.READ_CALL_LOG"
       ]
     }
   }

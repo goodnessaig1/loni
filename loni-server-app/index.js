@@ -71,52 +71,62 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     const callId = Number(remoteMessage.data.call_id);
     const callerName = remoteMessage.data.caller_name || 'Someone';
 
-    let usedCallKeep = false;
+    // Bug found via real-device/emulator testing: `displayIncomingCall()`
+    // (lib/callKeepService.ts) calls a `void` native bridge method on
+    // Android - it has no way to know whether Telecom actually accepted and
+    // displayed the call, only whether the JS->native call was made without
+    // throwing. The Java side silently no-ops (just logs a warning) if the
+    // self-managed phone account isn't registered/enabled yet - which is
+    // the default state on first run, and is especially unreliable on
+    // emulators/AVDs, where the "enable calling account" system prompt
+    // doesn't always surface the way it does on real hardware. The
+    // previous `usedCallKeep` gate treated "the bridge call didn't throw"
+    // as "the user is now seeing an incoming call", and skipped the notifee
+    // fallback whenever that was wrongly true - the exact "nothing rings in
+    // the background, the call is only visible once I open the app" bug
+    // this comment is replacing. notifee's full-screen notification is the
+    // one path in this app that's actually been proven to work reliably
+    // (real-device screenshots, this bug report's own "I see the call once
+    // I open the app" confirms the underlying FCM delivery + store
+    // hydration is fine) - so it's now unconditional. CallKeep is called
+    // best-effort alongside it; when Telecom does successfully take the
+    // self-managed call, its own system call UI simply layers on top - a
+    // possible brief double-surface is a far smaller problem than the call
+    // not ringing at all.
     if (Platform.OS === 'android' && callId) {
       try {
         await setupCallKeep();
-        // displayIncomingCall returns null when CallKeep is disabled
-        // (EXPO_PUBLIC_ENABLE_CALLKEEP=false) or failed to load - only
-        // treat it as "handled" if it actually returned a call UUID, or
-        // the notifee fallback below would be wrongly skipped and the
-        // call would ring via NO mechanism at all.
-        const uuid = displayIncomingCall(callId, callerName);
-        usedCallKeep = !!uuid;
+        displayIncomingCall(callId, callerName);
       } catch (e) {
-        console.error('[CallKeep] displayIncomingCall failed, falling back to notifee', e);
+        console.error('[CallKeep] displayIncomingCall failed - notifee will still ring', e);
       }
     }
 
-    if (!usedCallKeep) {
-      // Fallback path (also still useful for logging/notification-shade
-      // visibility even when CallKeep succeeds is intentionally skipped to
-      // avoid a duplicate UI).
-      const channelId = await notifee.createChannel({
-        id: 'calls_v2',
-        name: 'Incoming Calls',
-        vibration: true,
-        importance: AndroidImportance.HIGH,
-        sound: 'default',
-      });
+    const channelId = await notifee.createChannel({
+      id: 'calls_v2',
+      name: 'Incoming Calls',
+      vibration: true,
+      importance: AndroidImportance.HIGH,
+      sound: 'default',
+    });
 
-      await notifee.displayNotification({
-        id: `incoming-${remoteMessage.data.call_id}`,
-        title: 'Incoming Call',
-        body: `${callerName} is calling`,
-        data: remoteMessage.data,
-        android: {
-          channelId,
-          category: AndroidCategory.CALL,
-          visibility: AndroidVisibility.PUBLIC,
-          importance: AndroidImportance.HIGH,
-          fullScreenAction: { id: 'default' },
-          actions: [
-            { title: 'Decline', pressAction: { id: 'decline' } },
-            { title: 'Accept', pressAction: { id: 'accept' } },
-          ],
-        },
-      });
-    }
+    await notifee.displayNotification({
+      id: `incoming-${remoteMessage.data.call_id}`,
+      title: 'Incoming Call',
+      body: `${callerName} is calling`,
+      data: remoteMessage.data,
+      android: {
+        channelId,
+        category: AndroidCategory.CALL,
+        visibility: AndroidVisibility.PUBLIC,
+        importance: AndroidImportance.HIGH,
+        fullScreenAction: { id: 'default' },
+        actions: [
+          { title: 'Decline', pressAction: { id: 'decline' } },
+          { title: 'Accept', pressAction: { id: 'accept' } },
+        ],
+      },
+    });
   } else if (remoteMessage.data && ['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(remoteMessage.data.type)) {
     // Issue 4/8: clear/end a still-ringing call if it was resolved before
     // the Nurse acted on it (Mother cancelled, another nurse in a

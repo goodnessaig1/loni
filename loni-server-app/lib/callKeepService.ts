@@ -87,6 +87,17 @@ export async function setupCallKeep(): Promise<void> {
   if (!CK) return; // disabled, or failed to load - app continues on notifee only
   isSetup = true;
 
+  // Must happen BEFORE CK.setup() - react-native-callkeep's Android side
+  // gates displayIncomingCall/startCall/etc. behind hasPhoneAccount(),
+  // which itself requires CALL_PHONE, READ_PHONE_NUMBERS (or
+  // READ_PHONE_STATE below API 30) and READ_CALL_LOG to already be granted
+  // (see lib/permissions.ts's requestCallKeepAndroidPermissions for the
+  // full explanation). None of these were ever requested anywhere before -
+  // without this, CallKeep would silently no-op forever even after fixing
+  // the missing-manifest-service crash.
+  const { requestCallKeepAndroidPermissions } = await import('./permissions');
+  await requestCallKeepAndroidPermissions();
+
   const options = {
     ios: {
       appName: 'Loni Server',
@@ -174,6 +185,35 @@ export async function setupCallKeep(): Promise<void> {
     // mute button and in-app mute button both work independently today
     // without visibly conflicting (each just enforces "muted" once).
     console.log('[CallKeep] native mute toggled', muted);
+  });
+
+  // Android self-managed mode ONLY (no-op on iOS, where CallKit renders its
+  // own incoming-call UI automatically): per react-native-callkeep's own
+  // README ("Android Self Managed Mode"), a self-managed app is responsible
+  // for showing ITS OWN incoming-call UI - the framework does not draw one
+  // for you. This event is Telecom's signal that `displayIncomingCall` was
+  // accepted and it's now this app's turn to render something. In practice
+  // notifee's full-screen notification (index.js's messaging().setBackgroundMessageHandler,
+  // and applyServerCallEvent for the foregrounded/WebSocket path) already
+  // renders unconditionally as soon as an incoming_call event arrives - it
+  // doesn't wait for this event - so there's nothing further to draw here.
+  // Logged for visibility/debugging so a "call never actually reached the
+  // Telecom layer" failure is distinguishable from "notifee never even
+  // tried."
+  CK.addEventListener('showIncomingCallUi', ({ callUUID, handle, name }: { callUUID: string; handle: string; name: string }) => {
+    console.log('[CallKeep] showIncomingCallUi', { callUUID, handle, name });
+  });
+
+  // Android self-managed mode ONLY. Telecom refused to let this app show an
+  // incoming call at all (e.g. Do Not Disturb blocking self-managed calls
+  // on some OEM ROMs, or the phone account got disabled) - per the docs,
+  // the correct response is to clean up our own call-id/UUID bookkeeping so
+  // a stale entry doesn't linger; the incoming call still rings via
+  // notifee's independent notification either way.
+  CK.addEventListener('createIncomingConnectionFailed', ({ callUUID }: { callUUID: string }) => {
+    console.warn('[CallKeep] createIncomingConnectionFailed - Telecom refused the call', callUUID);
+    const callId = callIdByUUID.get(callUUID);
+    if (callId != null) forgetCall(callId);
   });
 
   // Replay any events that fired before this listener was attached - e.g.

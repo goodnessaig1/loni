@@ -76,6 +76,17 @@ export async function setupCallKeep(): Promise<void> {
   if (!CK) return; // disabled, or failed to load - app continues without native call UI
   isSetup = true;
 
+  // Must happen BEFORE CK.setup() - react-native-callkeep's Android side
+  // gates startCall/etc. behind hasPhoneAccount(), which itself requires
+  // CALL_PHONE, READ_PHONE_NUMBERS (or READ_PHONE_STATE below API 30) and
+  // READ_CALL_LOG to already be granted (see lib/permissions.ts's
+  // requestCallKeepAndroidPermissions for the full explanation). None of
+  // these were ever requested anywhere before - without this, CallKeep
+  // would silently no-op forever even after fixing the missing-manifest-
+  // service crash.
+  const { requestCallKeepAndroidPermissions } = await import('./permissions');
+  await requestCallKeepAndroidPermissions();
+
   const options = {
     ios: {
       appName: 'Loni',
