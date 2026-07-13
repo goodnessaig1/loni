@@ -97,14 +97,10 @@ export async function setupCallKeep(): Promise<void> {
     },
     android: {
       alertTitle: 'Phone account permission required',
-      alertDescription: 'Loni needs access to manage calls so your call to a nurse works like a normal phone call.',
+      alertDescription: 'Loni needs access to manage calls so your call works like a normal phone call.',
       cancelButton: 'Cancel',
       okButton: 'OK',
-      // Deliberately NOT setting `imageName` - see CALL_SYSTEM_AUDIT.md.
-      // react-native-callkeep resolves it as a `drawable/` resource; this
-      // project's ic_launcher only exists under mipmap-*/, and the
-      // resulting Icon.createWithResource(context, 0) call had no
-      // try/catch on the Java side, crashing the app on every launch.
+      imageName: 'phone_account_icon',
       additionalPermissions: [] as string[],
       selfManaged: true,
       foregroundService: {

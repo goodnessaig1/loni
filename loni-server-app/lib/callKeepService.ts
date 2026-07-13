@@ -111,11 +111,7 @@ export async function setupCallKeep(): Promise<void> {
       alertDescription: 'Loni needs access to manage calls so incoming calls can ring like a normal phone call.',
       cancelButton: 'Cancel',
       okButton: 'OK',
-      // Deliberately NOT setting `imageName` - see CALL_SYSTEM_AUDIT.md.
-      // react-native-callkeep resolves it as a `drawable/` resource; this
-      // project's ic_launcher only exists under mipmap-*/, and the
-      // resulting Icon.createWithResource(context, 0) call had no
-      // try/catch on the Java side, crashing the app on every launch.
+      imageName: 'phone_account_icon',
       additionalPermissions: [] as string[],
       // Self-managed avoids the intrusive default-phone-account/dialer-role
       // prompt on Android 10+ (API 29+) while still getting the native

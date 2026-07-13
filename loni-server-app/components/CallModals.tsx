@@ -1,29 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, Dimensions, Platform, AppState } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, Image as RNImage, Dimensions, Platform, AppState } from 'react-native';
+import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
+import { Audio } from 'expo-av';
+import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { StatusBar } from 'expo-status-bar';
 import { useCallStore, ConnectionQuality } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
 import { LiveKitRoom, useRoomContext, useLocalParticipant } from '@livekit/react-native';
-import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, Track } from 'livekit-client';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Image } from 'expo-image';
-import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import {
-  startCallAudioSession,
-  stopCallAudioSession,
-  listAudioOutputs,
-  selectAudioOutput,
-  showNativeAudioRoutePicker,
-} from '../lib/audioSession';
+import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality } from 'livekit-client';
+import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker } from '../lib/audioSession';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
-import {
-  PermissionStatus,
-  getMicrophonePermissionStatus,
-  requestMicrophonePermission,
-  openAppSettings,
-} from '../lib/permissions';
+import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
 
-const { width, height } = Dimensions.get('window');
 const LOG = '[Call/Nurse]';
+const CONNECT_TIMEOUT_MS = 20000;
 
 function useCallLogger() {
   useEffect(() => {
@@ -40,22 +31,6 @@ function useCallLogger() {
   }, []);
 }
 
-/**
- * Issue 12 fix: only RoomEvent.ConnectionStateChanged was handled before.
- * Issue 3 fix: timer now keys off callStore.connectedAt (set from
- * ParticipantConnected locally + the backend's webhook-driven `call_state`
- * WS event - see mobile-app/components/CallModals.tsx for the full
- * rationale, identical here).
- * Issue 6/7 fix: this screen used to hardcode "🤰 2nd Trimester" for
- * EVERY caller regardless of who was actually calling. Now reads
- * `remoteParticipant.trimester` / `.pregnancy_week`, populated by the
- * backend from the real Mother's profile (see backend
- * app/modules/calls/services/call_service.py::_participant_info).
- * Issue 7 (re-render audit): converted to granular Zustand selectors -
- * this previously destructured the whole store and re-rendered on every
- * single field change, including ones this component doesn't render
- * (e.g. connectionQuality ticking).
- */
 const ActiveCallUI = () => {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
@@ -68,75 +43,37 @@ const ActiveCallUI = () => {
   const setConnectionQuality = useCallStore((s) => s.setConnectionQuality);
   const endCall = useCallStore((s) => s.endCall);
   const { hangupCall } = useCall();
+  
   const [duration, setDuration] = useState(0);
   const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
-  const [selectedOutput, setSelectedOutput] = useState('earpiece');
+  const [selectedOutput, setSelectedOutput] = useState<string>('earpiece');
   const [showOutputPicker, setShowOutputPicker] = useState(false);
 
   useEffect(() => {
-    console.log(LOG, 'ActiveCallUI mounted - wiring LiveKit room event listeners');
-
-    const onConnected = () => {
-      console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
-    };
-    const onParticipantConnected = (participant: any) => {
-      console.log(LOG, 'Participant Joined:', participant?.identity ?? '(already present)');
+    const onConnected = () => console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
+    const onParticipantConnected = (participant?: any) => {
       if (room.remoteParticipants.size >= 1 && room.state === ConnectionState.Connected) {
         setConnected();
       }
     };
-    const onParticipantDisconnected = (participant: any) => {
-      console.log(LOG, 'Participant Left:', participant?.identity);
-    };
-    const onReconnecting = () => {
-      console.warn(LOG, 'Reconnection started - audio paused, timer NOT reset.');
-      setReconnecting();
-    };
-    const onReconnected = () => {
-      console.log(LOG, 'Reconnection succeeded - audio/subscriptions restored automatically.');
-      setConnected();
-    };
-    const onDisconnected = (reason: any) => {
-      console.log(LOG, 'Call Ended (room disconnected). reason=', reason);
-      endCall('ENDED');
-    };
-    const onLocalTrackPublished = (publication: any) => {
-      console.log(LOG, 'Audio Published: kind=', publication?.kind, 'source=', publication?.source, 'sid=', publication?.trackSid);
-    };
-    const onTrackSubscribed = (track: any, publication: any, participant: any) => {
-      console.log(LOG, 'Audio Subscribed: from=', participant?.identity, 'sid=', publication?.trackSid);
-    };
-    const onTrackSubscriptionFailed = (trackSid: string, participant: any) => {
-      console.error(LOG, 'Track Subscription FAILED for', trackSid, 'from', participant?.identity);
-    };
-    const onTrackMuted = (publication: any, participant: any) => {
-      console.log(LOG, participant?.isLocal ? 'Microphone Muted' : `Remote muted: ${participant?.identity}`);
-    };
-    const onTrackUnmuted = (publication: any, participant: any) => {
-      console.log(LOG, participant?.isLocal ? 'Microphone Enabled' : `Remote unmuted: ${participant?.identity}`);
-    };
-    const onMediaDevicesError = (error: Error) => {
-      console.error(LOG, 'MediaDevicesError - local track creation failed:', error?.message || error);
-    };
+    const onParticipantDisconnected = () => {};
+    const onReconnecting = () => setReconnecting();
+    const onReconnected = () => setConnected();
+    const onDisconnected = (reason: any) => endCall('ENDED');
     const onAudioPlaybackStatusChanged = () => {
       if (!room.canPlaybackAudio) {
-        console.warn(LOG, 'Audio playback blocked by platform - attempting room.startAudio() to resume.');
-        room.startAudio().catch((e) => console.error(LOG, 'room.startAudio() failed:', e));
+        room.startAudio().catch(() => {});
       }
     };
     const onQualityChanged = (quality: LKConnectionQuality, participant: any) => {
       if (participant?.sid === localParticipant?.sid) {
         const mapped: ConnectionQuality =
           quality === LKConnectionQuality.Excellent ? 'excellent' :
-          quality === LKConnectionQuality.Good ? 'good' :
-          quality === LKConnectionQuality.Poor ? 'poor' : 'unknown';
+          quality === LKConnectionQuality.Good ? 'good' : 'poor';
         setConnectionQuality(mapped);
       }
     };
-    // Issue 12: auto-refresh the picker's list whenever a device
-    // connects/disconnects, so it's never stale when opened.
     const onMediaDevicesChanged = () => {
-      console.log(LOG, 'Audio Device Changed - refreshing available outputs');
       if (Platform.OS === 'android') {
         listAudioOutputs().then(setAudioOutputs);
       }
@@ -148,17 +85,11 @@ const ActiveCallUI = () => {
     room.on(RoomEvent.Reconnecting, onReconnecting);
     room.on(RoomEvent.Reconnected, onReconnected);
     room.on(RoomEvent.Disconnected, onDisconnected);
-    room.on(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
-    room.on(RoomEvent.TrackSubscribed, onTrackSubscribed);
-    room.on(RoomEvent.TrackSubscriptionFailed, onTrackSubscriptionFailed);
-    room.on(RoomEvent.TrackMuted, onTrackMuted);
-    room.on(RoomEvent.TrackUnmuted, onTrackUnmuted);
-    room.on(RoomEvent.MediaDevicesError, onMediaDevicesError);
     room.on(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
     room.on(RoomEvent.ConnectionQualityChanged, onQualityChanged);
     room.on(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
 
-    onParticipantConnected(undefined as any);
+    onParticipantConnected();
     if (!room.canPlaybackAudio) onAudioPlaybackStatusChanged();
 
     return () => {
@@ -168,26 +99,17 @@ const ActiveCallUI = () => {
       room.off(RoomEvent.Reconnecting, onReconnecting);
       room.off(RoomEvent.Reconnected, onReconnected);
       room.off(RoomEvent.Disconnected, onDisconnected);
-      room.off(RoomEvent.LocalTrackPublished, onLocalTrackPublished);
-      room.off(RoomEvent.TrackSubscribed, onTrackSubscribed);
-      room.off(RoomEvent.TrackSubscriptionFailed, onTrackSubscriptionFailed);
-      room.off(RoomEvent.TrackMuted, onTrackMuted);
-      room.off(RoomEvent.TrackUnmuted, onTrackUnmuted);
-      room.off(RoomEvent.MediaDevicesError, onMediaDevicesError);
       room.off(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
       room.off(RoomEvent.ConnectionQualityChanged, onQualityChanged);
       room.off(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
     };
   }, [room]);
 
-  // Issue 4: Android foreground service around the connected window only.
   useEffect(() => {
     if (status === 'CONNECTED') {
       startCallForegroundService('Call in progress', `Connected with ${remoteParticipant?.name || 'Mother'}`);
     }
-    return () => {
-      stopCallForegroundService();
-    };
+    return () => { stopCallForegroundService(); };
   }, [status === 'CONNECTED']);
 
   useEffect(() => {
@@ -195,18 +117,11 @@ const ActiveCallUI = () => {
       setDuration(0);
       return;
     }
-    console.log(LOG, 'Timer Started at', new Date(connectedAt).toISOString());
     const tick = () => setDuration(Math.max(0, Math.floor((Date.now() - connectedAt) / 1000)));
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [connectedAt]);
-
-  const formatDuration = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
 
   const toggleMicrophone = () => {
     if (localParticipant) {
@@ -232,110 +147,123 @@ const ActiveCallUI = () => {
   };
 
   const statusLabel =
-    status === 'CONNECTED' ? formatDuration(duration) :
+    status === 'CONNECTED' ? 'Call Ongoing' :
     status === 'RECONNECTING' ? 'Reconnecting...' :
     'Connecting...';
 
-  const trimesterLabel = remoteParticipant?.trimester
-    ? `🤰 ${remoteParticipant.trimester}${remoteParticipant.pregnancy_week ? ` · ${remoteParticipant.pregnancy_week}` : ''}`
-    : null;
+  const m = Math.floor(duration / 60).toString();
+  const s = `:${(duration % 60) < 10 ? '0' : ''}${duration % 60}`;
+
+  const hasTrimester = remoteParticipant?.trimester || remoteParticipant?.pregnancy_week;
+  const specialtyLabel = hasTrimester
+    ? `${remoteParticipant.trimester || ''} ${remoteParticipant.pregnancy_week ? `• Week ${remoteParticipant.pregnancy_week}` : ''}`
+    : remoteParticipant?.hospital_affiliation || 'Patient';
 
   return (
-    <LinearGradient colors={['#D8B4A0', '#4A6970', '#0B192C']} style={styles.fullScreen}>
-      <SafeAreaView style={styles.activeSafeArea}>
-        {/* Top Bar */}
-        <View style={styles.topBar}>
-          <View style={styles.callOngoingPill}>
-            <Feather name="bar-chart-2" size={16} color="white" />
-            <Text style={styles.callOngoingText}>{status === 'RECONNECTING' ? 'Reconnecting' : 'Call Ongoing'}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={styles.topMuteBtn} onPress={handleOutputPress}>
-              <Feather name={outputIcon(selectedOutput) as any} size={20} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.topMuteBtn, !isMicrophoneEnabled && styles.topMutedBtn]}
-              onPress={toggleMicrophone}
-            >
-              <Feather name={isMicrophoneEnabled ? "mic" : "mic-off"} size={20} color={isMicrophoneEnabled ? "white" : "#ef4444"} />
-            </TouchableOpacity>
-          </View>
-        </View>
+    <View style={styles.container}>
+      <StatusBar style='light' />
+      {remoteParticipant?.profile_picture ? (
+        <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.bgImage} contentFit="cover" />
+      ) : (
+        <View style={[styles.bgImage, { backgroundColor: '#2b2a29' }]} />
+      )}
 
-        {/* Center Sound Wave */}
-        <View style={styles.soundWaveContainer}>
-          <View style={[styles.bar, { height: 40 }]} />
-          <View style={[styles.bar, { height: 70 }]} />
-          <View style={[styles.bar, { height: 100 }]} />
-          <View style={[styles.bar, { height: 70 }]} />
-          <View style={[styles.bar, { height: 40 }]} />
-        </View>
+      <View style={styles.overlay}>
+        <SafeAreaView style={styles.safeArea}>
 
-        {/* Caller Details */}
-        <View style={styles.callerDetails}>
-          <Text style={styles.durationText}>{statusLabel}</Text>
-          <Text style={styles.activeCallerName}>{remoteParticipant?.name || "A Mother"}</Text>
-          {trimesterLabel && (
-            <View style={styles.trimesterBadge}>
-              <Text style={styles.trimesterText}>{trimesterLabel}</Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.badge}>
+              <View style={styles.soundBarsContainer}>
+                <View style={[styles.soundBar, { height: 12 }]} />
+                <View style={[styles.soundBar, { height: 16 }]} />
+                <View style={[styles.soundBar, { height: 10 }]} />
+              </View>
+              <Text style={styles.badgeText}>{statusLabel}</Text>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity style={styles.iconButton} onPress={handleOutputPress}>
+                <Feather name={outputIcon(selectedOutput) as any} size={20} color="#FFF" />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.iconButton, !isMicrophoneEnabled && { backgroundColor: '#ef4444' }]} onPress={toggleMicrophone}>
+                <Feather name={isMicrophoneEnabled ? "mic" : "mic-off"} size={20} color="#FFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Center Graphic */}
+          <View style={styles.centerGraphic}>
+            <View style={styles.visualizerContainer}>
+              <View style={[styles.bigBar, { height: 40 }]} />
+              <View style={[styles.bigBar, { height: 60 }]} />
+              <View style={[styles.bigBar, { height: 90 }]} />
+              <View style={[styles.bigBar, { height: 60 }]} />
+              <View style={[styles.bigBar, { height: 40 }]} />
+            </View>
+          </View>
+
+          {/* Participant Info */}
+          <View style={styles.infoContainer}>
+            <View style={styles.timerContainer}>
+              <Text style={styles.timerMinutes}>{m}</Text>
+              <Text style={styles.timerSeconds}>{s}</Text>
+            </View>
+            <Text style={styles.nurseName}>
+              {remoteParticipant?.name ? remoteParticipant.name.replace(' ', '\n') : 'A\nMother'}
+            </Text>
+
+            <View style={styles.specialtyBadge}>
+              <Ionicons name={hasTrimester ? "medical" : "business"} size={14} color="#FFF" style={{ marginRight: 6 }} />
+              <Text style={styles.specialtyText}>{specialtyLabel}</Text>
+            </View>
+          </View>
+
+          {/* Android Audio Output Picker */}
+          {showOutputPicker && (
+            <View style={styles.outputPicker}>
+              {audioOutputs.map((deviceId) => (
+                <TouchableOpacity
+                  key={deviceId}
+                  style={[styles.outputOption, selectedOutput === deviceId && styles.outputOptionSelected]}
+                  onPress={async () => {
+                    await selectAudioOutput(deviceId);
+                    setSelectedOutput(deviceId);
+                    setShowOutputPicker(false);
+                  }}
+                >
+                  <Feather name={outputIcon(deviceId) as any} size={18} color="white" />
+                  <Text style={styles.outputOptionText}>{deviceId}</Text>
+                  {selectedOutput === deviceId && <Feather name="check" size={16} color="white" style={{ marginLeft: 'auto' }} />}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={styles.outputOption} onPress={() => setShowOutputPicker(false)}>
+                <Feather name="x" size={18} color="white" />
+                <Text style={styles.outputOptionText}>Cancel</Text>
+              </TouchableOpacity>
             </View>
           )}
-        </View>
 
-        {/* Audio output picker (Android) */}
-        {showOutputPicker && (
-          <View style={styles.outputPicker}>
-            {audioOutputs.map((deviceId) => (
-              <TouchableOpacity
-                key={deviceId}
-                style={[styles.outputOption, selectedOutput === deviceId && styles.outputOptionSelected]}
-                onPress={async () => {
-                  await selectAudioOutput(deviceId);
-                  setSelectedOutput(deviceId);
-                  setShowOutputPicker(false);
-                }}
-              >
-                <Feather name={outputIcon(deviceId) as any} size={18} color="white" />
-                <Text style={styles.outputOptionText}>{deviceId}</Text>
-                {selectedOutput === deviceId && <Feather name="check" size={16} color="white" style={{ marginLeft: 'auto' }} />}
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.outputOption} onPress={() => setShowOutputPicker(false)}>
-              <Feather name="x" size={18} color="white" />
-              <Text style={styles.outputOptionText}>Cancel</Text>
+          {/* Footer Actions */}
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.endCallBtn} onPress={() => {
+                if (callId) hangupCall(callId);
+                else endCall('ENDED');
+            }}>
+              <Feather name="phone-off" size={24} color="#FFF" style={{ marginRight: 12 }} />
+              <Text style={styles.endCallText}>End Call</Text>
             </TouchableOpacity>
-          </View>
-        )}
 
-        {/* Bottom Actions */}
-        <View style={styles.bottomActions}>
-          <TouchableOpacity style={styles.endCallBtn} onPress={() => {
-              if (callId) hangupCall(callId);
-              else endCall('ENDED');
-          }}>
-            <MaterialIcons name="call-end" size={24} color="white" />
-            <Text style={styles.endCallText}>End Call</Text>
-          </TouchableOpacity>
-          <Text style={styles.confidentialText}>This call is confidential and secure</Text>
-        </View>
-      </SafeAreaView>
-    </LinearGradient>
+            <Text style={styles.secureText}>This call is confidential and secure</Text>
+          </View>
+
+        </SafeAreaView>
+      </View>
+    </View>
   );
 };
 
-// If LiveKit hasn't reached CONNECTED within this window after the room
-// token is issued, something is wrong at the network/media layer (most
-// likely Issue 9: LiveKit's node_ip/TURN not reachable from this device's
-// network) rather than just "taking a while". Signaling succeeding but
-// media never completing is exactly what an unreachable ICE candidate
-// looks like from the client's point of view - it doesn't error, it just
-// never finishes. Surfacing this as a clear failure after a bounded wait
-// is far better than an infinite "Connecting..." spinner with zero
-// feedback, which is what happened before this fix.
-const CONNECT_TIMEOUT_MS = 20000;
-
 export const CallModals = () => {
-  // Issue 7: granular selectors instead of one big destructure.
   const isIncoming = useCallStore((s) => s.isIncoming);
   const isActive = useCallStore((s) => s.isActive);
   const status = useCallStore((s) => s.status);
@@ -351,24 +279,10 @@ export const CallModals = () => {
 
   useCallLogger();
 
+  const visible = isIncoming || isActive;
   const micGranted = micStatus === 'granted';
 
   useEffect(() => {
-    // Issue 13 fix: gate connecting on mic permission BEFORE
-    // <LiveKitRoom connect={true}> mounts, instead of racing it.
-    //
-    // Production permission requirement: onboarding (app/(auth)/permissions.tsx)
-    // and a launch-time bootstrap for existing users (NotificationContext)
-    // both already resolve microphone permission long before any call
-    // starts - especially important here since the Nurse has to *accept*
-    // an incoming call immediately. This reads the cached status first
-    // instead of always calling requestPermissionsAsync(), which is what
-    // used to make the dialog pop up while a call was already ringing.
-    // requestMicrophonePermission() is only invoked as a fallback for the
-    // genuinely-undetermined case, and itself no-ops rather than
-    // re-prompting if the OS has already permanently denied access -
-    // that's surfaced as 'blocked' so the UI can point to Settings instead
-    // of a dead-end "Microphone Required" screen.
     if (!isActive || !roomToken) {
       setMicStatus('undetermined');
       return;
@@ -381,13 +295,8 @@ export const CallModals = () => {
         return;
       }
       requestMicrophonePermission()
-        .then((res) => {
-          if (!cancelled) setMicStatus(res);
-        })
-        .catch((e) => {
-          console.error(LOG, 'Microphone permission request failed', e);
-          if (!cancelled) setMicStatus('denied');
-        });
+        .then((res) => { if (!cancelled) setMicStatus(res); })
+        .catch((e) => { if (!cancelled) setMicStatus('denied'); });
     });
     return () => { cancelled = true; };
   }, [isActive, roomToken]);
@@ -411,19 +320,12 @@ export const CallModals = () => {
     const timer = setTimeout(() => {
       const current = useCallStore.getState();
       if (current.callId === callId && current.status !== 'CONNECTED' && current.isActive) {
-        console.error(LOG, 'Connection timed out after', CONNECT_TIMEOUT_MS, 'ms');
         setConnectTimedOut(true);
       }
     }, CONNECT_TIMEOUT_MS);
 
     return () => clearTimeout(timer);
   }, [isActive, roomToken, callId, status === 'CONNECTED']);
-
-  // Issue 5: ringing is handled entirely by notifee's native full-screen
-  // call notification (see index.js) while backgrounded, and by the
-  // system notification sound/vibration even in foreground - no custom
-  // audio file is played here, matching "use the platform's native call
-  // experience" (Issue 5's requirement).
 
   const handleAccept = () => {
     if (callId) acceptCall(callId);
@@ -433,344 +335,172 @@ export const CallModals = () => {
     if (callId) rejectCall(callId);
   };
 
-  // Incoming Call UI (Issue 6: real caller info, not "Mother Calling")
+  let content: React.ReactNode;
+
+  // INCOMING CALL (WhatsApp Style)
   if (isIncoming && !isActive && callId) {
-    return (
-      <Modal visible animationType="slide" transparent>
-        <LinearGradient colors={['#8B7355', '#2F4F4F', '#001F3F']} style={styles.fullScreen}>
+    const hasTrimester = remoteParticipant?.trimester || remoteParticipant?.pregnancy_week;
+    const specialtyLabel = hasTrimester
+      ? `${remoteParticipant.trimester || ''} ${remoteParticipant.pregnancy_week ? `• Week ${remoteParticipant.pregnancy_week}` : ''}`
+      : remoteParticipant?.hospital_affiliation || '';
+
+    content = (
+      <View style={styles.incomingContainer}>
+        <StatusBar style='light' />
+        <BlurView intensity={100} tint="dark" style={StyleSheet.absoluteFill}>
           <SafeAreaView style={styles.incomingSafeArea}>
-            <View style={styles.incomingHeader}>
-              <View style={styles.avatarPlaceholder}>
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <View style={styles.incomingAvatarPlaceholder}>
                 {remoteParticipant?.profile_picture ? (
-                  <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.avatar} contentFit="cover" />
+                  <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.incomingAvatar} contentFit="cover" />
                 ) : (
-                  <Ionicons name="person" size={40} color="white" />
+                  <Text style={styles.incomingAvatarInitial}>{(remoteParticipant?.name || 'M')[0]}</Text>
                 )}
               </View>
-              <View style={styles.incomingInfo}>
-                <Text style={styles.incomingCallerName}>{remoteParticipant?.name || "Unknown Caller"}</Text>
-                {!!remoteParticipant?.trimester && (
-                  <Text style={styles.connectingText}>
-                    {remoteParticipant.trimester}{remoteParticipant.pregnancy_week ? ` · ${remoteParticipant.pregnancy_week}` : ''}
-                  </Text>
-                )}
-              </View>
+              <Text style={styles.incomingName}>{remoteParticipant?.name || 'Incoming Call'}</Text>
+              
+              {!!specialtyLabel && (
+                <Text style={styles.incomingSubtitle}>{specialtyLabel}</Text>
+              )}
             </View>
 
             <View style={styles.incomingActions}>
-              <View style={styles.actionWrapper}>
-                <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={handleDecline}>
+              <View style={styles.incomingActionWrapper}>
+                <TouchableOpacity style={[styles.incomingBtn, styles.declineBtn]} onPress={handleDecline}>
                   <MaterialIcons name="call-end" size={32} color="white" />
                 </TouchableOpacity>
-                <Text style={styles.actionLabel}>Decline</Text>
+                <Text style={styles.incomingActionLabel}>Decline</Text>
               </View>
 
-              <View style={styles.actionWrapper}>
-                <TouchableOpacity style={[styles.actionBtn, styles.acceptBtnUI]} onPress={handleAccept}>
+              <View style={styles.incomingActionWrapper}>
+                <TouchableOpacity style={[styles.incomingBtn, styles.acceptBtnUI]} onPress={handleAccept}>
                   <Feather name="phone" size={32} color="white" />
                 </TouchableOpacity>
-                <Text style={styles.actionLabel}>Accept</Text>
+                <Text style={styles.incomingActionLabel}>Answer</Text>
               </View>
             </View>
           </SafeAreaView>
-        </LinearGradient>
-      </Modal>
+        </BlurView>
+      </View>
     );
-  }
-
-  // Active Connected Call UI
-  if (isActive && roomToken) {
+  } else if (isActive && roomToken) {
     if (!livekitUrl) {
-      console.error(LOG, 'No livekitUrl from server - cannot connect.');
-      return (
-        <Modal visible animationType="fade" transparent>
-          <View style={styles.incomingSafeArea}>
-            <Text style={styles.incomingCallerName}>Call Failed</Text>
-            <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={() => endCall('FAILED')}>
-              <MaterialIcons name="call-end" size={32} color="white" />
+      content = (
+        <View style={styles.centerContent}>
+          <Text style={styles.title}>Call Failed</Text>
+          <Text style={styles.statusText}>Could not reach the call server. Please try again.</Text>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => endCall('FAILED')}>
+            <Text style={styles.cancelText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    } else if (!micGranted) {
+      content = (
+        <View style={styles.centerContent}>
+          <Text style={styles.title}>Microphone Required</Text>
+          <Text style={styles.statusText}>Please allow microphone access to continue.</Text>
+          {micStatus === 'blocked' && (
+            <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: '#3b82f6' }]} onPress={openAppSettings}>
+              <Text style={styles.cancelText}>Open Settings</Text>
             </TouchableOpacity>
-          </View>
-        </Modal>
+          )}
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => {
+            if (callId) hangupCall(callId); else endCall('ENDED');
+          }}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
       );
-    }
-
-    if (!micGranted) {
-      return (
-        <Modal visible animationType="fade" transparent>
-          <SafeAreaView style={styles.incomingSafeArea}>
-            <Text style={styles.incomingCallerName}>Microphone Required</Text>
-            <Text style={styles.connectingText}>
-              {micStatus === 'blocked'
-                ? 'Microphone access is turned off for this app. Enable it in Settings to continue.'
-                : 'Please allow microphone access to continue the call.'}
-            </Text>
-            {micStatus === 'blocked' && (
-              <TouchableOpacity
-                style={{ backgroundColor: '#3b82f6', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24, marginBottom: 16 }}
-                onPress={openAppSettings}
-              >
-                <Text style={{ color: 'white', fontSize: 15, fontWeight: '600' }}>Open Settings</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={() => {
-              if (callId) hangupCall(callId); else endCall('ENDED');
-            }}>
-              <MaterialIcons name="call-end" size={32} color="white" />
-            </TouchableOpacity>
-          </SafeAreaView>
-        </Modal>
+    } else if (!audioSessionReady) {
+      content = (
+        <View style={styles.centerContent}>
+          <Text style={styles.title}>Preparing Audio...</Text>
+        </View>
       );
-    }
-
-    if (!audioSessionReady) {
-      return (
-        <Modal visible animationType="fade" transparent>
-          <SafeAreaView style={styles.incomingSafeArea}>
-            <Text style={styles.incomingCallerName}>Preparing Audio...</Text>
-          </SafeAreaView>
-        </Modal>
+    } else if (connectTimedOut) {
+      content = (
+        <View style={styles.centerContent}>
+          <Text style={styles.title}>Connection Failed</Text>
+          <Text style={styles.statusText}>Could not establish a connection.</Text>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => {
+            if (callId) hangupCall(callId); else endCall('FAILED');
+          }}>
+            <Text style={styles.cancelText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       );
-    }
-
-    if (connectTimedOut) {
-      return (
-        <Modal visible animationType="fade" transparent>
-          <SafeAreaView style={styles.incomingSafeArea}>
-            <Text style={styles.incomingCallerName}>Connection Failed</Text>
-            <Text style={styles.connectingText}>
-              Could not establish a call connection. This usually means the call server isn't reachable from your network - check with support if this keeps happening.
-            </Text>
-            <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={() => {
-              if (callId) hangupCall(callId); else endCall('FAILED');
-            }}>
-              <MaterialIcons name="call-end" size={32} color="white" />
-            </TouchableOpacity>
-          </SafeAreaView>
-        </Modal>
-      );
-    }
-
-    return (
-      <Modal visible animationType="fade">
+    } else {
+      content = (
         <LiveKitRoom
           serverUrl={livekitUrl}
           token={roomToken}
           connect={true}
           audio={true}
           video={false}
-          options={{
-            adaptiveStream: true,
-            dynacast: true,
-          }}
-          onConnected={() => console.log(LOG, 'LiveKitRoom onConnected callback fired')}
-          onDisconnected={() => console.log(LOG, 'LiveKitRoom onDisconnected callback fired')}
-          onError={(e) => console.error(LOG, 'LiveKitRoom onError:', e)}
-          onMediaDeviceFailure={(f) => console.error(LOG, 'LiveKitRoom onMediaDeviceFailure:', f)}
+          options={{ adaptiveStream: true, dynacast: true }}
         >
           <ActiveCallUI />
         </LiveKitRoom>
-      </Modal>
-    );
+      );
+    }
   }
 
-  return null;
+  if (!visible) return null;
+
+  return (
+    <Modal visible animationType="fade" transparent>
+      {content}
+    </Modal>
+  );
 };
 
 const styles = StyleSheet.create({
-  fullScreen: {
-    flex: 1,
-  },
-  activeSafeArea: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  callOngoingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
-  },
-  callOngoingText: {
-    color: 'white',
-    fontFamily: 'Helixa-Bold',
-    fontSize: 14,
-  },
-  topMuteBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  topMutedBtn: {
-    backgroundColor: 'rgba(255,255,255,0.8)',
-  },
-  soundWaveContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  bar: {
-    width: 6,
-    backgroundColor: 'white',
-    borderRadius: 3,
-  },
-  callerDetails: {
-    paddingHorizontal: 30,
-    paddingBottom: 40,
-  },
-  durationText: {
-    color: 'white',
-    fontFamily: 'Helixa-Bold',
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  activeCallerName: {
-    color: 'white',
-    fontFamily: 'Helixa-Black',
-    fontSize: 48,
-    lineHeight: 52,
-    marginBottom: 15,
-  },
-  trimesterBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  trimesterText: {
-    color: 'white',
-    fontFamily: 'Helixa-Bold',
-    fontSize: 14,
-  },
-  outputPicker: {
-    position: 'absolute',
-    bottom: 160,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    borderRadius: 16,
-    padding: 8,
-    minWidth: 200,
-  },
-  outputOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  outputOptionSelected: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 10,
-  },
-  outputOptionText: {
-    color: 'white',
-    fontFamily: 'Helixa-Regular',
-    fontSize: 15,
-    textTransform: 'capitalize',
-  },
-  bottomActions: {
-    alignItems: 'center',
-    paddingBottom: 40,
-  },
-  endCallBtn: {
-    backgroundColor: '#FF3B30',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 30,
-    gap: 10,
-    marginBottom: 20,
-  },
-  endCallText: {
-    color: 'white',
-    fontFamily: 'Helixa-Bold',
-    fontSize: 18,
-  },
-  confidentialText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontFamily: 'Helixa-Regular',
-    fontSize: 14,
-  },
-  incomingSafeArea: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingBottom: 60,
-    paddingTop: 80,
-  },
-  incomingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 30,
-    gap: 20,
-  },
-  avatarPlaceholder: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  avatar: {
-    width: '100%',
-    height: '100%',
-  },
-  incomingInfo: {
-    justifyContent: 'center',
-  },
-  incomingCallerName: {
-    color: 'white',
-    fontFamily: 'Helixa-Bold',
-    fontSize: 28,
-    marginBottom: 4,
-  },
-  connectingText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontFamily: 'Helixa-Regular',
-    fontSize: 18,
-  },
-  incomingActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    paddingHorizontal: 20,
-  },
-  actionWrapper: {
-    alignItems: 'center',
-  },
-  actionBtn: {
-    width: 75,
-    height: 75,
-    borderRadius: 37.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  declineBtn: {
-    backgroundColor: '#FF3B30',
-  },
-  acceptBtnUI: {
-    backgroundColor: '#34C759',
-  },
-  actionLabel: {
-    color: 'white',
-    fontFamily: 'Helixa-Regular',
-    fontSize: 16,
-  }
+  container: { flex: 1, backgroundColor: '#000' },
+  bgImage: { ...StyleSheet.absoluteFillObject, width: '100%', height: '100%' },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.4)' },
+  safeArea: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%' },
+  badge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 0, 0, 0.4)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24 },
+  soundBarsContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 8 },
+  soundBar: { width: 2, backgroundColor: '#FFF', marginHorizontal: 1.5, borderRadius: 2 },
+  badgeText: { color: '#FFF', fontSize: 16, fontWeight: '500' },
+  iconButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center' },
+  centerGraphic: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  visualizerContainer: { flexDirection: 'row', alignItems: 'center' },
+  bigBar: { width: 6, backgroundColor: '#FFF', marginHorizontal: 6, borderRadius: 4 },
+  infoContainer: { alignItems: 'flex-start', width: '100%', marginBottom: 40 },
+  timerContainer: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 },
+  timerMinutes: { color: '#FFF', fontSize: 24, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  timerSeconds: { color: '#FFF', fontSize: 18, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  nurseName: { color: '#FFF', fontSize: 48, lineHeight: 52, marginBottom: 16, fontWeight: 'bold', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
+  specialtyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.15)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.2)' },
+  specialtyText: { color: '#FFF', fontSize: 14 },
+  footer: { width: '100%', alignItems: 'center' },
+  endCallBtn: { backgroundColor: '#FF3B30', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', width: 200, height: 56, borderRadius: 28, marginBottom: 24 },
+  endCallText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  secureText: { color: '#FFF', fontSize: 14, opacity: 0.8 },
+  outputPicker: { position: 'absolute', bottom: 140, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.9)', borderRadius: 16, padding: 8, minWidth: 200 },
+  outputOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14 },
+  outputOptionSelected: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10 },
+  outputOptionText: { color: 'white', fontSize: 15, textTransform: 'capitalize' },
+  centerContent: { flex: 1, backgroundColor: '#0f172a', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  title: { fontSize: 28, color: '#fff', fontWeight: 'bold', marginBottom: 4, textAlign: 'center' },
+  statusText: { fontSize: 16, color: '#94a3b8', marginTop: 8, marginBottom: 50, textAlign: 'center' },
+  cancelBtn: { backgroundColor: '#ef4444', paddingVertical: 15, paddingHorizontal: 30, borderRadius: 30, marginTop: 20 },
+  cancelText: { color: '#fff', fontSize: 18, fontWeight: '600' },
+  
+  // INCOMING STYLES
+  incomingContainer: { flex: 1, backgroundColor: '#111' },
+  incomingSafeArea: { flex: 1, justifyContent: 'space-between', paddingBottom: 60, paddingTop: 80 },
+  incomingAvatarPlaceholder: { width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', marginBottom: 24 },
+  incomingAvatar: { width: '100%', height: '100%', borderRadius: 70 },
+  incomingAvatarInitial: { color: '#FFF', fontSize: 48, fontWeight: 'bold' },
+  incomingName: { color: 'white', fontSize: 36, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+  incomingSubtitle: { color: 'rgba(255,255,255,0.8)', fontSize: 20, textAlign: 'center' },
+  incomingActions: { flexDirection: 'row', justifyContent: 'space-evenly', paddingHorizontal: 20 },
+  incomingActionWrapper: { alignItems: 'center' },
+  incomingBtn: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  declineBtn: { backgroundColor: '#FF3B30' },
+  acceptBtnUI: { backgroundColor: '#34C759' },
+  incomingActionLabel: { color: 'white', fontSize: 18, fontWeight: '500' }
 });

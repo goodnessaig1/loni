@@ -52,12 +52,40 @@
  * this one is a plain top-level Android permission, added directly to both
  * app.json's `android.permissions` array instead of through this plugin.
  */
-const { withAndroidManifest, AndroidConfig } = require('@expo/config-plugins');
+const { withAndroidManifest, AndroidConfig, withDangerousMod } = require('@expo/config-plugins');
+const fs = require('fs');
+const path = require('path');
 
 const SERVICE_NAME = 'io.wazo.callkeep.VoiceConnectionService';
 const BIND_PERMISSION = 'android.permission.BIND_TELECOM_CONNECTION_SERVICE';
 
+function withPhoneAccountIcon(config) {
+  return withDangerousMod(config, [
+    'android',
+    async (config) => {
+      const resPath = path.join(config.modRequest.platformProjectRoot, 'app/src/main/res/drawable');
+      if (!fs.existsSync(resPath)) {
+        fs.mkdirSync(resPath, { recursive: true });
+      }
+      const iconPath = path.join(resPath, 'phone_account_icon.xml');
+      const iconXml = `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24.0"
+    android:viewportHeight="24.0">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z"/>
+</vector>`;
+      fs.writeFileSync(iconPath, iconXml);
+      return config;
+    },
+  ]);
+}
+
 function withCallKeepAndroid(config) {
+  config = withPhoneAccountIcon(config);
   return withAndroidManifest(config, (config) => {
     AndroidConfig.Manifest.ensureToolsAvailable(config.modResults);
     const manifest = config.modResults.manifest;

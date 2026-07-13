@@ -2,68 +2,149 @@ import { registerGlobals } from '@livekit/react-native';
 import { registerRootComponent } from 'expo';
 import { ExpoRoot } from 'expo-router';
 import messaging from '@react-native-firebase/messaging';
-import { registerCallForegroundService } from './lib/callForegroundService';
+import notifee, { AndroidImportance, AndroidCategory, AndroidVisibility, EventType } from '@notifee/react-native';
+import { Platform } from 'react-native';
 
-/**
- * `@livekit/react-native`'s docs are explicit: "Must be called before
- * using LiveKit." `app/_layout.tsx` previously only had a bare
- * `import '@livekit/react-native'` (a side-effect import that loads the
- * module but does NOT call this function - confirmed by reading the
- * installed package's actual source). Without it, `react-native-webrtc`'s
- * globals (RTCPeerConnection etc.) never get installed into the JS global
- * scope, so `livekit-client` has no way to create a WebRTC connection at
- * all - signaling still succeeds (you get a token, the room "exists"), but
- * `room.connect()` can never actually complete. That's the real cause of
- * "stuck on Connecting" / "WebRTC isn't detected, have you called
- * registerGlobals?" - not a network/TURN/node_ip issue. Called here, at
- * the very top of the true JS entry point, so it runs before any other
- * module gets a chance to touch LiveKit.
- */
 registerGlobals();
 
-/**
- * Issue 4 fix: "call does not continue when app is closed/backgrounded".
- * Must register this runner before components/CallModals.tsx's active
- * call screen tries to start it (once the call connects) - see
- * lib/callForegroundService.ts for the full explanation. The Mother's
- * outgoing/active call needs the exact same background-survival guarantee
- * as the Nurse's incoming call does.
- */
+import { setupCallKeep, displayIncomingCall, reportCallEnded } from './lib/callKeepService';
+import { registerCallForegroundService } from './lib/callForegroundService';
+
+setupCallKeep().catch((e) => console.error('[CallKeep] setup failed at boot', e));
 registerCallForegroundService();
 
-/**
- * Issue 1/2 fix: this file did not exist at all. mobile-app's package.json
- * `main` pointed straight at "expo-router/entry", which means
- * `messaging().setBackgroundMessageHandler` was NEVER registered anywhere
- * in the Mother-facing app. Per react-native-firebase's requirements, that
- * handler must be registered in the actual JS entry file, before the root
- * component mounts - registering it inside app/_layout.tsx (which only
- * runs once Expo Router has already booted) is too late and unreliable.
- *
- * Concretely, without this file: any data-only FCM push (call_accepted,
- * call_rejected, call_ended, call_timeout, call_missed, call_failed) that
- * arrives while the Mother's app is backgrounded or fully killed was
- * silently dropped - Android/iOS have nothing to hand the message to. That
- * directly compounds Issue 1/2: if the Mother locks her phone for even a
- * few seconds while a call is ringing (very plausible - screens auto-lock
- * quickly), the "call accepted" push had no code path to be processed at
- * all, on top of the WebSocket being suspended while backgrounded.
- *
- * This app doesn't need to build a full-screen incoming-call UI the way
- * the Nurse app does (the Mother is never the callee), so the handler here
- * is intentionally minimal - it just needs to exist so the OS hands the
- * message to the JS engine instead of dropping it, and so the app's normal
- * cold/warm-start reconciliation (NotificationContext's socket connect +
- * notifee.getInitialNotification-equivalent state) has a chance to run.
- */
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   console.log('[FCM] Background message received:', remoteMessage?.data?.type);
-  // No UI work here by design - see comment above. State reconciliation
-  // happens once the app is foregrounded, via the WebSocket reconnect and
-  // GET /calls/active-style checks in AuthContext/NotificationContext.
+
+  if (remoteMessage.data && remoteMessage.data.type === 'incoming_call') {
+    const callId = Number(remoteMessage.data.call_id);
+    let callerName = remoteMessage.data.caller_name || 'Someone';
+    let profilePic = undefined;
+    let subtitle = '';
+
+    try {
+      if (remoteMessage.data.caller) {
+        const caller = JSON.parse(remoteMessage.data.caller);
+        callerName = caller.name || callerName;
+        profilePic = caller.profile_picture;
+        if (caller.hospital_affiliation) {
+           subtitle = `\n${caller.hospital_affiliation}`;
+        }
+      }
+    } catch (e) {}
+
+    if (callId) {
+      try {
+        await setupCallKeep();
+        displayIncomingCall(callId, callerName);
+      } catch (e) {
+        console.error('[CallKeep] displayIncomingCall failed', e);
+      }
+    }
+
+    if (Platform.OS === 'android') {
+      const channelId = await notifee.createChannel({
+        id: 'calls_v4_ringtone',
+        name: 'Incoming Calls (V4)',
+        vibration: true,
+        importance: AndroidImportance.HIGH,
+        sound: 'default',
+      });
+
+      const androidConfig = {
+        channelId,
+        category: AndroidCategory.CALL,
+        visibility: AndroidVisibility.PUBLIC,
+        importance: AndroidImportance.HIGH,
+        ongoing: true,
+        autoCancel: false,
+        fullScreenAction: { id: 'default', mainComponent: 'mobile-app' },
+        pressAction: { id: 'default' },
+        actions: [
+          { title: 'Decline', pressAction: { id: 'decline' } },
+          { title: 'Answer', pressAction: { id: 'accept', launchActivity: 'default' } },
+        ],
+      };
+
+      if (typeof profilePic === 'string' && profilePic.trim().length > 0) {
+        androidConfig.largeIcon = profilePic;
+        androidConfig.circularLargeIcon = true;
+      }
+
+      await notifee.displayNotification({
+        id: `incoming-${remoteMessage.data.call_id}`,
+        title: 'Incoming Call',
+        body: `${callerName}${subtitle}`,
+        data: remoteMessage.data,
+        android: androidConfig,
+      });
+
+      try {
+        const { Audio } = require('expo-av');
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
+        if (global.incomingCallSound) {
+          await global.incomingCallSound.stopAsync();
+          await global.incomingCallSound.unloadAsync();
+        }
+        const { sound } = await Audio.Sound.createAsync(require('./assets/calling.m4a'), { isLooping: true });
+        global.incomingCallSound = sound;
+        await sound.playAsync();
+      } catch (e) {
+        console.error('[Audio] Failed to play ringtone in background', e);
+      }
+    }
+  } else if (remoteMessage.data && ['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(remoteMessage.data.type)) {
+    const callId = remoteMessage.data.call_id ? Number(remoteMessage.data.call_id) : null;
+    if (callId) {
+      try {
+        reportCallEnded(callId);
+      } catch (e) {}
+      if (Platform.OS === 'android') {
+        await notifee.cancelNotification(`incoming-${callId}`).catch(() => {});
+      }
+    }
+    try {
+      if (global.incomingCallSound) {
+        await global.incomingCallSound.stopAsync();
+        await global.incomingCallSound.unloadAsync();
+        global.incomingCallSound = null;
+      }
+    } catch (e) {}
+  }
 });
 
-// Must be exported or Fast Refresh won't update the context
+notifee.onBackgroundEvent(async ({ type, detail }) => {
+  const data = detail.notification?.data;
+  const callId = data?.call_id ? Number(data.call_id) : null;
+  if (!callId) return;
+
+  try {
+    if (global.incomingCallSound) {
+      await global.incomingCallSound.stopAsync();
+      await global.incomingCallSound.unloadAsync();
+      global.incomingCallSound = null;
+    }
+  } catch (e) {}
+
+  if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'accept') {
+    await notifee.cancelNotification(detail.notification.id);
+    try {
+      const { acceptCallDirect } = require('./lib/callEvents');
+      await acceptCallDirect(callId);
+    } catch (e) {
+      console.error('[Notifee/background] Failed to accept call', e);
+    }
+  } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'decline') {
+    await notifee.cancelNotification(detail.notification.id);
+    try {
+      const { rejectCallDirect } = require('./lib/callEvents');
+      await rejectCallDirect(callId);
+    } catch (e) {
+      console.error('[Notifee/background] Failed to decline call', e);
+    }
+  }
+});
+
 export function App() {
   const ctx = require.context('./app');
   return <ExpoRoot context={ctx} />;

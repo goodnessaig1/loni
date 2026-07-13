@@ -67,7 +67,22 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
 
   if (remoteMessage.data && remoteMessage.data.type === 'incoming_call') {
     const callId = Number(remoteMessage.data.call_id);
-    const callerName = remoteMessage.data.caller_name || 'Someone';
+    let callerName = remoteMessage.data.caller_name || 'Someone';
+    let profilePic = undefined;
+    let subtitle = '';
+
+    try {
+      if (remoteMessage.data.caller) {
+        const caller = JSON.parse(remoteMessage.data.caller);
+        callerName = caller.name || callerName;
+        profilePic = caller.profile_picture;
+        if (caller.trimester) {
+           subtitle = `\n${caller.trimester} • Week ${caller.pregnancy_week || '?'}`;
+        } else if (caller.hospital_affiliation) {
+           subtitle = `\n${caller.hospital_affiliation}`;
+        }
+      }
+    } catch (e) {}
 
     if (callId) {
       try {
@@ -79,32 +94,57 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     }
 
     if (Platform.OS === 'android') {
+      // Re-create channel to ensure it plays a sound
       const channelId = await notifee.createChannel({
-        id: 'calls_v3_ringtone',
-        name: 'Incoming Calls (Ringtone)',
+        id: 'calls_v4_ringtone',
+        name: 'Incoming Calls (V4)',
         vibration: true,
         importance: AndroidImportance.HIGH,
-        sound: 'content://settings/system/ringtone', // Attempt to use system ringtone
+        sound: 'default', 
       });
+
+      const androidConfig = {
+        channelId,
+        category: AndroidCategory.CALL,
+        visibility: AndroidVisibility.PUBLIC,
+        importance: AndroidImportance.HIGH,
+        ongoing: true,
+        autoCancel: false,
+        fullScreenAction: { id: 'default', mainComponent: 'loni-server-app' },
+        pressAction: { id: 'default' },
+        actions: [
+          { title: 'Decline', pressAction: { id: 'decline' } },
+          { title: 'Answer', pressAction: { id: 'accept', launchActivity: 'default' } },
+        ],
+      };
+
+      if (typeof profilePic === 'string' && profilePic.trim().length > 0) {
+        androidConfig.largeIcon = profilePic;
+        androidConfig.circularLargeIcon = true;
+      }
 
       await notifee.displayNotification({
         id: `incoming-${remoteMessage.data.call_id}`,
         title: 'Incoming Call',
-        body: `Tap to answer call from ${callerName}`,
+        body: `${callerName}${subtitle}`,
         data: remoteMessage.data,
-        android: {
-          channelId,
-          category: AndroidCategory.CALL,
-          visibility: AndroidVisibility.PUBLIC,
-          importance: AndroidImportance.HIGH,
-          // Launch the app's MainActivity immediately if locked
-          fullScreenAction: { id: 'default', mainComponent: 'loni-server-app' },
-          // Removed standard Accept/Decline actions to force the user to interact
-          // with the full-screen native React Native UI (just like WhatsApp).
-          // Android 12+ Heads-Up will just be a tap-to-open banner if unlocked.
-          pressAction: { id: 'default' },
-        },
+        android: androidConfig,
       });
+
+      // Play ringing sound manually in JS since Notifee doesn't loop
+      try {
+        const { Audio } = require('expo-av');
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
+        if (global.incomingCallSound) {
+          await global.incomingCallSound.stopAsync();
+          await global.incomingCallSound.unloadAsync();
+        }
+        const { sound } = await Audio.Sound.createAsync(require('./assets/calling.m4a'), { isLooping: true });
+        global.incomingCallSound = sound;
+        await sound.playAsync();
+      } catch (e) {
+        console.error('[Audio] Failed to play ringtone in background', e);
+      }
     }
   } else if (remoteMessage.data && ['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(remoteMessage.data.type)) {
     const callId = remoteMessage.data.call_id ? Number(remoteMessage.data.call_id) : null;
@@ -116,6 +156,14 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         await notifee.cancelNotification(`incoming-${callId}`).catch(() => {});
       }
     }
+    // Stop ringing
+    try {
+      if (global.incomingCallSound) {
+        await global.incomingCallSound.stopAsync();
+        await global.incomingCallSound.unloadAsync();
+        global.incomingCallSound = null;
+      }
+    } catch (e) {}
   }
 });
 

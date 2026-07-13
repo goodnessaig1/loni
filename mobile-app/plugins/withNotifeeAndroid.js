@@ -131,14 +131,14 @@ function withNotifeeForegroundServiceType(config) {
 
     if (existing) {
       // Re-running prebuild - just make sure the override is still correct.
-      existing.$['android:foregroundServiceType'] = 'microphone';
+      existing.$['android:foregroundServiceType'] = 'microphone|phoneCall';
       existing.$['tools:replace'] = 'android:foregroundServiceType';
     } else {
       application.service.push({
         $: {
           'android:name': SERVICE_NAME,
           'android:exported': 'false',
-          'android:foregroundServiceType': 'microphone',
+          'android:foregroundServiceType': 'microphone|phoneCall',
           'tools:replace': 'android:foregroundServiceType',
         },
       });
