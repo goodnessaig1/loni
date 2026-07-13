@@ -50,7 +50,12 @@ const ActiveCallUI = () => {
   const [showOutputPicker, setShowOutputPicker] = useState(false);
 
   useEffect(() => {
-    const onConnected = () => console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
+    const onConnected = () => {
+      console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
+      if (room.remoteParticipants.size >= 1) {
+        setConnected();
+      }
+    };
     const onParticipantConnected = (participant?: any) => {
       if (room.remoteParticipants.size >= 1 && room.state === ConnectionState.Connected) {
         setConnected();
@@ -279,7 +284,7 @@ export const CallModals = () => {
 
   useCallLogger();
 
-  const visible = isIncoming || isActive;
+  const visible = isActive;
   const micGranted = micStatus === 'granted';
 
   useEffect(() => {

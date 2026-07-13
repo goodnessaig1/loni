@@ -54,6 +54,57 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
           }
         }
         applyServerCallEvent(data.type, parsed);
+
+        // Foreground heads-up notification
+        if (data.type === 'incoming_call') {
+          const uiMode = process.env.EXPO_PUBLIC_CALL_UI_MODE || 'NATIVE_DIALER';
+          if (uiMode === 'IN_APP_UI' && Platform.OS === 'android') {
+            const { AndroidImportance } = require('@notifee/react-native');
+            let callerName = data.caller_name || 'Someone';
+            let profilePic = undefined;
+            let subtitle = '';
+            try {
+              if (parsed.caller) {
+                callerName = parsed.caller.name || callerName;
+                profilePic = parsed.caller.profile_picture;
+                if (parsed.caller.trimester) {
+                   subtitle = `\n${parsed.caller.trimester} • Week ${parsed.caller.pregnancy_week || '?'}`;
+                } else if (parsed.caller.hospital_affiliation) {
+                   subtitle = `\n${parsed.caller.hospital_affiliation}`;
+                }
+              }
+            } catch (e) {}
+
+            const channelId = await notifee.createChannel({
+              id: 'calls_v6_in_app',
+              name: 'Incoming Requests',
+              vibration: true,
+              importance: AndroidImportance.HIGH,
+              sound: 'notification',
+            });
+            const androidConfig: any = {
+              channelId,
+              importance: AndroidImportance.HIGH,
+              autoCancel: true,
+              pressAction: { id: 'default', launchActivity: 'default' },
+            };
+            if (typeof profilePic === 'string' && profilePic.trim().length > 0) {
+              androidConfig.largeIcon = profilePic;
+              androidConfig.circularLargeIcon = true;
+            }
+            await notifee.displayNotification({
+              id: `incoming-${data.call_id}`,
+              title: 'Mother needs assistance',
+              body: `${callerName}${subtitle} is requesting a call. Tap to view.`,
+              data: data,
+              android: androidConfig,
+            });
+          }
+        } else if (['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(data.type)) {
+          if (data.call_id) {
+            await notifee.cancelNotification(`incoming-${data.call_id}`).catch(() => {});
+          }
+        }
       }
     });
 

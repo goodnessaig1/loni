@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Switch,
   Image as RNImage,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -97,20 +98,21 @@ export default function NurseDashboardScreen() {
     }
   };
 
-  const { status, callId, remoteParticipant } = useCallStore();
+  const { status, callId, remoteParticipant, incomingRequests } = useCallStore();
   const { rejectCall } = useCall();
   const router = useRouter();
 
-  const hasIncomingRequest = status === 'INCOMING' && callId != null;
+  const [showAllRequests, setShowAllRequests] = useState(false);
+  const topRequests = incomingRequests.slice(0, 3);
+  const hasIncomingRequests = incomingRequests.length > 0;
 
-  const handleDecline = async () => {
-    if (callId) {
-      await rejectCall(callId);
-    }
+  const handleDecline = async (id: number) => {
+    await rejectCall(id);
   };
 
-  const handleView = () => {
-    router.push('/incoming-call');
+  const handleView = (id: number) => {
+    setShowAllRequests(false);
+    router.push({ pathname: '/incoming-call', params: { callId: id } });
   };
 
   const [recentActivities, setRecentActivities] = useState([
@@ -196,58 +198,61 @@ export default function NurseDashboardScreen() {
         {/* Incoming Requests */}
         <View style={styles.sectionHeader}>
           <HelixaText style={styles.sectionTitle}>Incoming Requests</HelixaText>
-          {hasIncomingRequest && (
-            <TouchableOpacity>
+          {hasIncomingRequests && (
+            <TouchableOpacity onPress={() => setShowAllRequests(true)}>
               <HelixaText style={styles.viewAllText}>View all ❯</HelixaText>
             </TouchableOpacity>
           )}
         </View>
 
-        {hasIncomingRequest ? (
-          <View style={styles.incomingCard}>
-            <View style={styles.incomingTop}>
-              <Image
-                source={{
-                  uri: remoteParticipant?.profile_picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                }}
-                style={styles.incomingAvatar}
-              />
-              <View style={styles.incomingInfo}>
-                <View style={styles.incomingNameRow}>
-                  <HelixaText style={styles.incomingName} weight="bold">
-                    {remoteParticipant?.name || 'A Mother'}
-                  </HelixaText>
-                  <HelixaText style={styles.incomingTime}>Just now</HelixaText>
-                </View>
-                {!!remoteParticipant?.trimester && (
-                  <View style={styles.trimesterRow}>
-                    <TrimesterIcon />
-                    <HelixaText style={styles.trimesterText}>
-                      {remoteParticipant.trimester}{remoteParticipant.pregnancy_week ? ` · Week ${remoteParticipant.pregnancy_week}` : ''}
-                    </HelixaText>
+        {hasIncomingRequests ? (
+          <View style={{ gap: 12 }}>
+            {topRequests.map((req) => (
+              <View key={req.callId} style={styles.incomingCard}>
+                <View style={styles.incomingTop}>
+                  <Image
+                    source={{
+                      uri: req.remote?.profile_picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                    }}
+                    style={styles.incomingAvatar}
+                  />
+                  <View style={styles.incomingInfo}>
+                    <View style={styles.incomingNameRow}>
+                      <HelixaText style={styles.incomingName} weight="bold">
+                        {req.remote?.name || 'A Mother'}
+                      </HelixaText>
+                      <HelixaText style={styles.incomingTime}>Just now</HelixaText>
+                    </View>
+                    {!!req.remote?.trimester && (
+                      <View style={styles.trimesterRow}>
+                        <TrimesterIcon />
+                        <HelixaText style={styles.trimesterText}>
+                          {req.remote.trimester}{req.remote.pregnancy_week ? ` · Week ${req.remote.pregnancy_week}` : ''}
+                        </HelixaText>
+                      </View>
+                    )}
+                    <View style={styles.plusMemberBadge}>
+                      <View style={styles.plusDot} />
+                      <HelixaText style={styles.plusMemberText}>Plus Member</HelixaText>
+                    </View>
                   </View>
-                )}
-                {/* We'll keep the Plus Member badge as a placeholder or remove it. We'll leave it as requested. */}
-                <View style={styles.plusMemberBadge}>
-                  <View style={styles.plusDot} />
-                  <HelixaText style={styles.plusMemberText}>Plus Member</HelixaText>
+                  <TouchableOpacity style={styles.callIconBtn} onPress={() => handleView(req.callId)}>
+                    <Feather name="phone-call" size={18} color="#000" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.incomingActions}>
+                  <TouchableOpacity
+                    style={styles.declineBtn}
+                    onPress={() => handleDecline(req.callId)}>
+                    <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.viewBtn} onPress={() => handleView(req.callId)}>
+                    <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
+                    <HelixaText style={styles.viewBtnText}>View</HelixaText>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <TouchableOpacity style={styles.callIconBtn} onPress={handleView}>
-                <Feather name="phone-call" size={18} color="#000" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.incomingActions}>
-              <TouchableOpacity
-                style={styles.declineBtn}
-                onPress={handleDecline}>
-                <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.viewBtn} onPress={handleView}>
-                <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
-                <HelixaText style={styles.viewBtnText}>View</HelixaText>
-              </TouchableOpacity>
-            </View>
+            ))}
           </View>
         ) : (
           <View style={styles.emptyCard}>
@@ -365,6 +370,59 @@ export default function NurseDashboardScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* View All Incoming Requests Modal */}
+      <Modal visible={showAllRequests} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAllRequests(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAllRequests(false)} style={styles.closeBtn}>
+              <Feather name="x" size={24} color="#000" />
+            </TouchableOpacity>
+            <HelixaText style={styles.modalTitle} weight="bold">All Requests ({incomingRequests.length})</HelixaText>
+            <View style={{ width: 24 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+            {incomingRequests.map((req) => (
+              <View key={req.callId} style={styles.incomingCard}>
+                <View style={styles.incomingTop}>
+                  <Image
+                    source={{ uri: req.remote?.profile_picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80' }}
+                    style={styles.incomingAvatar}
+                  />
+                  <View style={styles.incomingInfo}>
+                    <View style={styles.incomingNameRow}>
+                      <HelixaText style={styles.incomingName} weight="bold">{req.remote?.name || 'A Mother'}</HelixaText>
+                      <HelixaText style={styles.incomingTime}>Just now</HelixaText>
+                    </View>
+                    {!!req.remote?.trimester && (
+                      <View style={styles.trimesterRow}>
+                        <TrimesterIcon />
+                        <HelixaText style={styles.trimesterText}>
+                          {req.remote.trimester}{req.remote.pregnancy_week ? ` · Week ${req.remote.pregnancy_week}` : ''}
+                        </HelixaText>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.incomingActions}>
+                  <TouchableOpacity style={styles.declineBtn} onPress={() => handleDecline(req.callId)}>
+                    <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.viewBtn} onPress={() => handleView(req.callId)}>
+                    <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
+                    <HelixaText style={styles.viewBtnText}>View</HelixaText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+            {incomingRequests.length === 0 && (
+              <View style={styles.emptyCard}>
+                <HelixaText style={styles.emptyText}>No pending requests.</HelixaText>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -693,5 +751,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     color: '#6B6B6B',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#000',
+  },
+  closeBtn: {
+    padding: 4,
   },
 });

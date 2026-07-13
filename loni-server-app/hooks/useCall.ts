@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { Alert } from 'react-native';
 import { useCallStore } from '../store/callStore';
 import { apiClient } from '../api/client';
 
@@ -20,7 +21,7 @@ export const useCall = () => {
   const {
     isActive, isIncoming, isOutgoing, status,
     callerName, callId, roomName, remoteParticipant,
-    setOutgoingCall, setConnecting, endCall,
+    setOutgoingCall, setConnecting, endCall, removeIncomingCall,
   } = useCallStore();
 
   const requestCall = useCallback(async (nurseId?: string) => {
@@ -44,13 +45,24 @@ export const useCall = () => {
         livekitUrl: response.data.livekit_url,
         remote: toParticipant(response.data.participant),
       });
+      // Once accepted, we can remove it from incoming requests list if we want, 
+      // but the state moves to CONNECTING anyway. We should clear it.
+      removeIncomingCall(incomingCallId);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to accept call', error);
-      endCall('FAILED');
+      removeIncomingCall(incomingCallId);
+      Alert.alert(
+        'Call Unavailable',
+        'This request may have been cancelled or accepted by another nurse.',
+        [{ text: 'OK' }]
+      );
+      // Wait, if we throw, caller handles it. But we should also endCall if it was the ONLY active call.
+      // But endCall clears everything. If we had other incoming requests, we don't want to end everything.
+      // removeIncomingCall handles switching to next or IDLE.
       throw error;
     }
-  }, [setConnecting, endCall]);
+  }, [setConnecting, removeIncomingCall]);
 
   const joinCall = useCallback(async (existingCallId: number) => {
     try {
@@ -75,9 +87,9 @@ export const useCall = () => {
     } catch (error) {
       console.error('Failed to reject call', error);
     } finally {
-      endCall('REJECTED');
+      removeIncomingCall(incomingCallId);
     }
-  }, [endCall]);
+  }, [removeIncomingCall]);
 
   const hangupCall = useCallback(async (activeCallId: number) => {
     try {

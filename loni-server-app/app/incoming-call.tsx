@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useCallStore } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
@@ -34,13 +34,18 @@ const { width, height } = Dimensions.get('window');
  */
 export default function IncomingCallScreen() {
   const router = useRouter();
-  const { callId, remoteParticipant } = useCallStore();
+  const params = useLocalSearchParams();
+  const specificCallId = params.callId ? parseInt(params.callId as string, 10) : null;
+  const { incomingRequests } = useCallStore();
   const { acceptCall, rejectCall } = useCall();
+  
+  const specificRequest = incomingRequests.find(r => r.callId === specificCallId);
+  const remoteParticipant = specificRequest?.remote;
 
   const handleAccept = async () => {
-    if (!callId) { router.replace('/'); return; }
+    if (!specificCallId) { router.replace('/'); return; }
     try {
-      await acceptCall(callId);
+      await acceptCall(specificCallId);
     } catch (e) {
       console.error('Failed to accept call', e);
     } finally {
@@ -49,8 +54,8 @@ export default function IncomingCallScreen() {
   };
 
   const handleDecline = async () => {
-    if (callId) {
-      await rejectCall(callId);
+    if (specificCallId) {
+      await rejectCall(specificCallId);
     }
     router.replace('/');
   };

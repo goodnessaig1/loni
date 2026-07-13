@@ -60,6 +60,9 @@ interface CallState {
   // basis anymore, because that fires as soon as *this device's* signaling
   // connects, independent of whether the other side ever joined.
   connectedAt: number | null;
+  // Array of multiple incoming requests
+  incomingRequests: Array<{ callId: number; roomName: string; remote: ParticipantInfo | null }>;
+
   // Monotonic guard against a re-delivered/duplicate/out-of-order push or
   // WS message re-opening a call that has already moved on locally
   // (Issue 8, Issue 11: "prevent duplicate events / race conditions").
@@ -73,6 +76,7 @@ interface CallState {
   callerName: string | null;
 
   setIncomingCall: (callId: number, roomName: string, remote: ParticipantInfo | null) => void;
+  removeIncomingCall: (callId: number) => void;
   setOutgoingCall: (callId: number, roomName: string) => void;
   setAccepted: (payload: { roomToken?: string; livekitUrl?: string; remote?: ParticipantInfo | null }) => void;
   setConnecting: (payload: { callId?: number; roomToken?: string; livekitUrl?: string; remote?: ParticipantInfo | null }) => void;
@@ -94,6 +98,7 @@ const initial = {
   remoteParticipant: null,
   connectionQuality: 'unknown' as const,
   connectedAt: null,
+  incomingRequests: [],
   lastEventCallId: null,
   lastEventStatus: null,
   isActive: false,
@@ -110,17 +115,60 @@ export const useCallStore = create<CallState>((set, get) => ({
     return current !== null && current !== callId;
   },
 
-  setIncomingCall: (callId, roomName, remote) => set({
-    status: 'INCOMING',
-    isIncoming: true,
-    isOutgoing: false,
-    isActive: false,
-    callId,
-    roomName,
-    remoteParticipant: remote,
-    callerName: remote?.name ?? null,
-    lastEventCallId: callId,
-    lastEventStatus: 'INCOMING',
+  setIncomingCall: (callId, roomName, remote) => set((state) => {
+    // Avoid duplicates in the array
+    const existing = state.incomingRequests.find((r) => r.callId === callId);
+    const newRequests = existing
+      ? state.incomingRequests
+      : [...state.incomingRequests, { callId, roomName, remote }];
+      
+    return {
+      status: 'INCOMING',
+      isIncoming: true,
+      isOutgoing: false,
+      isActive: false,
+      callId: state.callId ?? callId, // keep existing active callId if there is one
+      roomName: state.roomName ?? roomName,
+      remoteParticipant: state.remoteParticipant ?? remote,
+      callerName: state.callerName ?? (remote?.name ?? null),
+      incomingRequests: newRequests,
+      lastEventCallId: callId,
+      lastEventStatus: 'INCOMING',
+    };
+  }),
+
+  removeIncomingCall: (callId) => set((state) => {
+    const remaining = state.incomingRequests.filter((r) => r.callId !== callId);
+    const hasMore = remaining.length > 0;
+    
+    // If the currently displayed call is the one being removed, and there are others, 
+    // maybe we switch to another one. Otherwise if none left, we go IDLE.
+    // Wait, if we are currently CONNECTING or ACCEPTED, we shouldn't change status to IDLE 
+    // just because an incoming request was removed!
+    if (state.isActive || state.status === 'CONNECTED' || state.status === 'CONNECTING') {
+      return { incomingRequests: remaining };
+    }
+    
+    // If we are just showing INCOMING for this call and it's removed
+    if (state.status === 'INCOMING' && state.callId === callId) {
+      if (hasMore) {
+        const next = remaining[remaining.length - 1];
+        return {
+          incomingRequests: remaining,
+          callId: next.callId,
+          roomName: next.roomName,
+          remoteParticipant: next.remote,
+          callerName: next.remote?.name ?? null,
+        };
+      } else {
+        return {
+          ...initial,
+          incomingRequests: [],
+        };
+      }
+    }
+    
+    return { incomingRequests: remaining };
   }),
 
   setOutgoingCall: (callId, roomName) => set({
