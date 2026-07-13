@@ -118,6 +118,7 @@ export async function requestCallKeepAndroidPermissions(): Promise<void> {
       PermissionsAndroid.PERMISSIONS.CALL_PHONE,
       phoneNumberPermission,
       PermissionsAndroid.PERMISSIONS.READ_CALL_LOG,
+      PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
     ]);
   } catch (e) {
     console.error('[Permissions] CallKeep Android permission request failed', e);

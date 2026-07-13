@@ -58,6 +58,13 @@ export async function startCallAudioSession(): Promise<boolean> {
       },
     });
     await AudioSession.startAudioSession();
+    try {
+      const InCallManager = require('react-native-incall-manager').default;
+      InCallManager.start({ media: 'audio' });
+      InCallManager.setForceSpeakerphoneOn(false);
+    } catch (e) {
+      console.error(TAG, 'InCallManager start failed', e);
+    }
     started = true;
     console.log(TAG, 'Audio Session Activated (platform=' + Platform.OS + ')');
     return true;
@@ -71,6 +78,12 @@ export async function startCallAudioSession(): Promise<boolean> {
 export async function stopCallAudioSession(): Promise<void> {
   if (!started) return;
   try {
+    try {
+      const InCallManager = require('react-native-incall-manager').default;
+      InCallManager.stop();
+    } catch (e) {
+      console.error(TAG, 'InCallManager stop failed', e);
+    }
     await AudioSession.stopAudioSession();
     console.log(TAG, 'Audio Session Released');
   } catch (e) {

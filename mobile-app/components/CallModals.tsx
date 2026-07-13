@@ -331,32 +331,24 @@ export const CallModals = () => {
   }, [isActive, roomToken, callId, status === 'CONNECTED']);
 
   useEffect(() => {
-    if (!(isOutgoing && status === 'RINGING') || Platform.OS === 'ios') {
-      if (soundRef.current) {
-        soundRef.current.stopAsync().then(() => soundRef.current?.unloadAsync());
-        soundRef.current = null;
-      }
+    if (!(isOutgoing && status === 'RINGING')) {
+      try {
+        const InCallManager = require('react-native-incall-manager').default;
+        InCallManager.stopRingback();
+      } catch (e) {}
       return;
     }
-    let cancelled = false;
-    (async () => {
-      try {
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
-        const { sound } = await Audio.Sound.createAsync(require('../assets/calling.m4a'), { isLooping: true });
-        if (cancelled) {
-          await sound.unloadAsync();
-          return;
-        }
-        soundRef.current = sound;
-        await sound.playAsync();
-      } catch (e) {}
-    })();
+    
+    try {
+      const InCallManager = require('react-native-incall-manager').default;
+      InCallManager.start({ media: 'audio', ringback: '_DEFAULT_' });
+    } catch (e) {}
+    
     return () => {
-      cancelled = true;
-      if (soundRef.current) {
-        soundRef.current.stopAsync().then(() => soundRef.current?.unloadAsync());
-        soundRef.current = null;
-      }
+      try {
+        const InCallManager = require('react-native-incall-manager').default;
+        InCallManager.stopRingback();
+      } catch (e) {}
     };
   }, [isOutgoing, status]);
 

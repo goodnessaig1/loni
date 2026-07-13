@@ -131,19 +131,12 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         android: androidConfig,
       });
 
-      // Play ringing sound manually in JS since Notifee doesn't loop
+      // Fallback: Play default system ringtone via InCallManager if CallKeep is off
       try {
-        const { Audio } = require('expo-av');
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
-        if (global.incomingCallSound) {
-          await global.incomingCallSound.stopAsync();
-          await global.incomingCallSound.unloadAsync();
-        }
-        const { sound } = await Audio.Sound.createAsync(require('./assets/calling.m4a'), { isLooping: true });
-        global.incomingCallSound = sound;
-        await sound.playAsync();
+        const InCallManager = require('react-native-incall-manager').default;
+        InCallManager.startRingtone('_DEFAULT_');
       } catch (e) {
-        console.error('[Audio] Failed to play ringtone in background', e);
+        console.error('[Audio] Failed to play InCallManager ringtone', e);
       }
     }
   } else if (remoteMessage.data && ['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(remoteMessage.data.type)) {
@@ -158,11 +151,8 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     }
     // Stop ringing
     try {
-      if (global.incomingCallSound) {
-        await global.incomingCallSound.stopAsync();
-        await global.incomingCallSound.unloadAsync();
-        global.incomingCallSound = null;
-      }
+      const InCallManager = require('react-native-incall-manager').default;
+      InCallManager.stopRingtone();
     } catch (e) {}
   }
 });
@@ -178,6 +168,10 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   if (!callId) return;
 
   if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'accept') {
+    try {
+      const InCallManager = require('react-native-incall-manager').default;
+      InCallManager.stopRingtone();
+    } catch (e) {}
     await notifee.cancelNotification(detail.notification.id);
     try {
       const { acceptCallDirect } = require('./lib/callEvents');
@@ -186,6 +180,10 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
       console.error('[Notifee/background] Failed to accept call', e);
     }
   } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'decline') {
+    try {
+      const InCallManager = require('react-native-incall-manager').default;
+      InCallManager.stopRingtone();
+    } catch (e) {}
     await notifee.cancelNotification(detail.notification.id);
     try {
       const { rejectCallDirect } = require('./lib/callEvents');

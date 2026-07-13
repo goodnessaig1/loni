@@ -80,17 +80,10 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
       });
 
       try {
-        const { Audio } = require('expo-av');
-        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true });
-        if (global.incomingCallSound) {
-          await global.incomingCallSound.stopAsync();
-          await global.incomingCallSound.unloadAsync();
-        }
-        const { sound } = await Audio.Sound.createAsync(require('./assets/calling.m4a'), { isLooping: true });
-        global.incomingCallSound = sound;
-        await sound.playAsync();
+        const InCallManager = require('react-native-incall-manager').default;
+        InCallManager.startRingtone('_DEFAULT_');
       } catch (e) {
-        console.error('[Audio] Failed to play ringtone in background', e);
+        console.error('[Audio] Failed to play InCallManager ringtone', e);
       }
     }
   } else if (remoteMessage.data && ['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(remoteMessage.data.type)) {
@@ -104,11 +97,8 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
       }
     }
     try {
-      if (global.incomingCallSound) {
-        await global.incomingCallSound.stopAsync();
-        await global.incomingCallSound.unloadAsync();
-        global.incomingCallSound = null;
-      }
+      const InCallManager = require('react-native-incall-manager').default;
+      InCallManager.stopRingtone();
     } catch (e) {}
   }
 });
@@ -119,11 +109,8 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   if (!callId) return;
 
   try {
-    if (global.incomingCallSound) {
-      await global.incomingCallSound.stopAsync();
-      await global.incomingCallSound.unloadAsync();
-      global.incomingCallSound = null;
-    }
+    const InCallManager = require('react-native-incall-manager').default;
+    InCallManager.stopRingtone();
   } catch (e) {}
 
   if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'accept') {
