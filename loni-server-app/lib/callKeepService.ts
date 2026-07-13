@@ -113,10 +113,10 @@ export async function setupCallKeep(): Promise<void> {
       okButton: 'OK',
       imageName: 'phone_account_icon',
       additionalPermissions: [] as string[],
-      // Self-managed avoids the intrusive default-phone-account/dialer-role
-      // prompt on Android 10+ (API 29+) while still getting the native
-      // full-screen incoming call UI, ringtone, and telecom integration.
-      selfManaged: true,
+      // We must set selfManaged: false to force Android to use the true
+      // native Google Dialer full-screen UI (as requested by the user).
+      // Note: This will prompt the user to enable the app as a "Calling Account" in settings.
+      selfManaged: false,
       foregroundService: {
         channelId: 'com.loni.server.calls',
         channelName: 'Loni Calls',

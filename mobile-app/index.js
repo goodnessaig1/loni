@@ -44,11 +44,10 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
 
     if (Platform.OS === 'android') {
       const channelId = await notifee.createChannel({
-        id: 'calls_v4_ringtone',
-        name: 'Incoming Calls (V4)',
+        id: 'calls_v5_silent',
+        name: 'Incoming Calls (Silent popup)',
         vibration: true,
         importance: AndroidImportance.HIGH,
-        sound: 'default',
       });
 
       const androidConfig = {
@@ -82,6 +81,14 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
       try {
         const InCallManager = require('react-native-incall-manager').default;
         InCallManager.startRingtone('_DEFAULT_');
+        
+        // Safety timeout: Always stop ringing after 30 seconds in case 'call_ended' FCM is missed
+        setTimeout(() => {
+          try {
+            InCallManager.stopRingtone();
+            notifee.cancelNotification(`incoming-${remoteMessage.data.call_id}`).catch(() => {});
+          } catch (e) {}
+        }, 30000);
       } catch (e) {
         console.error('[Audio] Failed to play InCallManager ringtone', e);
       }
