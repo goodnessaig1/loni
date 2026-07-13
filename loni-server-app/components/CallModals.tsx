@@ -110,6 +110,19 @@ const ActiveCallUI = () => {
     };
   }, [room]);
 
+  // Bulletproof periodic check for room connection state to start the timer,
+  // in case the native SDK fired events too fast or missed them.
+  useEffect(() => {
+    if (connectedAt) return; // Already connected, timer is running
+    const checkInterval = setInterval(() => {
+      if (room.state === ConnectionState.Connected && room.remoteParticipants.size >= 1) {
+        setConnected();
+        clearInterval(checkInterval);
+      }
+    }, 500);
+    return () => clearInterval(checkInterval);
+  }, [room, connectedAt, setConnected]);
+
   useEffect(() => {
     if (status === 'CONNECTED') {
       startCallForegroundService('Call in progress', `Connected with ${remoteParticipant?.name || 'Mother'}`);
