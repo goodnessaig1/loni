@@ -11,6 +11,7 @@
       "tsconfigPaths": true
     },
     "plugins": [
+      "./plugins/withNotificationSound.js",
       "expo-font",
       "expo-router",
       "expo-secure-store",
@@ -88,10 +89,6 @@
         "android.permission.USE_FULL_SCREEN_INTENT",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MICROPHONE",
-        "android.permission.MANAGE_OWN_CALLS",
-        "android.permission.CALL_PHONE",
-        "android.permission.READ_PHONE_NUMBERS",
-        "android.permission.READ_PHONE_STATE",
         "android.permission.READ_CALL_LOG"
       ]
     }

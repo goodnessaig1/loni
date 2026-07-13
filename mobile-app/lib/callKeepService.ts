@@ -72,6 +72,8 @@ function forgetCall(callId: number) {
 
 export async function setupCallKeep(): Promise<void> {
   if (isSetup) return;
+  const uiMode = process.env.EXPO_PUBLIC_CALL_UI_MODE || 'NATIVE_DIALER';
+  if (uiMode === 'IN_APP_UI') return; // CallKeep is fully disabled in IN_APP_UI mode
   const CK = loadCallKeep();
   if (!CK) return; // disabled, or failed to load - app continues without native call UI
   isSetup = true;

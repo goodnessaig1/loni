@@ -16,6 +16,9 @@ import { HelixaText } from '../../components/HelixaText';
 import { CustomSwitch } from 'components/CustomSwitch';
 import { useAuth } from '../../hooks/useAuth';
 import { apiClient } from '../../api/client';
+import { useCallStore } from '../../store/callStore';
+import { useCall } from '../../hooks/useCall';
+import { useRouter } from 'expo-router';
 
 // Custom SVGs from user request
 const HomeIcon = ({ color }: { color: string }) => (
@@ -94,8 +97,22 @@ export default function NurseDashboardScreen() {
     }
   };
 
-  // State for demonstration: toggle these to see empty states
-  const [hasIncomingRequest, setHasIncomingRequest] = useState(true);
+  const { status, callId, remoteParticipant } = useCallStore();
+  const { rejectCall } = useCall();
+  const router = useRouter();
+
+  const hasIncomingRequest = status === 'INCOMING' && callId != null;
+
+  const handleDecline = async () => {
+    if (callId) {
+      await rejectCall(callId);
+    }
+  };
+
+  const handleView = () => {
+    router.push('/incoming-call');
+  };
+
   const [recentActivities, setRecentActivities] = useState([
     {
       id: '1',
@@ -191,37 +208,42 @@ export default function NurseDashboardScreen() {
             <View style={styles.incomingTop}>
               <Image
                 source={{
-                  uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+                  uri: remoteParticipant?.profile_picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
                 }}
                 style={styles.incomingAvatar}
               />
               <View style={styles.incomingInfo}>
                 <View style={styles.incomingNameRow}>
                   <HelixaText style={styles.incomingName} weight="bold">
-                    Sarah A.
+                    {remoteParticipant?.name || 'A Mother'}
                   </HelixaText>
-                  <HelixaText style={styles.incomingTime}>1 min ago</HelixaText>
+                  <HelixaText style={styles.incomingTime}>Just now</HelixaText>
                 </View>
-                <View style={styles.trimesterRow}>
-                  <TrimesterIcon />
-                  <HelixaText style={styles.trimesterText}>2nd Trimester</HelixaText>
-                </View>
+                {!!remoteParticipant?.trimester && (
+                  <View style={styles.trimesterRow}>
+                    <TrimesterIcon />
+                    <HelixaText style={styles.trimesterText}>
+                      {remoteParticipant.trimester}{remoteParticipant.pregnancy_week ? ` · Week ${remoteParticipant.pregnancy_week}` : ''}
+                    </HelixaText>
+                  </View>
+                )}
+                {/* We'll keep the Plus Member badge as a placeholder or remove it. We'll leave it as requested. */}
                 <View style={styles.plusMemberBadge}>
                   <View style={styles.plusDot} />
                   <HelixaText style={styles.plusMemberText}>Plus Member</HelixaText>
                 </View>
               </View>
-              <TouchableOpacity style={styles.callIconBtn}>
+              <TouchableOpacity style={styles.callIconBtn} onPress={handleView}>
                 <Feather name="phone-call" size={18} color="#000" />
               </TouchableOpacity>
             </View>
             <View style={styles.incomingActions}>
               <TouchableOpacity
                 style={styles.declineBtn}
-                onPress={() => setHasIncomingRequest(false)}>
+                onPress={handleDecline}>
                 <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.viewBtn}>
+              <TouchableOpacity style={styles.viewBtn} onPress={handleView}>
                 <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
                 <HelixaText style={styles.viewBtnText}>View</HelixaText>
               </TouchableOpacity>
