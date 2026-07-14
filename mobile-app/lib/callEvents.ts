@@ -101,7 +101,7 @@ export async function applyServerCallEvent(type: string, data: any) {
       if (callId == null || store.isStale(callId)) return;
       const status = data.status;
       if (status === 'CONNECTED') {
-        const ts = data.started_at ? new Date(data.started_at).getTime() : Date.now();
+        const ts = Date.now(); // Ignore server's started_at to avoid clock skew bugs
         store.setConnected(ts); // Issue 3: this is the ONLY place the timer basis is set
         try { reportConnected(callId); } catch { /* CallKeep unavailable - non-fatal */ }
       } else if (status === 'RECONNECTING') {

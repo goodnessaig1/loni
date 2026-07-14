@@ -26,7 +26,7 @@ rtc:
   # firewalls) fall back to the TURN relay configured below - which is why
   # getting TURN right matters just as much as node_ip.
   use_external_ip: false
-  node_ip: 192.168.100.136 # <-- CHANGE PER ENVIRONMENT. See comment above.
+  node_ip: 192.168.93.242 # <-- CHANGE PER ENVIRONMENT. See comment above.
   enable_loopback_candidate: false
 redis:
   address: "redis:6379"
