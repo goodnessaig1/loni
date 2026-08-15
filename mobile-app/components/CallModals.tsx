@@ -7,8 +7,8 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useCallStore, ConnectionQuality } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
-import { LiveKitRoom, useRoomContext, useLocalParticipant } from '@livekit/react-native';
-import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality } from 'livekit-client';
+import { LiveKitRoom, useRoomContext, useLocalParticipant, useRemoteParticipants, useTrackVolume } from '@livekit/react-native';
+import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, Track, LocalAudioTrack, RemoteAudioTrack } from 'livekit-client';
 import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker } from '../lib/audioSession';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
 import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
@@ -34,6 +34,7 @@ function useCallLogger() {
 const ActiveCallUI = () => {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
+  const remoteParticipants = useRemoteParticipants();
   const callId = useCallStore((s) => s.callId);
   const remoteParticipant = useCallStore((s) => s.remoteParticipant);
   const connectedAt = useCallStore((s) => s.connectedAt);
@@ -48,6 +49,16 @@ const ActiveCallUI = () => {
   const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
   const [selectedOutput, setSelectedOutput] = useState<string>('earpiece');
   const [showOutputPicker, setShowOutputPicker] = useState(false);
+
+  const actualRemoteParticipant = remoteParticipants.length > 0 ? remoteParticipants[0] : null;
+  const isRemoteMuted = actualRemoteParticipant ? !actualRemoteParticipant.isMicrophoneEnabled : false;
+
+  const localMic = localParticipant?.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+  const remoteMic = actualRemoteParticipant?.getTrackPublication(Track.Source.Microphone)?.track as RemoteAudioTrack | undefined;
+  const localVol = useTrackVolume(localMic) || 0;
+  const remoteVol = useTrackVolume(remoteMic) || 0;
+  const activeVol = Math.max(localVol, remoteVol);
+  const scale = 1 + activeVol * 1.5;
 
   useEffect(() => {
     const onConnected = () => console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
@@ -209,11 +220,11 @@ const ActiveCallUI = () => {
           {/* Center Graphic */}
           <View style={styles.centerGraphic}>
             <View style={styles.visualizerContainer}>
-              <View style={[styles.bigBar, { height: 40 }]} />
-              <View style={[styles.bigBar, { height: 60 }]} />
-              <View style={[styles.bigBar, { height: 90 }]} />
-              <View style={[styles.bigBar, { height: 60 }]} />
-              <View style={[styles.bigBar, { height: 40 }]} />
+              <View style={[styles.bigBar, { height: 40 * (1 + activeVol * 0.5) }]} />
+              <View style={[styles.bigBar, { height: 60 * (1 + activeVol * 0.8) }]} />
+              <View style={[styles.bigBar, { height: 90 * scale }]} />
+              <View style={[styles.bigBar, { height: 60 * (1 + activeVol * 0.8) }]} />
+              <View style={[styles.bigBar, { height: 40 * (1 + activeVol * 0.5) }]} />
             </View>
           </View>
 
@@ -226,6 +237,13 @@ const ActiveCallUI = () => {
             <Text style={styles.nurseName}>
               {remoteParticipant?.name ? remoteParticipant.name.replace(' ', '\n') : 'A\nNurse'}
             </Text>
+
+            {isRemoteMuted && (
+              <View style={[styles.specialtyBadge, { backgroundColor: '#ef4444', borderColor: '#ef4444', marginBottom: 8 }]}>
+                <Feather name="mic-off" size={14} color="#FFF" style={{ marginRight: 6 }} />
+                <Text style={styles.specialtyText}>Muted</Text>
+              </View>
+            )}
 
             {!!remoteParticipant?.hospital_affiliation && (
               <View style={styles.specialtyBadge}>
@@ -344,26 +362,27 @@ export const CallModals = () => {
   }, [isActive, roomToken, callId, status === 'CONNECTED']);
 
   useEffect(() => {
-    if (!(isOutgoing && status === 'RINGING')) {
-      try {
-        const InCallManager = require('react-native-incall-manager').default;
-        InCallManager.stopRingback();
-      } catch (e) {}
-      return;
-    }
-    
     try {
       const InCallManager = require('react-native-incall-manager').default;
-      InCallManager.start({ media: 'audio', ringback: '_DEFAULT_' });
+      if (isOutgoing && status === 'RINGING') {
+        InCallManager.start({ media: 'audio', ringback: '_DEFAULT_' });
+      } else if (isIncoming && status === 'RINGING') {
+        InCallManager.start({ media: 'audio' });
+        InCallManager.startRingtone('_DEFAULT_');
+      } else {
+        InCallManager.stopRingback();
+        InCallManager.stopRingtone();
+      }
     } catch (e) {}
     
     return () => {
       try {
         const InCallManager = require('react-native-incall-manager').default;
         InCallManager.stopRingback();
+        InCallManager.stopRingtone();
       } catch (e) {}
     };
-  }, [isOutgoing, status]);
+  }, [isOutgoing, isIncoming, status]);
 
   if (!visible) return null;
 

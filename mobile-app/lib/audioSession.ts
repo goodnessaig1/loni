@@ -108,6 +108,16 @@ export async function selectAudioOutput(deviceId: string): Promise<void> {
   try {
     await AudioSession.selectAudioOutput(deviceId);
     console.log(TAG, 'Audio output switched to', deviceId);
+    try {
+      const InCallManager = require('react-native-incall-manager').default;
+      let route = 'EARPIECE';
+      if (deviceId === 'speaker') route = 'SPEAKER_PHONE';
+      else if (deviceId === 'bluetooth') route = 'BLUETOOTH';
+      else if (deviceId === 'headset') route = 'WIRED_HEADSET';
+      InCallManager.chooseAudioRoute(route);
+    } catch (e) {
+      // Ignore if InCallManager is not available
+    }
   } catch (e) {
     console.error(TAG, 'selectAudioOutput failed', e);
   }
