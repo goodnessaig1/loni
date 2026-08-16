@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 
 // Use your machine's local IP for physical devices, or 10.0.2.2 for Android emulator
 // export const API_URL ='https://loni-1.onrender.com/api/v1';
-export const API_URL = 'http://192.168.100.8:8000/api/v1';
+export const API_URL = 'http://192.168.100.156:8000/api/v1';
 // ipconfig getifaddr en0
 export const apiClient = axios.create({
   baseURL: API_URL,

@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import or_, desc
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 
@@ -412,3 +413,42 @@ class CallService:
             asyncio.create_task(_emit(other_participant_id, "call_ended", "Call Ended", "The call has ended.", data))
 
         return call
+
+    @staticmethod
+    async def rate_call(db: AsyncSession, call_id: int, user_id: str, rating: int, feedback: str | None = None):
+        stmt = select(Call).where(Call.id == call_id).with_for_update()
+        result = await db.execute(stmt)
+        call = result.scalar_one_or_none()
+
+        if not call:
+            raise HTTPException(status_code=404, detail="Call not found")
+
+        # Allow either participant to rate
+        if user_id not in (call.caller_id, call.receiver_id):
+            raise HTTPException(status_code=403, detail="Unauthorized to rate this call")
+
+        call.rating = rating
+        call.feedback = feedback
+        
+        await db.commit()
+        await db.refresh(call)
+        return call
+
+    @staticmethod
+    async def get_history(db: AsyncSession, user_id: str, limit: int = 20, offset: int = 0):
+        stmt = (
+            select(Call)
+            .options(
+                selectinload(Call.caller).selectinload(User.nurse_profile),
+                selectinload(Call.caller).selectinload(User.driver_profile),
+                selectinload(Call.receiver).selectinload(User.nurse_profile),
+                selectinload(Call.receiver).selectinload(User.driver_profile)
+            )
+            .where(or_(Call.caller_id == user_id, Call.receiver_id == user_id))
+            .order_by(desc(Call.created_at))
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await db.execute(stmt)
+        calls = result.scalars().all()
+        return calls

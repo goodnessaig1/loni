@@ -9,6 +9,11 @@ class CallRequest(BaseModel):
     nurse_id: Optional[str] = None
 
 
+class CallRatingRequest(BaseModel):
+    rating: int
+    feedback: Optional[str] = None
+
+
 class CallParticipantSchema(BaseModel):
     user_id: str
     role: ParticipantRoleEnum
@@ -45,7 +50,11 @@ class CallResponse(BaseModel):
     answered_at: Optional[datetime] = None
     ended_at: Optional[datetime] = None
     duration_seconds: int
+    rating: Optional[int] = None
+    feedback: Optional[str] = None
     created_at: datetime
+    caller: Optional[ParticipantInfo] = None
+    receiver: Optional[ParticipantInfo] = None
 
     class Config:
         from_attributes = True
@@ -66,3 +75,9 @@ class CallActionResponse(BaseModel):
 class CallHistoryFilter(BaseModel):
     limit: int = 20
     offset: int = 0
+
+
+class CallStatsResponse(BaseModel):
+    total_calls: int
+    total_duration_seconds: int
+    total_duration_formatted: str

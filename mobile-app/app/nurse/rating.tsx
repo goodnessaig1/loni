@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { HelixaText } from '../../components/HelixaText';
+import { apiClient } from '../../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
@@ -26,12 +27,29 @@ const StarIcon = ({ filled, size = 40 }: { filled: boolean; size?: number }) => 
 
 export default function NurseRatingScreen() {
   const router = useRouter();
+  const { callId } = useLocalSearchParams<{ callId: string }>();
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    // Navigate back to home tab
-    router.replace('/(tabs)/');
+  const handleSubmit = async () => {
+    if (!callId || rating === 0) {
+      router.replace('/(tabs)/');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      await apiClient.post(`/calls/${callId}/rate`, {
+        rating,
+        feedback: feedback.trim() || null
+      });
+    } catch (e) {
+      console.error("Failed to submit rating", e);
+    } finally {
+      setIsSubmitting(false);
+      router.replace('/(tabs)/');
+    }
   };
 
   const handleBackToHome = () => {
@@ -86,8 +104,14 @@ export default function NurseRatingScreen() {
           </View>
 
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-              <HelixaText style={styles.submitBtnText}>Submit Rating</HelixaText>
+            <TouchableOpacity 
+              style={[styles.submitBtn, (rating === 0 || isSubmitting) && { opacity: 0.7 }]} 
+              onPress={handleSubmit}
+              disabled={rating === 0 || isSubmitting}
+            >
+              <HelixaText style={styles.submitBtnText}>
+                {isSubmitting ? 'Submitting...' : 'Submit Rating'}
+              </HelixaText>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.backBtn} onPress={handleBackToHome}>

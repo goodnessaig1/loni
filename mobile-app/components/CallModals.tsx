@@ -12,6 +12,7 @@ import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, T
 import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker } from '../lib/audioSession';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
 import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
+import { useRouter } from 'expo-router';
 
 const LOG = '[Call/Mother]';
 const CONNECT_TIMEOUT_MS = 20000;
@@ -323,12 +324,21 @@ export const CallModals = () => {
   const remoteParticipant = useCallStore((s) => s.remoteParticipant);
   const endCall = useCallStore((s) => s.endCall);
   const { hangupCall, acceptCall, rejectCall } = useCall();
+  const router = useRouter();
+  const previousStatus = useRef<string | null>(status);
   const [micStatus, setMicStatus] = useState<PermissionStatus>('undetermined');
   const [audioSessionReady, setAudioSessionReady] = useState(false);
   const [connectTimedOut, setConnectTimedOut] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
 
   useCallLogger();
+
+  useEffect(() => {
+    if (previousStatus.current === 'CONNECTED' && status === 'ENDED' && callId) {
+      router.push({ pathname: '/nurse/rating', params: { callId } });
+    }
+    previousStatus.current = status;
+  }, [status, callId, router]);
 
   const visible = isOutgoing || isIncoming || isActive;
   const micGranted = micStatus === 'granted';
