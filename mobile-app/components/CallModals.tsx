@@ -350,6 +350,12 @@ export const CallModals = () => {
   }, [micGranted, isActive, roomToken]);
 
   useEffect(() => {
+    if (!isActive) {
+      stopCallAudioSession();
+    }
+  }, [isActive]);
+
+  useEffect(() => {
     setConnectTimedOut(false);
     if (!isActive || !roomToken || status === 'CONNECTED') return;
     const timer = setTimeout(() => {
@@ -362,13 +368,23 @@ export const CallModals = () => {
   }, [isActive, roomToken, callId, status === 'CONNECTED']);
 
   useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
     try {
       const InCallManager = require('react-native-incall-manager').default;
-      if (isOutgoing && status === 'RINGING') {
-        InCallManager.start({ media: 'audio', ringback: '_DEFAULT_' });
-      } else if (isIncoming && status === 'RINGING') {
+      if (status === 'RINGING') {
         InCallManager.start({ media: 'audio' });
-        InCallManager.startRingtone('_DEFAULT_');
+        if (isOutgoing) {
+          InCallManager.startRingback('_DEFAULT_');
+          // On many Android devices, the native _DEFAULT_ ringback plays only once (a single beep).
+          // Loop it every 3 seconds to simulate a continuous ringing tone.
+          if (Platform.OS === 'android') {
+            intervalId = setInterval(() => {
+              InCallManager.startRingback('_DEFAULT_');
+            }, 3000);
+          }
+        } else if (isIncoming) {
+          InCallManager.startRingtone('_DEFAULT_');
+        }
       } else {
         InCallManager.stopRingback();
         InCallManager.stopRingtone();
@@ -376,6 +392,7 @@ export const CallModals = () => {
     } catch (e) {}
     
     return () => {
+      if (intervalId) clearInterval(intervalId);
       try {
         const InCallManager = require('react-native-incall-manager').default;
         InCallManager.stopRingback();
