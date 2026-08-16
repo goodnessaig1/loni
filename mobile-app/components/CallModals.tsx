@@ -322,10 +322,15 @@ export const CallModals = () => {
   const roomToken = useCallStore((s) => s.roomToken);
   const livekitUrl = useCallStore((s) => s.livekitUrl);
   const remoteParticipant = useCallStore((s) => s.remoteParticipant);
+  const callerName = useCallStore((s) => s.callerName);
   const endCall = useCallStore((s) => s.endCall);
   const { hangupCall, acceptCall, rejectCall } = useCall();
   const router = useRouter();
-  const previousStatus = useRef<string | null>(status);
+  
+  const wasConnected = useRef(false);
+  const lastCallId = useRef<number | null>(null);
+  const lastNurseName = useRef<string | null>(null);
+
   const [micStatus, setMicStatus] = useState<PermissionStatus>('undetermined');
   const [audioSessionReady, setAudioSessionReady] = useState(false);
   const [connectTimedOut, setConnectTimedOut] = useState(false);
@@ -333,12 +338,36 @@ export const CallModals = () => {
 
   useCallLogger();
 
+  // Track call ID, nurse name, and connected state while call is active
+  if (callId) {
+    lastCallId.current = callId;
+  }
+  if (remoteParticipant?.name || callerName) {
+    lastNurseName.current = remoteParticipant?.name || callerName;
+  }
+  if (status === 'CONNECTED' || (isActive && status !== 'RINGING' && status !== 'INCOMING')) {
+    wasConnected.current = true;
+  }
+
   useEffect(() => {
-    if (previousStatus.current === 'CONNECTED' && status === 'ENDED' && callId) {
-      router.push({ pathname: '/nurse/rating', params: { callId } });
+    // When the call terminates (status transitions to IDLE) and was previously connected/active, route to rating
+    if (status === 'IDLE' && wasConnected.current && lastCallId.current) {
+      const idToRate = lastCallId.current;
+      const nurseNameToRate = lastNurseName.current;
+      wasConnected.current = false;
+      lastCallId.current = null;
+      lastNurseName.current = null;
+
+      console.log(LOG, 'Call ended, navigating to nurse rating screen for callId:', idToRate);
+      router.push({
+        pathname: '/nurse/rating',
+        params: {
+          callId: String(idToRate),
+          name: nurseNameToRate || 'Nurse',
+        },
+      });
     }
-    previousStatus.current = status;
-  }, [status, callId, router]);
+  }, [status, router]);
 
   const visible = isOutgoing || isIncoming || isActive;
   const micGranted = micStatus === 'granted';

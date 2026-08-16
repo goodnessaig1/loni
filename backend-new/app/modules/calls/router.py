@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import inspect
 
 from app.core.database import get_db
 from app.api.deps import get_current_user
@@ -11,6 +12,27 @@ from app.modules.calls.services.call_stats import get_user_call_stats
 
 router = APIRouter()
 
+def map_call_response(call) -> dict:
+    call_dict = {
+        "id": call.id,
+        "caller_id": call.caller_id,
+        "receiver_id": call.receiver_id,
+        "status": call.status,
+        "room_name": call.room_name,
+        "started_at": call.started_at,
+        "answered_at": call.answered_at,
+        "ended_at": call.ended_at,
+        "duration_seconds": call.duration_seconds,
+        "rating": call.rating,
+        "feedback": call.feedback,
+        "created_at": call.created_at,
+    }
+    unloaded = inspect(call).unloaded
+    if "caller" not in unloaded and getattr(call, "caller", None):
+        call_dict["caller"] = _participant_info(call.caller).model_dump()
+    if "receiver" not in unloaded and getattr(call, "receiver", None):
+        call_dict["receiver"] = _participant_info(call.receiver).model_dump()
+    return call_dict
 
 @router.post("/request", response_model=CallResponse)
 async def request_call(
@@ -22,7 +44,7 @@ async def request_call(
     Mother requests a call.
     """
     call = await CallService.request_call(db, str(current_user.id), request)
-    return call
+    return map_call_response(call)
 
 
 @router.post("/{call_id}/accept", response_model=CallActionResponse)
@@ -49,7 +71,7 @@ async def accept_call(
         message="Call accepted",
         token=token,
         livekit_url=LiveKitService.get_public_url(),
-        call=call,
+        call=map_call_response(call),
         participant=caller_info,
     )
 
@@ -79,7 +101,7 @@ async def join_call(
         message="Token generated",
         token=token,
         livekit_url=LiveKitService.get_public_url(),
-        call=call,
+        call=map_call_response(call),
         participant=other_info,
     )
 
@@ -91,7 +113,7 @@ async def reject_call(
     db: AsyncSession = Depends(get_db)
 ):
     call = await CallService.reject_call(db, call_id, str(current_user.id))
-    return CallActionResponse(success=True, message="Call rejected", call=call)
+    return CallActionResponse(success=True, message="Call rejected", call=map_call_response(call))
 
 
 @router.post("/{call_id}/end", response_model=CallActionResponse)
@@ -101,10 +123,10 @@ async def end_call(
     db: AsyncSession = Depends(get_db)
 ):
     call = await CallService.end_call(db, call_id, str(current_user.id))
-    return CallActionResponse(success=True, message="Call ended", call=call)
+    return CallActionResponse(success=True, message="Call ended", call=map_call_response(call))
 
 
-@router.post("/{call_id}/rate", response_model=CallResponse)
+@router.post("/{call_id}/rate")
 async def rate_call(
     call_id: int,
     request: CallRatingRequest,
@@ -112,7 +134,7 @@ async def rate_call(
     db: AsyncSession = Depends(get_db)
 ):
     call = await CallService.rate_call(db, call_id, str(current_user.id), request.rating, request.feedback)
-    return call
+    return {"success": True, "message": "Call rated successfully"}
 
 
 @router.get("/history", response_model=list[CallResponse])
@@ -125,25 +147,7 @@ async def get_history(
     
     results = []
     for call in calls:
-        call_dict = {
-            "id": call.id,
-            "caller_id": call.caller_id,
-            "receiver_id": call.receiver_id,
-            "status": call.status,
-            "room_name": call.room_name,
-            "started_at": call.started_at,
-            "answered_at": call.answered_at,
-            "ended_at": call.ended_at,
-            "duration_seconds": call.duration_seconds,
-            "rating": call.rating,
-            "feedback": call.feedback,
-            "created_at": call.created_at,
-        }
-        if call.caller:
-            call_dict["caller"] = _participant_info(call.caller).model_dump()
-        if call.receiver:
-            call_dict["receiver"] = _participant_info(call.receiver).model_dump()
-        results.append(call_dict)
+        results.append(map_call_response(call))
         
     return results
 

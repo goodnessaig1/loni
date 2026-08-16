@@ -27,10 +27,14 @@ const StarIcon = ({ filled, size = 40 }: { filled: boolean; size?: number }) => 
 
 export default function NurseRatingScreen() {
   const router = useRouter();
-  const { callId } = useLocalSearchParams<{ callId: string }>();
+  const { callId, name } = useLocalSearchParams<{ callId: string; name?: string }>();
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const formattedNurseName = name && name.trim() 
+    ? (name.trim().toLowerCase().startsWith('nurse') ? name.trim() : `Nurse ${name.trim()}`)
+    : 'the Nurse';
 
   const handleSubmit = async () => {
     if (!callId || rating === 0) {
@@ -76,7 +80,7 @@ export default function NurseRatingScreen() {
           </View>
 
           <HelixaText weight="bold" style={styles.title}>
-            How was your experience with Nurse Micheal?
+            {`How was your experience with ${formattedNurseName}?`}
           </HelixaText>
 
           <View style={styles.starsContainer}>
