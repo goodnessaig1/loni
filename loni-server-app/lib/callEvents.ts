@@ -87,27 +87,34 @@ export async function applyServerCallEvent(type: string, data: any) {
     }
 
     case 'call_accepted': {
-      // Only relevant to the caller (Mother app); the Nurse app receives
-      // its own token synchronously from POST /accept instead. Harmless
-      // no-op if received here.
-      if (callId == null || store.isStale(callId)) return;
-      if (store.status === 'CONNECTING' || store.status === 'CONNECTED') return;
-      store.setAccepted({ remote: toParticipant(data.receiver) });
+      if (callId == null) return;
+      if (store.callId === callId && (store.status === 'CONNECTING' || store.status === 'CONNECTED')) return;
+      store.removeIncomingCall(callId);
+      try { reportCallEnded(callId); } catch {}
       return;
     }
 
     case 'call_state': {
-      if (callId == null || store.isStale(callId)) return;
+      if (callId == null) return;
       const status = data.status;
+      
+      if (store.callId !== callId) {
+        if (['ENDED', 'REJECTED', 'CANCELLED', 'TIMEOUT', 'MISSED', 'FAILED', 'ACCEPTED', 'CONNECTED'].includes(status)) {
+          store.removeIncomingCall(callId);
+          try { reportCallEnded(callId); } catch {}
+        }
+        return;
+      }
+
       if (status === 'CONNECTED') {
-        const ts = Date.now(); // Ignore server's started_at to avoid clock skew bugs
-        store.setConnected(ts); // Issue 3: this is the ONLY place the timer basis is set
-        try { reportConnected(callId); } catch { /* CallKeep unavailable - non-fatal */ }
+        const ts = Date.now(); 
+        store.setConnected(ts); 
+        try { reportConnected(callId); } catch {}
       } else if (status === 'RECONNECTING') {
         store.setReconnecting();
       } else if (['ENDED', 'REJECTED', 'CANCELLED', 'TIMEOUT', 'MISSED', 'FAILED'].includes(status)) {
         store.endCall(status);
-        try { reportCallEnded(callId); } catch { /* CallKeep unavailable - non-fatal */ }
+        try { reportCallEnded(callId); } catch {}
       }
       return;
     }
@@ -117,7 +124,14 @@ export async function applyServerCallEvent(type: string, data: any) {
     case 'call_timeout':
     case 'call_missed':
     case 'call_failed': {
-      if (callId == null || store.isStale(callId)) return;
+      if (callId == null) return;
+      
+      if (store.callId !== callId) {
+        store.removeIncomingCall(callId);
+        try { reportCallEnded(callId); } catch {}
+        return;
+      }
+
       const map: Record<string, any> = {
         call_rejected: 'REJECTED',
         call_ended: 'ENDED',
@@ -126,10 +140,7 @@ export async function applyServerCallEvent(type: string, data: any) {
         call_failed: 'FAILED',
       };
       store.endCall(map[type]);
-      // Server/other-party-driven end: dismiss the native CallKit/
-      // ConnectionService UI if it's still showing (e.g. the Mother
-      // cancelled while this device was still ringing).
-      try { reportCallEnded(callId); } catch { /* CallKeep unavailable - non-fatal */ }
+      try { reportCallEnded(callId); } catch {}
       return;
     }
   }

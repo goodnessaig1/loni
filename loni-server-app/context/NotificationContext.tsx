@@ -100,7 +100,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
               android: androidConfig,
             });
           }
-        } else if (['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(data.type)) {
+        } else if (['call_accepted', 'call_rejected', 'call_ended', 'call_timeout', 'call_missed', 'call_failed'].includes(data.type)) {
           if (data.call_id) {
             await notifee.cancelNotification(`incoming-${data.call_id}`).catch(() => {});
           }

@@ -180,7 +180,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         }
       }
     }
-  } else if (remoteMessage.data && ['call_rejected', 'call_ended', 'call_timeout', 'call_missed'].includes(remoteMessage.data.type)) {
+  } else if (remoteMessage.data && ['call_accepted', 'call_rejected', 'call_ended', 'call_timeout', 'call_missed', 'call_failed'].includes(remoteMessage.data.type)) {
     const callId = remoteMessage.data.call_id ? Number(remoteMessage.data.call_id) : null;
     if (callId) {
       try {
