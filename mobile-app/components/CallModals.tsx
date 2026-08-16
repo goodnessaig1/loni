@@ -7,7 +7,7 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useCallStore, ConnectionQuality } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
-import { LiveKitRoom, useRoomContext, useLocalParticipant, useRemoteParticipants, useTrackVolume } from '@livekit/react-native';
+import { LiveKitRoom, useRoomContext, useLocalParticipant, useRemoteParticipants, useTrackVolume, useParticipant } from '@livekit/react-native';
 import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, Track, LocalAudioTrack, RemoteAudioTrack } from 'livekit-client';
 import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker } from '../lib/audioSession';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
@@ -31,6 +31,19 @@ function useCallLogger() {
   }, []);
 }
 
+const RemoteMutedBadge = ({ participant }: { participant: any }) => {
+  const { microphonePublication } = useParticipant(participant);
+  if (!microphonePublication || microphonePublication.isMuted) {
+    return (
+      <View style={[styles.specialtyBadge, { backgroundColor: '#ef4444', borderColor: '#ef4444', marginBottom: 8 }]}>
+        <Feather name="mic-off" size={14} color="#FFF" style={{ marginRight: 6 }} />
+        <Text style={styles.specialtyText}>Muted</Text>
+      </View>
+    );
+  }
+  return null;
+};
+
 const ActiveCallUI = () => {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
@@ -51,7 +64,7 @@ const ActiveCallUI = () => {
   const [showOutputPicker, setShowOutputPicker] = useState(false);
 
   const actualRemoteParticipant = remoteParticipants.length > 0 ? remoteParticipants[0] : null;
-  const isRemoteMuted = actualRemoteParticipant ? !actualRemoteParticipant.isMicrophoneEnabled : false;
+  const connectionQuality = useCallStore((s) => s.connectionQuality);
 
   const localMic = localParticipant?.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
   const remoteMic = actualRemoteParticipant?.getTrackPublication(Track.Source.Microphone)?.track as RemoteAudioTrack | undefined;
@@ -200,9 +213,16 @@ const ActiveCallUI = () => {
           <View style={styles.header}>
             <View style={styles.badge}>
               <View style={styles.soundBarsContainer}>
-                <View style={[styles.soundBar, { height: 12 }]} />
-                <View style={[styles.soundBar, { height: 16 }]} />
-                <View style={[styles.soundBar, { height: 10 }]} />
+                {(() => {
+                  const bars = connectionQuality === 'excellent' ? 3 : connectionQuality === 'good' ? 2 : 1;
+                  return (
+                    <>
+                      <View style={[styles.soundBar, { height: 8, opacity: bars >= 1 ? 1 : 0.3 }]} />
+                      <View style={[styles.soundBar, { height: 12, opacity: bars >= 2 ? 1 : 0.3 }]} />
+                      <View style={[styles.soundBar, { height: 16, opacity: bars >= 3 ? 1 : 0.3 }]} />
+                    </>
+                  );
+                })()}
               </View>
               <Text style={styles.badgeText}>{statusLabel}</Text>
             </View>
@@ -238,12 +258,7 @@ const ActiveCallUI = () => {
               {remoteParticipant?.name ? remoteParticipant.name.replace(' ', '\n') : 'A\nNurse'}
             </Text>
 
-            {isRemoteMuted && (
-              <View style={[styles.specialtyBadge, { backgroundColor: '#ef4444', borderColor: '#ef4444', marginBottom: 8 }]}>
-                <Feather name="mic-off" size={14} color="#FFF" style={{ marginRight: 6 }} />
-                <Text style={styles.specialtyText}>Muted</Text>
-              </View>
-            )}
+            {actualRemoteParticipant && <RemoteMutedBadge participant={actualRemoteParticipant} />}
 
             {!!remoteParticipant?.hospital_affiliation && (
               <View style={styles.specialtyBadge}>

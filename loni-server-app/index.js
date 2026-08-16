@@ -89,7 +89,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     if (uiMode === 'IN_APP_UI') {
       if (Platform.OS === 'android') {
         const channelId = await notifee.createChannel({
-          id: 'calls_v6_in_app',
+          id: 'calls_v7_in_app',
           name: 'Incoming Requests',
           vibration: true,
           importance: AndroidImportance.HIGH,

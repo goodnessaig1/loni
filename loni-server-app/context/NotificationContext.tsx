@@ -76,7 +76,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
             } catch (e) {}
 
             const channelId = await notifee.createChannel({
-              id: 'calls_v6_in_app',
+              id: 'calls_v7_in_app',
               name: 'Incoming Requests',
               vibration: true,
               importance: AndroidImportance.HIGH,

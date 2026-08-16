@@ -7,8 +7,8 @@ import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useCallStore, ConnectionQuality } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
-import { LiveKitRoom, useRoomContext, useLocalParticipant } from '@livekit/react-native';
-import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality } from 'livekit-client';
+import { LiveKitRoom, useRoomContext, useLocalParticipant, useRemoteParticipants, useParticipant, useTrackVolume } from '@livekit/react-native';
+import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, Track, LocalAudioTrack, RemoteAudioTrack } from 'livekit-client';
 import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker } from '../lib/audioSession';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
 import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
@@ -31,6 +31,19 @@ function useCallLogger() {
   }, []);
 }
 
+const RemoteMutedBadge = ({ participant }: { participant: any }) => {
+  const { microphonePublication } = useParticipant(participant);
+  if (!microphonePublication || microphonePublication.isMuted) {
+    return (
+      <View style={[styles.specialtyBadge, { backgroundColor: '#ef4444', borderColor: '#ef4444', marginBottom: 8 }]}>
+        <Feather name="mic-off" size={14} color="#FFF" style={{ marginRight: 6 }} />
+        <Text style={styles.specialtyText}>Muted</Text>
+      </View>
+    );
+  }
+  return null;
+};
+
 const ActiveCallUI = () => {
   const room = useRoomContext();
   const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
@@ -48,6 +61,17 @@ const ActiveCallUI = () => {
   const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
   const [selectedOutput, setSelectedOutput] = useState<string>('earpiece');
   const [showOutputPicker, setShowOutputPicker] = useState(false);
+
+  const remoteParticipants = useRemoteParticipants();
+  const actualRemoteParticipant = remoteParticipants.length > 0 ? remoteParticipants[0] : null;
+  const connectionQuality = useCallStore((s) => s.connectionQuality);
+
+  const localMic = localParticipant?.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+  const remoteMic = actualRemoteParticipant?.getTrackPublication(Track.Source.Microphone)?.track as RemoteAudioTrack | undefined;
+  const localVol = useTrackVolume(localMic) || 0;
+  const remoteVol = useTrackVolume(remoteMic) || 0;
+  const activeVol = Math.max(localVol, remoteVol);
+  const scale = 1 + activeVol * 1.5;
 
   useEffect(() => {
     const onConnected = () => {
@@ -193,9 +217,16 @@ const ActiveCallUI = () => {
           <View style={styles.header}>
             <View style={styles.badge}>
               <View style={styles.soundBarsContainer}>
-                <View style={[styles.soundBar, { height: 12 }]} />
-                <View style={[styles.soundBar, { height: 16 }]} />
-                <View style={[styles.soundBar, { height: 10 }]} />
+                {(() => {
+                  const bars = connectionQuality === 'excellent' ? 3 : connectionQuality === 'good' ? 2 : 1;
+                  return (
+                    <>
+                      <View style={[styles.soundBar, { height: 8, opacity: bars >= 1 ? 1 : 0.3 }]} />
+                      <View style={[styles.soundBar, { height: 12, opacity: bars >= 2 ? 1 : 0.3 }]} />
+                      <View style={[styles.soundBar, { height: 16, opacity: bars >= 3 ? 1 : 0.3 }]} />
+                    </>
+                  );
+                })()}
               </View>
               <Text style={styles.badgeText}>{statusLabel}</Text>
             </View>
@@ -213,11 +244,11 @@ const ActiveCallUI = () => {
           {/* Center Graphic */}
           <View style={styles.centerGraphic}>
             <View style={styles.visualizerContainer}>
-              <View style={[styles.bigBar, { height: 40 }]} />
-              <View style={[styles.bigBar, { height: 60 }]} />
-              <View style={[styles.bigBar, { height: 90 }]} />
-              <View style={[styles.bigBar, { height: 60 }]} />
-              <View style={[styles.bigBar, { height: 40 }]} />
+              <View style={[styles.bigBar, { height: 40 * (1 + activeVol * 0.5) }]} />
+              <View style={[styles.bigBar, { height: 60 * (1 + activeVol * 0.8) }]} />
+              <View style={[styles.bigBar, { height: 90 * scale }]} />
+              <View style={[styles.bigBar, { height: 60 * (1 + activeVol * 0.8) }]} />
+              <View style={[styles.bigBar, { height: 40 * (1 + activeVol * 0.5) }]} />
             </View>
           </View>
 
@@ -230,6 +261,8 @@ const ActiveCallUI = () => {
             <Text style={styles.nurseName}>
               {remoteParticipant?.name ? remoteParticipant.name.replace(' ', '\n') : 'A\nMother'}
             </Text>
+
+            {actualRemoteParticipant && <RemoteMutedBadge participant={actualRemoteParticipant} />}
 
             <View style={styles.specialtyBadge}>
               <Ionicons name={hasTrimester ? "medical" : "business"} size={14} color="#FFF" style={{ marginRight: 6 }} />
