@@ -19,13 +19,13 @@ export default function RoleSelectionScreen() {
   const [selectedRole, setSelectedRole] = useState<Role>(null);
 
   const handleContinue = () => {
-    if (selectedRole === 'nurse') {
-      router.push('/(auth)/complete-profile-nurse');
-    } else if (selectedRole === 'driver') {
+    // if (selectedRole === 'nurse') {
+      // router.push('/(auth)/complete-profile-nurse');
+    // } else if (selectedRole === 'driver') {
       router.push('/(auth)/become-driver');
-    } else if (selectedRole) {
-      router.push('/(auth)/phone'); // Fallback for other roles
-    }
+    // } else if (selectedRole) {
+    //   router.push('/(auth)/phone'); // Fallback for other roles
+    // }
   };
 
   return (

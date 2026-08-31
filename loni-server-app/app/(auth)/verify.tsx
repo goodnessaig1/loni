@@ -47,7 +47,7 @@ export default function VerifyScreen() {
         router.replace('/(auth)/role-selection');
       }
     }
-  }, [user]);
+  }, []);
 
   const handleCodeChange = (text: string, index: number) => {
     // Only allow numbers
@@ -82,11 +82,13 @@ export default function VerifyScreen() {
         return;
       }
 
-      await verifyEmail({
-        email,
-        otp: code.join(''),
-        type: 'email_verification'
-      });
+      // await verifyEmail({
+      //   email,
+      //   otp: code.join(''),
+      //   type: 'email_verification'
+      // });
+        router.replace('/(auth)/role-selection');
+
       // Navigation is handled by the useEffect above when user context updates
     } catch (error: any) {
       console.error('Verification failed:', error.response?.data || error.message);

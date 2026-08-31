@@ -61,7 +61,7 @@ export default function CompleteProfileDocumentsScreen() {
       appendFile('government_id', idUri, idName);
       appendFile('vehicle_papers', papersUri, papersName);
       
-      await completeProfile(formData);
+      // await completeProfile(formData);
 
       router.push('/(auth)/verification-progress');
     } catch (error) {
