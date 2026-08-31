@@ -330,6 +330,7 @@ export const CallModals = () => {
   const wasConnected = useRef(false);
   const lastCallId = useRef<number | null>(null);
   const lastNurseName = useRef<string | null>(null);
+  const lastConnectedAt = useRef<number | null>(null);
 
   const [micStatus, setMicStatus] = useState<PermissionStatus>('undetermined');
   const [audioSessionReady, setAudioSessionReady] = useState(false);
@@ -345,6 +346,10 @@ export const CallModals = () => {
   if (remoteParticipant?.name || callerName) {
     lastNurseName.current = remoteParticipant?.name || callerName;
   }
+  const currentConnectedAt = useCallStore.getState().connectedAt;
+  if (currentConnectedAt) {
+    lastConnectedAt.current = currentConnectedAt;
+  }
   if (status === 'CONNECTED' || (isActive && status !== 'RINGING' && status !== 'INCOMING')) {
     wasConnected.current = true;
   }
@@ -354,9 +359,24 @@ export const CallModals = () => {
     if (status === 'IDLE' && wasConnected.current && lastCallId.current) {
       const idToRate = lastCallId.current;
       const nurseNameToRate = lastNurseName.current;
+      const avatarToPass = useCallStore.getState().remoteParticipant?.profile_picture;
+      
+      let durationStr = '';
+      if (lastConnectedAt.current) {
+        const diffInSeconds = Math.max(0, Math.floor((Date.now() - lastConnectedAt.current) / 1000));
+        if (diffInSeconds < 60) {
+          durationStr = `${diffInSeconds} secs`;
+        } else {
+          const mins = Math.floor(diffInSeconds / 60);
+          const secs = diffInSeconds % 60;
+          durationStr = secs > 0 ? `${mins} min${mins > 1 ? 's' : ''} ${secs} sec${secs > 1 ? 's' : ''}` : `${mins} min${mins > 1 ? 's' : ''}`;
+        }
+      }
+
       wasConnected.current = false;
       lastCallId.current = null;
       lastNurseName.current = null;
+      lastConnectedAt.current = null;
 
       console.log(LOG, 'Call ended, navigating to nurse rating screen for callId:', idToRate);
       router.push({
@@ -364,6 +384,8 @@ export const CallModals = () => {
         params: {
           callId: String(idToRate),
           name: nurseNameToRate || 'Nurse',
+          avatar: avatarToPass || '',
+          duration: durationStr,
         },
       });
     }
