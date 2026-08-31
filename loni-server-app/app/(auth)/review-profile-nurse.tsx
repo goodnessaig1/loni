@@ -37,7 +37,7 @@ export default function ReviewProfileNurseScreen() {
     </View>
   );
 
-  const profilePhoto = user?.nurse_profile?.verification_documents?.photo || user?.profile_picture || 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80';
+  const profilePhoto = user?.nurse_profile?.verification_documents?.photo || (user as any)?.profile_picture || (user as any)?.profilePicture || 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?ixlib=rb-1.2.1&auto=format&fit=crop&w=300&q=80';
   const licenseNumber = user?.nurse_profile?.verification_documents?.licenseNumber || 'N/A';
   const experience = user?.nurse_profile?.years_of_experience ? `${user.nurse_profile.years_of_experience} years` : 'N/A';
 
@@ -63,7 +63,7 @@ export default function ReviewProfileNurseScreen() {
         </View>
 
         <View style={styles.infoContainer}>
-          <InfoRow value={user?.gender || "Female"} label="Gender" />
+          <InfoRow value={(user as any)?.gender || "Female"} label="Gender" />
           <InfoRow label="Phone" value={user?.phone || "+1 (555) 234 - 5678"} valueFirst={false} />
           <InfoRow label="Email" value={user?.email || "Sarahchen@example.com"} valueFirst={false} />
           <InfoRow label="License No." value={licenseNumber} valueFirst={false} />

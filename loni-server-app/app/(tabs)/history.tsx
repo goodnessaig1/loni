@@ -4,13 +4,15 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Avatar } from '../../components/Avatar';
+import { useCallHistory, CallRecord } from '../../hooks/useCallHistory';
 
 // Trimester icon from user request
 const TrimesterIcon = () => (
@@ -29,74 +31,10 @@ const TrimesterIcon = () => (
   </Svg>
 );
 
-type CallStatus = 'completed' | 'missed';
-
-type CallRecord = {
-  id: string;
-  name: string;
-  trimester: string;
-  durationMins: number;
-  timeLabel: string; // "Today" | "Yesterday"
-  date: string;    // e.g. "Friday, June 5, 2026"
-  time: string;    // e.g. "02:30 PM"
-  duration: string; // e.g. "12:34"
-  status: CallStatus;
-  img: string;
-};
-
-const MOCK_CALLS: CallRecord[] = [
-  {
-    id: '1',
-    name: 'Sarah A.',
-    trimester: '2nd Trimester',
-    durationMins: 8,
-    timeLabel: 'Today',
-    date: 'Friday, June 5, 2026',
-    time: '02:30 PM',
-    duration: '08:14',
-    status: 'completed',
-    img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-  },
-  {
-    id: '2',
-    name: 'Mary O.',
-    trimester: '1st Trimester',
-    durationMins: 12,
-    timeLabel: 'Yesterday',
-    date: 'Thursday, June 4, 2026',
-    time: '10:15 AM',
-    duration: '12:42',
-    status: 'completed',
-    img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-  },
-  {
-    id: '3',
-    name: 'Sarah A.',
-    trimester: '2nd Trimester',
-    durationMins: 8,
-    timeLabel: 'Today',
-    date: 'Friday, June 5, 2026',
-    time: '11:00 AM',
-    duration: '00:00',
-    status: 'missed',
-    img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-  },
-  {
-    id: '4',
-    name: 'Grace A.',
-    trimester: '3rd Trimester',
-    durationMins: 6,
-    timeLabel: 'Yesterday',
-    date: 'Thursday, June 4, 2026',
-    time: '04:45 PM',
-    duration: '06:22',
-    status: 'completed',
-    img: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=150&q=80',
-  },
-];
-
 export default function HistoryScreen() {
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
+  
+  const { data: calls = [], isLoading } = useCallHistory(50);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -141,7 +79,11 @@ export default function HistoryScreen() {
           <View style={styles.detailCard}>
             <HelixaText style={styles.detailLabel}>Caller</HelixaText>
             <View style={styles.callerRow}>
-              <Image source={{ uri: selectedCall.img }} style={styles.detailAvatar} />
+              <Avatar 
+                uri={selectedCall?.img}
+                name={selectedCall?.name}
+                style={styles.detailAvatar} 
+              />
               <View>
                 <HelixaText style={styles.detailCallerName} weight="bold">
                   {selectedCall.name}
@@ -175,21 +117,28 @@ export default function HistoryScreen() {
             </View>
           </View>
         </ScrollView>
+      ) : isLoading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <HelixaText>Loading...</HelixaText>
+        </View>
       ) : (
-        /* ---- Call History List ---- */
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-        <CalText style={styles.heading}>Call History</CalText>
-        <HelixaText style={styles.callCount}>{MOCK_CALLS.length} calls</HelixaText>
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+          <CalText style={styles.heading}>Call History</CalText>
+          <HelixaText style={styles.callCount}>{calls.length} calls</HelixaText>
 
         <View style={styles.listCard}>
-          {MOCK_CALLS.map((call, index) => (
+          {calls.map((call, index) => (
             <View key={call.id}>
               <TouchableOpacity
                 style={styles.callRow}
                 activeOpacity={0.7}
                 onPress={() => setSelectedCall(call)}
               >
-                <Image source={{ uri: call.img }} style={styles.avatar} />
+                <Avatar 
+                  uri={call.img}
+                  name={call.name}
+                  style={styles.avatar} 
+                />
 
                 <View style={styles.callInfo}>
                   <View style={styles.nameRow}>
@@ -209,7 +158,7 @@ export default function HistoryScreen() {
                 </View>
 
                 <View style={styles.callMeta}>
-                  <HelixaText style={styles.metaDuration}>{call.durationMins} mins</HelixaText>
+                  <HelixaText style={styles.metaDuration}>{call.durationFormatted}</HelixaText>
                   <HelixaText style={styles.metaTime}>{call.timeLabel}</HelixaText>
                 </View>
 
@@ -219,11 +168,11 @@ export default function HistoryScreen() {
               </TouchableOpacity>
 
               {/* Divider between rows, not after last */}
-              {index < MOCK_CALLS.length - 1 && <View style={styles.divider} />}
+              {index < calls.length - 1 && <View style={styles.divider} />}
             </View>
           ))}
         </View>
-      </ScrollView>
+        </ScrollView>
       )}
     </SafeAreaView>
   );

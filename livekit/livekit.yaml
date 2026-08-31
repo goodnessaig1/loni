@@ -5,8 +5,28 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50050
+  # Issue 9 root cause: `node_ip` was hardcoded to one developer's LAN IP
+  # with use_external_ip disabled. LiveKit was telling EVERY client -
+  # Android emulator, iOS simulator, physical devices on other networks,
+  # anything not on that exact WiFi - to send WebRTC media to that one
+  # private address. That's why ICE/DTLS negotiation silently hung and the
+  # app got stuck on "Connecting...": the signaling websocket (port 7880)
+  # connects fine over LAN, but the actual audio RTP never finds a route.
+  #
+  # DEV (same-LAN phone/emulator only): keep use_external_ip:false and set
+  # node_ip to YOUR machine's current LAN IP (it changes on every network -
+  # `ipconfig getifaddr en0` on macOS). This only ever works for devices on
+  # that same WiFi.
+  #
+  # PRODUCTION / any device on cellular or a different network: set
+  # use_external_ip:true (LiveKit auto-detects the host's public IP) and
+  # remove node_ip entirely, OR run LiveKit on a VPS with a static public
+  # IP/domain and set node_ip to that public IP. Devices that can't reach
+  # node_ip directly (most real-world cases: NAT, carrier CGNAT, corporate
+  # firewalls) fall back to the TURN relay configured below - which is why
+  # getting TURN right matters just as much as node_ip.
   use_external_ip: false
-  node_ip: 192.168.100.132
+  node_ip: 192.168.100.156 # <-- CHANGE PER ENVIRONMENT. See comment above.
   enable_loopback_candidate: false
 redis:
   address: "redis:6379"
@@ -15,13 +35,41 @@ redis:
   db: 0
 turn:
   enabled: true
-  domain: turn.yourdomain.com
+  # Issue 9: this was left as the literal placeholder "turn.yourdomain.com",
+  # which does not resolve, combined with external_tls:true which requires
+  # a valid TLS certificate for that (nonexistent) domain. That means the
+  # TURN relay - the ONLY thing that rescues connectivity for devices
+  # behind NAT/cellular/a different network than the LiveKit host - was
+  # completely non-functional. You MUST point this at a real domain that
+  # resolves to the machine running coturn (see docker-compose.yml's
+  # `coturn` service, and set the matching DOMAIN in livekit/.env), with a
+  # valid cert (Caddy in docker-compose.yml can issue one automatically via
+  # Let's Encrypt if this domain has public DNS pointed at the host).
+  domain: turn.yourdomain.com # <-- REPLACE with your real TURN domain
   tls_port: 5349
   udp_port: 3478
   external_tls: true
-# webhook:
-#   api_key: devkey
-#   urls:
-#     - http://192.168.100.132:8000/api/v1/calls/webhook
+# Issue 3 / Issue 9 root cause: this block was commented out, so LiveKit
+# NEVER sent webhooks anywhere. webhook_router.py existed and looked
+# correct in isolation, but received zero traffic - which is why
+# "participant joined" could never be used to start the call timer, and why
+# a crashed/killed app's room never got reconciled in the DB (Issue 14).
+# The URL below was also wrong before (pointed at /api/v1/calls/webhook,
+# which doesn't exist) - the webhook router is mounted at prefix
+# "/livekit" in app/api/router.py, so the real path is /api/v1/livekit/webhook.
+#
+# `host.docker.internal` (not the LAN IP) - on Docker Desktop for Mac/
+# Windows this is a stable, built-in alias that always resolves to the
+# host machine from inside any container, regardless of what the host's
+# LAN IP currently is. This is what stops the webhook URL from needing to
+# be updated every time your IP changes (see scripts/update-lan-ip.sh for
+# the couple of values that genuinely still do need it). On Linux Docker
+# (no Docker Desktop), this alias isn't automatic - add
+# `extra_hosts: ["host.docker.internal:host-gateway"]` to the `livekit`
+# service in docker-compose.yml if you ever deploy there.
+webhook:
+  api_key: devkey
+  urls:
+    - http://host.docker.internal:8000/api/v1/livekit/webhook
 keys:
   devkey: "super_secret_livekit_key_32_chars_long!"

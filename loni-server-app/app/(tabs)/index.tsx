@@ -5,17 +5,23 @@ import {
   StyleSheet,
   TouchableOpacity,
   Switch,
-  Image as RNImage,
+  Image,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Avatar } from '../../components/Avatar';
 import { CustomSwitch } from 'components/CustomSwitch';
 import { useAuth } from '../../hooks/useAuth';
 import { apiClient } from '../../api/client';
+import { useCallStore } from '../../store/callStore';
+import { useCall } from '../../hooks/useCall';
+import { useCallHistory } from '../../hooks/useCallHistory';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { formatDistanceToNow } from 'date-fns';
 
 // Custom SVGs from user request
 const HomeIcon = ({ color }: { color: string }) => (
@@ -47,7 +53,7 @@ const ProfileIcon = ({ color }: { color: string }) => (
     <Path
       fillRule="evenodd"
       clipRule="evenodd"
-      d="M12 1C5.925 1 1 5.925 1 12C1 18.075 5.925 23 12 23C18.075 23 23 18.075 23 12C23 5.925 18.075 1 12 1ZM3 12C3 14.09 3.713 16.014 4.908 17.542C5.74744 16.4401 6.83015 15.5471 8.07164 14.9327C9.31312 14.3183 10.6798 13.9991 12.065 14C13.4324 13.9984 14.7821 14.3091 16.0111 14.9084C17.2402 15.5077 18.3162 16.3797 19.157 17.458C20.0234 16.3216 20.6068 14.9952 20.8589 13.5886C21.111 12.182 21.0244 10.7355 20.6065 9.36898C20.1886 8.00243 19.4512 6.75505 18.4555 5.73004C17.4598 4.70503 16.2343 3.93186 14.8804 3.47451C13.5265 3.01716 12.0832 2.88877 10.6699 3.09997C9.25652 3.31117 7.91379 3.85589 6.75277 4.68905C5.59175 5.52222 4.64581 6.61987 3.99323 7.8912C3.34065 9.16252 3.00018 10.571 3 12ZM12 21C9.93391 21.0033 7.93014 20.2926 6.328 18.988C6.97281 18.0646 7.83119 17.3107 8.83008 16.7905C9.82896 16.2702 10.9388 15.999 12.065 16C13.1772 15.999 14.2735 16.2635 15.263 16.7713C16.2524 17.2792 17.1064 18.0158 17.754 18.92C16.1395 20.267 14.1026 21.0033 12 21Z"
+      d="M12 1C5.925 1 1 5.925 1 12C1 18.075 5.925 23 12 23C18.075 23 23 18.075 23 12C23 5.925 18.075 1 12 1ZM3 12C3 14.09 3.713 16.014 4.908 17.542C5.74744 16.4401 6.83015 15.5471 8.07164 14.9327C9.31312 14.3183 10.6798 13.9991 12.065 14C13.4324 13.9984 14.7821 14.3091 16.0111 14.9084C17.2402 15.5077 18.3162 16.3797 19.157 17.458C20.0234 16.3216 20.6068 14.9952 20.8589 13.5886C21.111 12.182 21.0244 10.7355 20.6065 9.36898C20.1886 8.00243 19.4512 6.75505 18.4555 5.73004C17.4598 4.70503 16.2343 3.93186 14.8804 3.47451C13.5265 3.01716 12.0832 2.88877 10.6699 3.09997C9.25652 3.31117 7.91379 3.85589 6.75277 4.68905C5.59175 5.52222 4.64581 6.61987 3.99323 7.8912C3.34065 9.16252 3.00018 10.571 3 12ZM12 21C9.93391 21.0033 7.93014 20.2926 6.328 18.988C6.97281 18.0646 7.83119 17.3107 8.83008 16.7905C9.82896 16.2702 10.9388 15.5999 12.065 16C13.1772 15.999 14.2735 16.2635 15.263 16.7713C16.2524 17.2792 17.1064 18.0158 17.754 18.92C16.1395 20.267 14.1026 21.0033 12 21Z"
       fill={color}
     />
   </Svg>
@@ -74,6 +80,22 @@ export default function NurseDashboardScreen() {
 
   // Initialize isOnline from user data
   const [isOnline, setIsOnline] = useState<boolean>((user as any)?.is_online ?? false);
+  const [stats, setStats] = useState({ total_calls: 0, total_duration_formatted: '0 mins' });
+  const { data: recentActivities = [] } = useCallHistory(10);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchData = async () => {
+        try {
+          const statsRes = await apiClient.get('/calls/stats');
+          setStats(statsRes.data);
+        } catch (e) {
+          console.error("Failed to fetch stats", e);
+        }
+      };
+      fetchData();
+    }, [user?.id])
+  );
 
   const hour = new Date().getHours();
   let greeting = 'Evening';
@@ -94,31 +116,24 @@ export default function NurseDashboardScreen() {
     }
   };
 
-  // State for demonstration: toggle these to see empty states
-  const [hasIncomingRequest, setHasIncomingRequest] = useState(true);
-  const [recentActivities, setRecentActivities] = useState([
-    {
-      id: '1',
-      name: 'Sarah A.',
-      trimester: '2nd Trimester',
-      time: '8 mins Today',
-      img: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    },
-    {
-      id: '2',
-      name: 'Mary O.',
-      trimester: '1st Trimester',
-      time: '12 mins Yesterday',
-      img: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80',
-    },
-    {
-      id: '3',
-      name: 'Grace A.',
-      trimester: '3rd Trimester',
-      time: '6 mins Yesterday',
-      img: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&w=150&q=80',
-    },
-  ]);
+  const { status, callId, remoteParticipant, incomingRequests } = useCallStore();
+  const { rejectCall } = useCall();
+  const router = useRouter();
+
+  const [showAllRequests, setShowAllRequests] = useState(false);
+  const topRequests = incomingRequests.slice(0, 3);
+  const hasIncomingRequests = incomingRequests.length > 0;
+
+  const handleDecline = async (id: number) => {
+    await rejectCall(id);
+  };
+
+  const handleView = (id: number) => {
+    setShowAllRequests(false);
+    router.push({ pathname: '/incoming-call', params: { callId: id } });
+  };
+
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -131,11 +146,9 @@ export default function NurseDashboardScreen() {
               Verified Nurse
             </HelixaText>
           </View>
-          <Image
-            source={{
-              uri: user?.profilePicture ||
-                'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=150&q=80',
-            }}
+          <Avatar
+            uri={user?.profilePicture || null}
+            name={user?.name || 'Nurse'}
             style={styles.avatar}
           />
         </View>
@@ -168,64 +181,65 @@ export default function NurseDashboardScreen() {
             onValueChange={handleToggleOnline}
             activeColor="#D62D88"
           />
-          {/* <Switch 
-            value={isOnline}
-            onValueChange={setIsOnline}
-            trackColor={{ false: '#E5E7EB', true: '#D62D88' }}
-            thumbColor="#FFFFFF"
-          /> */}
         </View>
 
         {/* Incoming Requests */}
         <View style={styles.sectionHeader}>
           <HelixaText style={styles.sectionTitle}>Incoming Requests</HelixaText>
-          {hasIncomingRequest && (
-            <TouchableOpacity>
+          {hasIncomingRequests && (
+            <TouchableOpacity onPress={() => setShowAllRequests(true)}>
               <HelixaText style={styles.viewAllText}>View all ❯</HelixaText>
             </TouchableOpacity>
           )}
         </View>
 
-        {hasIncomingRequest ? (
-          <View style={styles.incomingCard}>
-            <View style={styles.incomingTop}>
-              <Image
-                source={{
-                  uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-                }}
-                style={styles.incomingAvatar}
-              />
-              <View style={styles.incomingInfo}>
-                <View style={styles.incomingNameRow}>
-                  <HelixaText style={styles.incomingName} weight="bold">
-                    Sarah A.
-                  </HelixaText>
-                  <HelixaText style={styles.incomingTime}>1 min ago</HelixaText>
+        {hasIncomingRequests ? (
+          <View style={{ gap: 12 }}>
+            {topRequests.map((req) => (
+              <View key={req.callId} style={styles.incomingCard}>
+                <View style={styles.incomingTop}>
+                  <Avatar
+                    uri={req.remote?.profile_picture || null}
+                    name={req.remote?.name || 'A Mother'}
+                    style={styles.incomingAvatar}
+                  />
+                  <View style={styles.incomingInfo}>
+                    <View style={styles.incomingNameRow}>
+                      <HelixaText style={styles.incomingName} weight="bold">
+                        {req.remote?.name || 'A Mother'}
+                      </HelixaText>
+                      <HelixaText style={styles.incomingTime}>Just now</HelixaText>
+                    </View>
+                    {!!req.remote?.trimester && (
+                      <View style={styles.trimesterRow}>
+                        <TrimesterIcon />
+                        <HelixaText style={styles.trimesterText}>
+                          {req.remote.trimester}{req.remote.pregnancy_week ? ` · Week ${req.remote.pregnancy_week}` : ''}
+                        </HelixaText>
+                      </View>
+                    )}
+                    <View style={styles.plusMemberBadge}>
+                      <View style={styles.plusDot} />
+                      <HelixaText style={styles.plusMemberText}>Plus Member</HelixaText>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.callIconBtn} onPress={() => handleView(req.callId)}>
+                    <Feather name="phone-call" size={18} color="#000" />
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.trimesterRow}>
-                  <TrimesterIcon />
-                  <HelixaText style={styles.trimesterText}>2nd Trimester</HelixaText>
-                </View>
-                <View style={styles.plusMemberBadge}>
-                  <View style={styles.plusDot} />
-                  <HelixaText style={styles.plusMemberText}>Plus Member</HelixaText>
+                <View style={styles.incomingActions}>
+                  <TouchableOpacity
+                    style={styles.declineBtn}
+                    onPress={() => handleDecline(req.callId)}>
+                    <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.viewBtn} onPress={() => handleView(req.callId)}>
+                    <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
+                    <HelixaText style={styles.viewBtnText}>View</HelixaText>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <TouchableOpacity style={styles.callIconBtn}>
-                <Feather name="phone-call" size={18} color="#000" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.incomingActions}>
-              <TouchableOpacity
-                style={styles.declineBtn}
-                onPress={() => setHasIncomingRequest(false)}>
-                <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.viewBtn}>
-                <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
-                <HelixaText style={styles.viewBtnText}>View</HelixaText>
-              </TouchableOpacity>
-            </View>
+            ))}
           </View>
         ) : (
           <View style={styles.emptyCard}>
@@ -241,13 +255,23 @@ export default function NurseDashboardScreen() {
           contentContainerStyle={styles.glanceScroll}>
           <View style={styles.glanceCardLight}>
             <View style={styles.glanceIconBox}>
-              <Feather name="phone-call" size={16} color="#000" />
+              <Feather name="phone-call" size={20} color="#000" />
             </View>
             <HelixaText style={styles.glanceValue} weight="bold">
-              12
+              {stats.total_calls}
             </HelixaText>
-            <HelixaText style={styles.glanceLabel}>Calls Today</HelixaText>
-            <HelixaText style={styles.glanceSub}>+2 from yesterday</HelixaText>
+            <HelixaText style={styles.glanceLabel}>Total Calls</HelixaText>
+            <HelixaText style={styles.glanceSub}>All time</HelixaText>
+          </View>
+          <View style={styles.glanceCardLight}>
+            <View style={styles.glanceIconBox}>
+              <Feather name="clock" size={20} color="#000" />
+            </View>
+            <HelixaText style={styles.glanceValue} weight="bold">
+              {stats.total_duration_formatted}
+            </HelixaText>
+            <HelixaText style={styles.glanceLabel}>Total Call Time</HelixaText>
+            <HelixaText style={styles.glanceSub}>All time</HelixaText>
           </View>
           <View style={styles.glanceCardDark}>
             <View style={[styles.glanceIconBox, { backgroundColor: '#FFF' }]}>
@@ -288,34 +312,42 @@ export default function NurseDashboardScreen() {
 
         {recentActivities.length > 0 ? (
           <View style={styles.recentContainer}>
-            {recentActivities.map((activity, index) => (
-              <View key={activity.id}>
-                <View style={styles.recentItem}>
-                  <Image source={{ uri: activity.img }} style={styles.recentAvatar} />
-                  <View style={styles.recentInfo}>
-                    <HelixaText style={styles.recentName} weight="bold">
-                      {activity.name}
-                    </HelixaText>
-                    <View style={styles.trimesterRow}>
-                      <TrimesterIcon />
-                      <HelixaText style={styles.trimesterText}>{activity.trimester}</HelixaText>
+            {recentActivities.map((activity, index) => {
+              return (
+                <View key={activity.id}>
+                  <View style={styles.recentItem}>
+                    <Avatar 
+                      uri={activity.img}
+                      name={activity.name}
+                      style={styles.recentAvatar}
+                    />
+                    <View style={styles.recentInfo}>
+                      <HelixaText style={styles.recentName} weight="bold">
+                        {activity.name}
+                      </HelixaText>
+                      {activity.trimester && activity.trimester !== 'Unknown' && (
+                        <View style={styles.trimesterRow}>
+                          <TrimesterIcon />
+                          <HelixaText style={styles.trimesterText}>{activity.trimester}</HelixaText>
+                        </View>
+                      )}
                     </View>
+                    <View style={styles.recentRight}>
+                      <HelixaText style={styles.recentTimeTop}>
+                        {activity.durationFormatted}
+                      </HelixaText>
+                      <HelixaText style={styles.recentTimeBottom}>
+                        {activity.relativeTime}
+                      </HelixaText>
+                    </View>
+                    <TouchableOpacity style={styles.recentArrow}>
+                      <Feather name="chevron-right" size={16} color="#6B7280" />
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.recentRight}>
-                    <HelixaText style={styles.recentTimeTop}>
-                      {activity.time.split(' ')[0]} {activity.time.split(' ')[1]}
-                    </HelixaText>
-                    <HelixaText style={styles.recentTimeBottom}>
-                      {activity.time.split(' ')[2] || ''}
-                    </HelixaText>
-                  </View>
-                  <TouchableOpacity style={styles.recentArrow}>
-                    <Feather name="chevron-right" size={16} color="#6B7280" />
-                  </TouchableOpacity>
+                  {index < recentActivities.length - 1 && <View style={styles.divider} />}
                 </View>
-                {index < recentActivities.length - 1 && <View style={styles.divider} />}
-              </View>
-            ))}
+              );
+            })}
           </View>
         ) : (
           <View style={[styles.emptyCard, { marginBottom: 40 }]}>
@@ -343,6 +375,60 @@ export default function NurseDashboardScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* View All Incoming Requests Modal */}
+      <Modal visible={showAllRequests} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAllRequests(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowAllRequests(false)} style={styles.closeBtn}>
+              <Feather name="x" size={24} color="#000" />
+            </TouchableOpacity>
+            <HelixaText style={styles.modalTitle} weight="bold">All Requests ({incomingRequests.length})</HelixaText>
+            <View style={{ width: 24 }} />
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
+            {incomingRequests.map((req) => (
+              <View key={req.callId} style={styles.incomingCard}>
+                <View style={styles.incomingTop}>
+                  <Avatar
+                    uri={req.remote?.profile_picture || null}
+                    name={req.remote?.name || 'A Mother'}
+                    style={styles.incomingAvatar}
+                  />
+                  <View style={styles.incomingInfo}>
+                    <View style={styles.incomingNameRow}>
+                      <HelixaText style={styles.incomingName} weight="bold">{req.remote?.name || 'A Mother'}</HelixaText>
+                      <HelixaText style={styles.incomingTime}>Just now</HelixaText>
+                    </View>
+                    {!!req.remote?.trimester && (
+                      <View style={styles.trimesterRow}>
+                        <TrimesterIcon />
+                        <HelixaText style={styles.trimesterText}>
+                          {req.remote.trimester}{req.remote.pregnancy_week ? ` · Week ${req.remote.pregnancy_week}` : ''}
+                        </HelixaText>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.incomingActions}>
+                  <TouchableOpacity style={styles.declineBtn} onPress={() => handleDecline(req.callId)}>
+                    <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.viewBtn} onPress={() => handleView(req.callId)}>
+                    <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
+                    <HelixaText style={styles.viewBtnText}>View</HelixaText>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))}
+            {incomingRequests.length === 0 && (
+              <View style={styles.emptyCard}>
+                <HelixaText style={styles.emptyText}>No pending requests.</HelixaText>
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -671,5 +757,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     color: '#6B6B6B',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    color: '#000',
+  },
+  closeBtn: {
+    padding: 4,
   },
 });

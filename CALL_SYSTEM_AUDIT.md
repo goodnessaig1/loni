@@ -1,0 +1,406 @@
+# Voice Calling System — Debug & Fix Audit
+
+Scope: `backend-new` (FastAPI), `mobile-app` (Mother), `loni-server-app` (Nurse), `livekit/` (self-hosted LiveKit + coturn + Caddy).
+
+This document explains, per reported issue: the exact root cause found in the code, why it produced the observed symptom, and the fix that was implemented. All fixes are live in the codebase — this is a record of _why_, not a proposal.
+
+**Post-implementation fixes (found via real-device testing) and current status of `react-native-callkeep`:**
+
+1. **TurboModule duplicate-method crash (fixed).** `react-native-callkeep@4.3.16`'s Android native module (`RNCallKeepModule.java`) declares two `@ReactMethod`-annotated Java overloads each for `displayIncomingCall` and `startCall` (a 3-arg and a 4-arg version). That's legal for React Native's legacy bridge, which resolves overloads by argument count, but breaks the New Architecture's TurboModule interop layer - which this project runs under (`react-native-worklets`/`reanimated@4.x` require New Architecture) - because it parses `@ReactMethod` methods by name only. The result was `Exception in HostObject::get for prop 'RNCallKeep': ... Module exports two methods to JavaScript with the same name`, thrown the instant anything imports `react-native-callkeep`, which cascaded into `hooks/useCall.ts` and `context/NotificationContext.tsx` failing to evaluate and Metro misreporting `_layout.tsx`/`app/nurse/connecting.tsx` as "missing default export" (both files are fine - that's a downstream symptom, not a separate bug). Confirmed via the JS wrapper (`index.js`) that the 3-arg overloads are never actually called on Android - fixed by removing `@ReactMethod` from the two dead 3-arg overloads directly in the installed copy, and packaged as `patches/react-native-callkeep+4.3.16.patch` (applied automatically via a new `postinstall: patch-package` script in both apps' `package.json`) so the fix survives `npm install`/`node_modules` reinstalls instead of being silently lost.
+
+2. **Invalid drawable-resource crash (fixed).** After (1), the app booted but then crashed shortly after ("white screen then closes"). Traced into the same Java source: the Android `setup()` options passed `imageName: 'ic_launcher'` for the PhoneAccount icon, which `RNCallKeepModule.java` resolves via `getResources().getIdentifier(imageName, "drawable", packageName)` - i.e. it must be a `drawable/` resource specifically. Both apps' `ic_launcher` only exists under `mipmap-*/` (the standard Expo-generated location), so the lookup returned `0`, and `Icon.createWithResource(context, 0)` threw with no try/catch anywhere on the Java side - an uncatchable-from-JS crash on every launch, since `setupCallKeep()` runs on mount. Fixed by removing `imageName` from the Android setup options entirely (it's optional - guarded by `hasKey("imageName")` - and only affects a cosmetic system-Settings icon, not call functionality).
+
+3. **Kill switch added (current state).** After fixes (1) and (2), a _third_, undiagnosed crash still occurred with the same "white screen then closes" symptom, and no crash log was available to trace it further (Metro's own terminal doesn't reliably surface a hard native crash - it requires `adb logcat`). Rather than keep making single-shot fixes against an untestable target, **`react-native-callkeep` (and its PushKit pairing, `react-native-voip-push-notification`) is now gated behind `EXPO_PUBLIC_ENABLE_CALLKEEP` in both apps' `.env` files, currently `"false"`.** `lib/callKeepService.ts` and `lib/voipPush.ts` (both apps) now `require()` the native modules lazily and only when the flag is on - while off, these modules are never touched at all, so nothing they do can crash the app. Every exported function (`startOutgoingCall`, `displayIncomingCall`, `reportConnected`, `reportCallEnded`) becomes a safe no-op and returns `null`/does nothing.
+
+   **This does not remove Issue 4/5 functionality, it removes the native-OS-call-UI polish layered on top of it.** With the flag off: incoming calls on the Nurse app still ring via notifee's full-screen, high-priority notification with working Accept/Decline actions (`index.js`'s `notifee.onBackgroundEvent`/`onForegroundEvent`); the WebSocket + FCM signaling, LiveKit audio, ring-timeout watchdog, and the in-app "Calling Nurse..."/incoming-call modals (`components/CallModals.tsx`) all work completely independently of CallKeep and are unaffected. What's lost while disabled: the native lock-screen CallKit/ConnectionService call screen, the guaranteed wake-on-force-quit path for iOS (PushKit), and the native outgoing ringback tone on iOS (the bundled `calling.m4a` ringback still plays there as a fallback in this state - see `app/nurse/connecting.tsx`).
+
+   **To re-enable and finish debugging:** set `EXPO_PUBLIC_ENABLE_CALLKEEP=true`, reproduce the crash, and capture `adb logcat AndroidRuntime:E ReactNative:E ReactNativeJS:E *:S` (or `adb logcat *:E`) from a fresh launch - the `FATAL EXCEPTION` block in that output is what's needed to trace the third crash the same way the first two were found (by reading the actual native source in `node_modules` against the real stack trace, not guessing).
+
+4. **`app.notifee:core` Gradle resolution failure (fixed).** `@notifee/react-native@9.1.8` ships its Android SDK as a _local_ flat Maven repo bundled inside the npm package itself (`node_modules/@notifee/react-native/android/libs/`) rather than publishing to any public repository - and unlike most other native deps in this project, it doesn't ship its own Expo config plugin to wire that in automatically. Without it, `allprojects { repositories { ... } }` in the generated `android/build.gradle` never points at that local path, so Gradle can't resolve `app.notifee:core` at all. Fixed with a new local config plugin, `loni-server-app/plugins/withNotifeeAndroid.js` (registered in `app.json`), which injects the missing `maven { url "$rootDir/../node_modules/@notifee/react-native/android/libs" }` entry via `withProjectBuildGradle`.
+
+5. **`WebhookReceiver` crashing on every webhook call (fixed).** Production logs showed every single LiveKit webhook delivery failing with `400 Bad Request` and `Webhook error: WebhookReceiver.__init__() takes 2 positional arguments but 3 were given`. The Python `livekit-api` SDK's `WebhookReceiver` (unlike the Node SDK) takes a single `TokenVerifier` instance, not raw `(api_key, api_secret)` strings directly. This meant `Call.status` was never reaching `CONNECTED` via the webhook path - the call timer was surviving purely on `CallModals.tsx`'s client-side `RoomEvent.ParticipantConnected` fallback. Fixed in `webhook_router.py`'s `get_webhook_receiver()`: `WebhookReceiver(TokenVerifier(api_key, api_secret))`.
+
+6. **Duplicate `POST /join` race (fixed).** Same logs showed `POST /api/v1/calls/{id}/join` fired twice back-to-back for one call. Root cause: `mobile-app/lib/callEvents.ts`'s `call_accepted` handler guarded re-entry on `store.status === 'CONNECTING' || 'CONNECTED'`, but `store.setAccepted()` sets status to `'ACCEPTED'` _first_, synchronously, before the `/join` request even starts - a second delivery of the same event (WS + FCM both fire by design) arriving in that window wasn't blocked. Fixed with a dedicated in-flight `Set<callId>` guard rather than depending on exactly which store field is set at exactly which async checkpoint.
+
+7. **Dead FCM tokens retried forever (fixed).** Same logs showed `Failed to send to token ...: Requested entity was not found` - Firebase's way of saying a token is permanently dead (app uninstalled, token rotated). Nothing pruned these from the `devices` collection, so every future call to that user paid for a doomed push request indefinitely. `NotificationService.send_push_notification` (now `async`) deletes matching tokens from Mongo when FCM reports them unregistered.
+
+8. **`LiveKitReactNative.setup()` never called natively - crashed both apps the instant audio session code ran (fixed).** One more required init step beyond `registerGlobals()` (JS) and `AudioSession.startAudioSession()` (JS): on Android, `@livekit/react-native`'s native Kotlin module requires `LiveKitReactNative.setup(this)` to be called from `MainApplication.kt`'s `onCreate()`, before `loadReactNative(this)` - confirmed by reading `LiveKitReactNative.kt` directly, whose `audioDeviceModule` getter throws `IllegalStateException: Audio device module is not initialized!` if this was skipped. Neither app's generated `MainApplication.kt` had this call, and (like notifee and CallKeep) `@livekit/react-native` ships no Expo config plugin to add it automatically. Fixed with a new `plugins/withLiveKitAndroid.js` in both apps (using `withMainApplication` to inject the import + call), registered in both `app.json`s. This crash hit both apps identically since both call the same `startCallAudioSession()` from `lib/audioSession.ts`.
+
+9. **No audio despite "Connected" on both ends (fixed).** Root cause confirmed by reading `@livekit/react-native`'s own source: `AudioSession.startAudioSession()` is a _separate, explicit, required_ call from `registerGlobals()` - it's what actually activates the native audio session (Android `AudioManager` mode + focus, iOS `AVAudioSession` category/mode). `registerGlobals()`'s default `autoConfigureAudioSession` option calls `setupIOSAudioManagement()`, which auto-starts/stops the session reactively on iOS - but that function is a documented no-op on Android (`if (Platform.OS !== 'ios') return`). Nothing in this app ever called `AudioSession.startAudioSession()`, so on Android the mic/speaker hardware was never actually activated for the call, even though LiveKit's signaling/ICE/DTLS could fully succeed (a room can report "Connected" purely at the transport level, independent of whether the OS audio session is configured). Fixed with a new `lib/audioSession.ts` in both apps, called before `<LiveKitRoom>` mounts and released (`stopAudioSession()`) the instant the call ends. Also added: `AudioSession.getAudioOutputs()`/`selectAudioOutput()`/`showAudioRoutePicker()` for Issue 6 (speaker/earpiece/bluetooth/wired routing - the SDK's own supported API for this, not a hand-rolled workaround), and comprehensive `RoomEvent` logging (`Connected`, `LocalTrackPublished`, `TrackSubscribed`, `TrackMuted`/`Unmuted`, `MediaDevicesError`, `AudioPlaybackStatusChanged`) across the whole publish/subscribe/playback pipeline so any future break is immediately visible in logs instead of a silent "connected but quiet" call.
+
+10. **`registerGlobals()` never called - the actual root cause of "stuck on Connecting" (fixed).** Turned out to have nothing to do with `node_ip`/TURN networking. `@livekit/react-native`'s own docs state `registerGlobals()` "must be called before using LiveKit" - it installs `react-native-webrtc`'s `RTCPeerConnection` and friends into the JS global scope, which `livekit-client` requires to create any WebRTC connection at all. Both apps' `app/_layout.tsx` only had a bare `import '@livekit/react-native'` (confirmed by reading the installed package's actual source in `node_modules` - that import alone does not call the function). Signaling worked fine (a token was issued, the "room" existed server-side) because none of that touches WebRTC - but `room.connect()` could never complete, which is exactly what the 20s client-side timeout (added earlier) was correctly catching, and precisely what produced `[Error: WebRTC isn't detected, have you called registerGlobals?]` once that surfaced in the logs. Fixed by calling `registerGlobals()` at the very top of both apps' `index.js` (the true JS entry point, evaluated before any other module).
+
+---
+
+## Architecture summary (before the fix)
+
+- **Signaling transport: push notifications only.** There was no WebSocket, Socket.IO, or SSE anywhere in the stack. Every call-state transition (ringing, accepted, rejected, ended) traveled exclusively through Firebase Cloud Messaging.
+- **Two apps share near-identical code**: `mobile-app` (Mother, caller) and `loni-server-app` (Nurse, callee) have parallel copies of `store/callStore.ts`, `hooks/useCall.ts`, `components/CallModals.tsx`, `context/NotificationContext.tsx`. Bugs were duplicated across both.
+- **LiveKit is self-hosted via Docker** (`livekit/docker-compose.yml`) with `coturn` for TURN relay and `caddy` for TLS, but the app never actually used either — it connected directly to `ws://192.168.100.136:7880`, a hardcoded developer LAN IP baked into 6+ source locations.
+- **Backend used SQLAlchemy/Postgres** for calls (`backend-new`, Neon-hosted) and **MongoDB** for devices/push tokens — this dual-database split was intentional and left as-is.
+
+---
+
+## Issue 1 — Nurse presses Accept, Mother isn't notified for a long time
+
+**Root cause:** Call-state notifications were sent via FCM as the _only_ signaling channel, and `call_accepted` specifically was sent through `send_push_notification`'s `else` branch — a mixed `notification+data` message with **default** Android priority and **no explicit APNs priority**. Default-priority pushes can be deferred/batched by the OS for power saving (Android Doze/App Standby, iOS default priority 5 = "delay allowed"). Only `incoming_call` was ever sent data-only/high-priority; every other event, including the one this issue is about, was not.
+
+Compounding this: even once received, the Mother's app had to make a full HTTP round trip (`POST /calls/{id}/join`) before showing anything, and on `mobile-app` specifically, **the Firebase foreground listener didn't exist at all** — `NotificationContext.tsx` only registered `expo-notifications` listeners, which never fire for raw FCM data messages sent via `firebase-admin` (see Issue 4 for why). So in the actual repo, the Mother app had _zero_ working foreground handler for `call_accepted`.
+
+**Fix:**
+
+- Added a real-time WebSocket channel (`backend-new/app/core/ws_manager.py` + `app/modules/calls/ws_router.py`, mounted at `/api/v1/calls/ws`). Every call-state transition is broadcast over this socket the instant it happens server-side (`CallService._emit`, `<50ms` typical). Both apps open this socket on login (`api/socket.ts`, wired in `NotificationContext.tsx`).
+- FCM is now used only as a background-wake fallback, and **all** `call.*` event types (not just `incoming_call`) are sent data-only, `AndroidConfig(priority='high')`, and `apns-priority: 10` (`notifications/service.py`).
+- Added the missing Firebase foreground `onMessage` listener to `mobile-app/context/NotificationContext.tsx` (it genuinely didn't exist before).
+- Discovered and fixed a **missing dependency**: `mobile-app/package.json` had neither `@react-native-firebase/app` nor `@react-native-firebase/messaging` installed, despite the code calling `require('@react-native-firebase/messaging')`. Added both (matching `loni-server-app`'s versions) and the `@react-native-firebase/app` Expo config plugin to `mobile-app/app.json`.
+
+---
+
+## Issue 2 — Both apps stuck on "Connecting…", room never joined
+
+Four independent root causes, all fixed:
+
+1. **No authorization/state validation on `/calls/{id}/join`.** Any authenticated user could mint a token for any `call_id`, in any state (including calls that were never accepted, or already ended). Fixed in `CallService.join_call` — now checks the caller is a participant and the call isn't in a terminal state.
+2. **`incoming-call.tsx` called `/join` instead of `/accept`.** `/join` never runs the accept state machine — it doesn't create the LiveKit room, set `receiver_id`, or notify the caller. If a Nurse ever answered from that specific screen, the call would silently never be marked accepted. Fixed to use `useCall().acceptCall()` → `POST /accept`.
+3. **Hardcoded LiveKit URL.** `ws://192.168.100.136:7880` was hardcoded as a fallback in `livekit_service.py`, `useLiveKit.ts` (×2), and `CallModals.tsx` (×2), plus the `.env` files. This only ever worked for a device on that exact WiFi network. Fixed: the backend now hands every client the correct URL via `CallActionResponse.livekit_url` (`LiveKitService.get_public_url()`, backed by a new `LIVEKIT_PUBLIC_URL` setting); all hardcoded fallbacks were removed from client code, and a missing URL now surfaces a visible "Call Failed" state instead of hanging forever.
+4. **LiveKit's `node_ip` was hardcoded to the same private LAN IP** with `use_external_ip: false` in `livekit.yaml` — the SFU was telling every client, including ones not on that WiFi, to send WebRTC media to an address they can't reach. Signaling (port 7880) connects fine over LAN; the actual RTP/ICE negotiation silently hangs. Documented and parameterized in `livekit.yaml` (see Issue 9).
+
+---
+
+## Issue 3 — Call timer never starts
+
+**Root cause:** `livekit.yaml`'s `webhook:` block was **entirely commented out**, so LiveKit never sent any webhook events anywhere — `webhook_router.py` existed and looked correct but received zero traffic. Even hypothetically, the webhook URL in the comment pointed at `/api/v1/calls/webhook`, which doesn't exist (the router is mounted at `/api/v1/livekit/webhook`). On the client, both `CallModals.tsx` versions started their timer from local `room.state === 'connected'`, which fires as soon as _that device's_ signaling connects — independent of whether the other participant ever joined.
+
+**Fix:**
+
+- Enabled `webhook:` in `livekit.yaml` with the correct URL.
+- `webhook_router.py` now drives the state machine: on `participant_joined`, it marks that `CallParticipant.joined_at`, and once **two** participants have joined, sets `Call.status = CONNECTED` and `Call.started_at = now()` — persisted and broadcast over the WebSocket as `call_state: CONNECTED`.
+- Client timer (`ActiveCallUI` in both `CallModals.tsx`) now starts only from `callStore.connectedAt`, set redundantly by (a) the local `RoomEvent.ParticipantConnected` listener (fastest) and (b) the server's webhook-driven WS event (authoritative fallback). `setConnected()` is idempotent so both firing is safe.
+- `answered_at` is now set in `accept_call` (when the Nurse accepts); `started_at` is set by the webhook handler (when media actually starts); `ended_at`/`duration_seconds` computed in `end_call` from `started_at` (falling back to `answered_at` if webhooks never fired).
+
+---
+
+## Issue 4 — Incoming calls don't work when Nurse app is backgrounded/locked/closed
+
+This was the most consequential gap. Root causes:
+
+1. **No `notifee.onBackgroundEvent`/`onForegroundEvent` registered anywhere.** `index.js` correctly built a full-screen, high-priority, CALL-category notification with Accept/Decline buttons — but nothing listened for a press on them. Tapping either button did nothing.
+2. **No cold-start hydration.** If the app was fully killed and relaunched via the notification, nothing read `notifee.getInitialNotification()` to know why it was launched.
+3. **Android 13+/14+ manifest permissions missing**: `POST_NOTIFICATIONS` and `USE_FULL_SCREEN_INTENT` were not declared in `app.json`.
+4. **No true VoIP wake path on iOS.** `loni-server-app/app.json` already declared `UIBackgroundModes: ["voip", ...]` — someone anticipated this — but there is no PushKit registration or `react-native-callkeep` usage anywhere (the package was even already installed, unused). Plain FCM/APNs delivery to a _terminated_ iOS app is not guaranteed; only a PushKit VoIP push reliably wakes a force-quit app.
+
+**Fix:**
+
+- `index.js` (loni-server-app): registered `notifee.onBackgroundEvent` at module scope, calling the REST accept/reject endpoints directly (no React tree required) via `lib/callEvents.ts`'s `acceptCallDirect`/`rejectCallDirect`.
+- `NotificationContext.tsx` (loni-server-app): registered `notifee.onForegroundEvent` for the same actions when the app is already open, and `notifee.getInitialNotification()` on mount to hydrate the incoming-call UI after a cold start via notification tap.
+- Notifications are now given a predictable id (`incoming-${call_id}`) so a later `call_ended`/`call_timeout`/`call_rejected` push can cancel a stale ringing notification instead of leaving a dead alert on the lock screen.
+- Added `android.permission.POST_NOTIFICATIONS` and `android.permission.USE_FULL_SCREEN_INTENT` to `loni-server-app/app.json`.
+- Backend now runs a ring-timeout watchdog (`CallService._ring_timeout_watchdog`, 45s) that marks unanswered calls `TIMEOUT`/`MISSED` and notifies both sides — previously an unanswered call stayed `REQUESTED` in the database forever with no way for either client to know to stop.
+- **Full PushKit + CallKit/ConnectionService integration, closing the "app fully killed" gap completely:**
+  - `loni-server-app/lib/callKeepService.ts` — wraps `react-native-callkeep`. `displayIncomingCall()` shows the native, full-screen, OS-owned incoming-call UI on both platforms (CallKit on iOS, self-managed ConnectionService on Android); `answerCall`/`endCall` native events are wired to `acceptCallDirect`/`rejectCallDirect`/`POST /end`; `getInitialEvents()` replays any answer that happened while the app was still cold-starting.
+  - `loni-server-app/lib/voipPush.ts` — registers a PushKit VoIP token via the newly added `react-native-voip-push-notification`, and on receiving a VoIP push calls `displayIncomingCall` **synchronously**, before anything else — Apple revokes an app's VoIP entitlement if it receives a VoIP push without immediately reporting a call.
+  - `index.js` now tries CallKeep's `displayIncomingCall` as the primary path on Android too (real ConnectionService call screen, proper ringtone/volume/DND behavior), falling back to the notifee notification only if CallKeep's native module isn't available.
+  - `backend-new/app/modules/notifications/voip_service.py` — **new**: sends VoIP pushes directly to Apple's APNs HTTP/2 API using `httpx` (HTTP/2) + `python-jose` (ES256 JWT signing) — both already project dependencies, so no new Python package was needed. FCM cannot send the `voip` push type at all, so this has to bypass FCM entirely. `NotificationService.notify_user` now routes `incoming_call` through this path whenever the target user has a registered `ios_voip` device token.
+  - `loni-server-app/plugins/withCallKeepIOS.js` — minimal Expo config plugin (using the official `withEntitlementsPlist` mod) that sets the `aps-environment` entitlement to match the backend's `APNS_USE_SANDBOX` setting.
+
+---
+
+## Issue 5 — Native ringtone / ringback
+
+**Fix:**
+
+- Android (Nurse): CallKeep's self-managed ConnectionService call now drives the incoming-call experience — real system ringtone, respects the phone's volume/Do-Not-Disturb call exceptions, works from the lock screen. `notifee`'s `sound: 'default'` + `AndroidCategory.CALL` notification remains only as the fallback path.
+- iOS (Nurse): CallKit owns the incoming-call ring entirely once `displayIncomingCall` is called — genuine native ringtone, no app code plays any audio.
+- iOS (Mother, outgoing): `hooks/useCall.ts`'s `requestCall()` now calls `RNCallKeep.startCall()` (`mobile-app/lib/callKeepService.ts`), which gives a **real system ringback tone via CallKit** — the bundled `assets/calling.m4a` is now skipped entirely on iOS (`app/nurse/connecting.tsx` checks `Platform.OS === 'ios'` and returns early).
+- Android (Mother, outgoing): the bundled ringback tone is kept **on purpose** — even with full self-managed ConnectionService integration, Android does not auto-play a ringback tone for outgoing calls; that remains an app responsibility. This is exactly the "custom audio only where required" split Issue 5 asks for.
+- Fixed a real bug in `connecting.tsx` along the way: `Audio.setAudioModeAsync({ staysActiveInBackground: false })` meant the ringback (and, after connecting, live call audio) would die the instant the screen locked — changed to `true`, and backed by a real `UIBackgroundModes: ["audio"]` declaration added to `mobile-app/app.json` (previously absent — the JS-level flag alone isn't sufficient without the native capability declared).
+
+---
+
+## Issue 6 — Caller info shows "Mother Calling" instead of real data
+
+**Root cause:** `CallService.request_call` hardcoded `"caller_name": "Mother"` as a literal string — it never looked up the caller's actual `User` row. `enrich_user_data()` (`app/utils/user_enrichment.py`) already computed trimester/pregnancy week from `pregnancy_start_date` — it was simply never called from the calls module.
+
+**Fix:** Added `_participant_info()` in `call_service.py`, which calls `enrich_user_data()` and maps it into a new `ParticipantInfo` schema (name, profile_picture, trimester, pregnancy_week, hospital_affiliation, years_of_experience). `request_call` now sends the real caller's full profile in the `incoming_call` payload, plus a `created_at` timestamp. Also fixed a serialization bug this surfaced: FCM data values were stringified with Python's `str()`, which turns a nested dict into an invalid-JSON repr (single quotes) that `JSON.parse()` on the client would throw on — changed to `json.dumps()` for dict/list values (`notifications/service.py`).
+
+---
+
+## Issue 7 — Participant info doesn't sync after answer
+
+**Fix:** `CallActionResponse` now carries a `participant: ParticipantInfo` field, populated per-endpoint with the _other_ side's real data (`accept_call` returns the caller's info to the Nurse; `join_call` returns the other side's info to whoever's asking). Both `CallModals.tsx` files now render `remoteParticipant.name/hospital_affiliation/profile_picture` (Mother sees Nurse's info) and `remoteParticipant.name/trimester/pregnancy_week/profile_picture` (Nurse sees Mother's info) instead of a single `callerName` string. Fixed a specific instance of this bug: `loni-server-app/components/CallModals.tsx` hardcoded `"🤰 2nd Trimester"` in JSX for literally every caller — now reads `remoteParticipant.trimester`/`.pregnancy_week`.
+
+---
+
+## Issue 8 — Unreliable call state synchronization
+
+**Root cause:** `RECONNECTING` didn't exist in `CallStatusEnum`. `RINGING`/`CONNECTING`/`CONNECTED` existed in the enum but were **never set anywhere** in the old `call_service.py` — `accept_call` jumped straight from `REQUESTED` to `ACCEPTED`. `MISSED`/`TIMEOUT`/`FAILED` were also never set. The only transport was best-effort push with no ordering guarantee and no de-duplication.
+
+**Fix:**
+
+- Added `RECONNECTING` to `CallStatusEnum` (safe with no migration — the column is `native_enum=False`, i.e. a plain `VARCHAR`).
+- `call_service.py` now actually transitions through the full lifecycle: `RINGING` (on request) → `CONNECTING` (on accept, after the LiveKit room is confirmed created) → `CONNECTED` (webhook confirms both joined) → `ENDED`/`CANCELLED`. `reject_call`/ring-timeout set `REJECTED`/`TIMEOUT`/`MISSED`. The LiveKit webhook handler optimistically sets `RECONNECTING` on `participant_left` from a previously-`CONNECTED` call.
+- Client `store/callStore.ts` was redesigned around a `status` field that mirrors the backend enum 1:1, so a `call_state` WS message applies with zero translation.
+- De-duplication: `callStore.isStale(callId)` guards every event handler in `lib/callEvents.ts` — a re-delivered push (expected, since WS + FCM are both always sent) or an out-of-order message for a call the client has already moved past is a safe no-op instead of resurrecting stale UI.
+
+---
+
+## Issue 9 — LiveKit/Docker networking
+
+Full findings, all documented in-place with inline comments in the affected files (not just here, so future changes don't regress them):
+
+- **`livekit.yaml`**: `node_ip` was hardcoded to one developer's LAN IP with `use_external_ip: false` — only works for devices on that exact WiFi. Documented dev-vs-production configuration directly in the file.
+- **TURN was non-functional**: `turn.yourdomain.com` doesn't resolve, `external_tls: true` requires a cert that can't be issued for a non-resolving domain, and `turnserver.conf` had literal placeholder values (`YOUR_PUBLIC_IP`, `YOUR_COTURN_SECRET`) that were never templated from `.env` — so `COTURN_SECRET` in `.env` was silently never used by the actual running coturn process. Fixed: `docker-compose.yml`'s `coturn` service now passes `--external-ip`/`--static-auth-secret`/`--realm` as CLI flags sourced from `.env` (compose variable substitution), which override the static config file and keep the two from drifting.
+- **Webhook URL mismatch**: the (disabled) webhook config pointed at `/api/v1/calls/webhook`, which doesn't exist; the real mount point is `/api/v1/livekit/webhook`. Fixed in `livekit.yaml` and `.env.example`.
+- **Backend/client URL conflation**: one `LIVEKIT_URL` env var was being used both for the backend's server-to-server REST calls _and_ implicitly for what clients should connect to, with no way to differ. Split into `LIVEKIT_URL` (backend-only, can be an internal/docker-network address) and `LIVEKIT_PUBLIC_URL` (what `LiveKitService.get_public_url()` hands to every client) in `backend-new/app/core/config.py`.
+- **6 hardcoded client-side fallbacks removed**: `livekit_service.py`, `useLiveKit.ts` (×2 apps), `CallModals.tsx` (×2 apps) all had `'ws://192.168.100.136:7880'`/`'http://192.168.100.136:7880'` baked in as defaults. All removed — a missing URL is now a loud, visible error instead of a silent wrong-network connection.
+
+**What still requires the user's action** (can't be done blind, since it depends on real infrastructure): registering a real domain for `DOMAIN`/TURN, pointing DNS at the LiveKit host, and setting `PUBLIC_IP`/`LIVEKIT_PUBLIC_URL` to that domain for anything beyond same-LAN development. Every place this matters now has an inline comment explaining exactly what to set and why.
+
+---
+
+## Issue 10 — Signaling flow audit
+
+Traced end to end; the flow in the ticket (`Mother → FastAPI → LiveKit → FCM → Nurse → Accept → Backend → LiveKit → Connection`) undersold what was actually happening: there was no realtime layer at all, `/join` had no auth check (a real security hole, not just a latency one), and duplicate/racing requests were possible (e.g., the Mother's `call_accepted` push handler could fire the `/join` POST twice if both WS and FCM delivered it). Fixed by:
+
+- Adding the WebSocket layer (Issue 1).
+- Adding authorization + state checks to `/join` (Issue 2).
+- Guarding every event handler with `callStore.isStale()` so duplicate delivery over two transports is a no-op (Issue 8).
+- Pessimistic row locking (`with_for_update()`) was already correctly used for `accept`/`reject`/`end` to prevent double-accept races — kept as-is, it was one of the few things already right.
+
+---
+
+## Issue 11 — WebSocket audit
+
+There were no WebSockets before this fix, so there was nothing to audit — this is itself the finding. The new socket (`api/socket.ts`, both apps) implements:
+
+- **Connection**: guarded against duplicate connects (checks `readyState` before opening a new one).
+- **Disconnection**: explicit `disconnectCallSocket()` clears all timers/listeners, called on logout.
+- **Reconnect**: exponential backoff, 1s → 30s cap, disabled once `disconnectCallSocket()` is called explicitly.
+- **Keepalive**: app-level ping every 25s (`{"type":"ping"}`), server replies `{"type":"pong"}` — detects NAT-killed connections that TCP itself won't notice for a long time.
+- **No duplicate/missing listeners**: a single `onmessage` handler routes everything through `applyServerCallEvent`, replacing what used to be three separate, divergent copies of similar logic.
+
+---
+
+## Issue 12 — LiveKit event listener audit
+
+Before: only `RoomEvent.ConnectionStateChanged` was handled, and it was duplicated (once ad-hoc inside `ActiveCallUI`, and again unused in `useLiveKit.ts`, which `CallModals.tsx` didn't even call). After, `ActiveCallUI` (both apps) handles: `ParticipantConnected` (drives the timer — see Issue 3), `Reconnecting`/`Reconnected` (drives `RECONNECTING` state), `ConnectionQualityChanged` (surfaced to the store, was previously read nowhere), `TrackSubscribed` (confirms remote audio actually started — Issue 13), `Disconnected` (local safety net that ends the call UI even if the WS/webhook path is delayed). All listeners are attached and detached in the same `useEffect` with a matching cleanup function — no leaks.
+
+---
+
+## Issue 13 — Microphone permissions & audio session
+
+**Root cause:** `Audio.requestPermissionsAsync()` was called inside a `useEffect` gated on `isActive` — but `isActive` only becomes `true` _after_ `<LiveKitRoom connect={true}>` has already mounted and started connecting/publishing, i.e. the permission prompt raced the connection attempt instead of gating it.
+
+**Fix:** Both `CallModals.tsx` now request microphone permission the moment a room token becomes available, **before** `<LiveKitRoom>` is ever rendered, and show a blocking "Microphone Required" screen if permission isn't granted rather than silently attempting to connect and publish without a mic. Remote audio auto-start is confirmed via the new `TrackSubscribed` listener (Issue 12) — `@livekit/react-native` handles the actual device audio-output attachment automatically once subscribed.
+
+---
+
+## Issue 14 — Cleanup on call end
+
+**Root cause:** `end_call` only ran when a client explicitly called `POST /end`. A crashed app, lost network, or force-quit mid-call left the room open until LiveKit's 5-minute `empty_timeout`, with the DB row stuck in whatever status it was last in. `CallParticipant.left_at` existed in the schema but was **never written anywhere** in the whole codebase.
+
+**Fix:**
+
+- `end_call` now sets `left_at` on every participant row that doesn't have it yet, and correctly distinguishes `CANCELLED` (call ended while still ringing) from `ENDED` (call ended after being answered) — the `CANCELLED` enum value existed but was never used before.
+- `webhook_router.py` now handles the `room_finished` LiveKit event as a safety net: if a call somehow never got a `/end` call (crash, killed app), LiveKit's own room-closed event reconciles the DB — sets `ENDED`, computes `duration_seconds`, and marks any still-open `left_at` fields — instead of the call staying open forever.
+- `participant_left` webhook events also stamp `left_at` in near-real-time, so presence is reconstructable even mid-call.
+
+---
+
+## Files changed
+
+**Backend (`backend-new/`)**
+
+- `app/core/config.py` — added `LIVEKIT_URL`/`LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET`/`LIVEKIT_PUBLIC_URL` settings
+- `app/core/ws_manager.py` — **new**, WebSocket connection registry + broadcast
+- `app/api/router.py` — mounted the new WS router
+- `app/modules/calls/ws_router.py` — **new**, `/calls/ws` signaling endpoint
+- `app/modules/calls/models.py` — added `RECONNECTING` to `CallStatusEnum`
+- `app/modules/calls/schemas.py` — added `ParticipantInfo`, `livekit_url`/`participant` fields
+- `app/modules/calls/services/call_service.py` — full state-machine rewrite, ring-timeout watchdog, real participant info, `left_at` cleanup
+- `app/modules/calls/services/livekit_service.py` — removed hardcoded URL fallback, added `get_public_url()`/`list_participants()`
+- `app/modules/calls/router.py` — auth/state checks on `/join`, `livekit_url`/`participant` in responses
+- `app/modules/calls/webhook_router.py` — drives state machine off real LiveKit events
+- `app/modules/notifications/service.py` — all call events sent data-only/high-priority, proper JSON encoding of nested payload values, routes `incoming_call` to VoIP push when an `ios_voip` token is registered
+- `app/modules/notifications/voip_service.py` — **new**, direct-to-APNs PushKit VoIP push sender (no new dependency — built on existing `httpx`/`python-jose`)
+- `.env` — added `LIVEKIT_PUBLIC_URL`, `APNS_*` VoIP settings, clarifying comments
+
+**LiveKit infra (`livekit/`)**
+
+- `livekit.yaml` — enabled `webhook:` with correct URL, extensive networking comments
+- `docker-compose.yml` — `coturn` command now sources real secret/IP from `.env`
+- `.env` / `.env.example` — clarifying comments, fixed webhook path reference
+
+**Mother app (`mobile-app/`)**
+
+- `index.js` — **new** (didn't exist — `package.json` pointed straight at `expo-router/entry`, so FCM background handler was never registered at all)
+- `package.json` — added missing `@react-native-firebase/app`/`messaging`, added `react-native-callkeep`, fixed `main`
+- `app.json` — added `@react-native-firebase/app` plugin, `POST_NOTIFICATIONS` permission, `ios.infoPlist.UIBackgroundModes: ["audio"]` (previously absent entirely)
+- `store/callStore.ts` — full state-machine rewrite
+- `api/socket.ts` — **new**, WebSocket client
+- `lib/callEvents.ts` — **new**, shared event-handling logic, now also drives CallKeep state
+- `lib/callKeepService.ts` — **new**, native outgoing-call UI (`startCall`/`reportConnected`/`reportCallEnded`)
+- `hooks/useCall.ts` — updated for new store/response shape, starts the native call on `requestCall`
+- `context/NotificationContext.tsx` — removed dead listeners, added working Firebase foreground handler + socket lifecycle + CallKeep setup
+- `components/CallModals.tsx` — full LiveKit event coverage, server-driven timer, real participant info, mic-permission gating, no hardcoded URL
+- `app/nurse/connecting.tsx` — fixed background audio session, reacts to terminal call states, skips the bundled ringback tone on iOS (CallKit provides a real one)
+
+**Nurse app (`loni-server-app/`)**
+
+- `index.js` — added `notifee.onBackgroundEvent` + CallKeep/VoIP-push setup at module scope, notification id/cancel logic, CallKeep as the primary Android incoming-call path
+- `app.json` — added `POST_NOTIFICATIONS`/`USE_FULL_SCREEN_INTENT` permissions, the `withCallKeepIOS` plugin
+- `package.json` — added `react-native-voip-push-notification` (`react-native-callkeep` was already present but unused)
+- `plugins/withCallKeepIOS.js` — **new**, sets the `aps-environment` entitlement
+- `store/callStore.ts`, `api/socket.ts` (new), `hooks/useCall.ts` — same pattern as mobile-app
+- `lib/callEvents.ts` — **new**, shared event-handling logic (`acceptCallDirect`/`rejectCallDirect`), now also drives CallKeep state and calls `displayIncomingCall` for consistency across delivery paths
+- `lib/callKeepService.ts` — **new**, native incoming-call UI (`displayIncomingCall`/`reportConnected`/`reportCallEnded`, `answerCall`/`endCall` event wiring)
+- `lib/voipPush.ts` — **new**, PushKit VoIP token registration + incoming-push handling
+- `context/NotificationContext.tsx` — added `onForegroundEvent`, `getInitialNotification()`, socket lifecycle, CallKeep/VoIP setup
+- `components/CallModals.tsx` — same fixes as mobile-app, plus removed the hardcoded `"🤰 2nd Trimester"` badge
+- `app/incoming-call.tsx` — fixed to use `POST /accept` (was calling `/join`, which skips the entire accept state machine)
+
+---
+
+## Known dead code (found, not deleted)
+
+- `mobile-app/app/nurse/call.tsx` and its dependency on `assets/images/nurse-img.png` — a static mock "call ongoing" screen with a hardcoded name ("Micheal Gracia") and a local-only timer, entirely disconnected from `callStore`/LiveKit. Nothing in the codebase navigates to it. It's not part of the live call flow (`components/CallModals.tsx` is), left untouched since deleting screens wasn't asked for, but flagged here so it isn't mistaken for working code.
+
+## What's implemented in code vs. what needs your Apple/Google Developer accounts + a physical device
+
+Everything that can be done as source code is done — the full CallKit/ConnectionService + PushKit VoIP stack is wired end to end (Issues 4 and 5 are now fully addressed in code, not just documented as gaps). What's left is inherently outside what any sandboxed text environment can do, because it requires real developer-account credentials and native compilation:
+
+1. **Run `npm install`** in both `mobile-app/` and `loni-server-app/` to pull in the newly added `react-native-callkeep` (mobile-app) and `react-native-voip-push-notification` (both) packages.
+2. **`npx expo prebuild --clean`** (both apps) to regenerate the native iOS/Android projects with these modules linked in, then build and install on a **physical device** — VoIP pushes do not work in the iOS Simulator at all, and CallKit/ConnectionService native UI is best verified on real hardware.
+3. **Apple Developer portal**: enable "Push Notifications" and "Background Modes → Voice over IP" capabilities for the `com.loni.server` App ID; generate an APNs Auth Key (.p8) and enter it plus its Key ID and your Team ID as `APNS_VOIP_AUTH_KEY`/`APNS_KEY_ID`/`APNS_TEAM_ID` in `backend-new/.env` (exact steps are in the comment block above those settings in `app/core/config.py`).
+4. **Real TURN/domain setup.** Set `DOMAIN`, `PUBLIC_IP`, `LIVEKIT_PUBLIC_URL` to real values once there's a public host for LiveKit; the code and config no longer have any hardcoded blocker, but the actual DNS/cert/VPS provisioning is an infra task outside this codebase.
+5. **Horizontal scaling of the WS layer.** `ws_manager.py`'s `ConnectionManager` is in-process only; if the FastAPI backend is ever run with >1 worker/container, swap it for the Redis pub/sub the LiveKit `docker-compose.yml` already runs, so a broadcast reaches a user regardless of which worker holds their socket.
+6. **Load/soak test** the ring-timeout watchdog and webhook-driven state machine, and the CallKeep native UI under real interruption scenarios (an actual cellular call arriving mid-VoIP-call, airplane mode toggling, etc.), before shipping.
+
+---
+
+## Round 3: production-grade polish pass (accept latency, background survival, unified UI, re-renders, audio picker)
+
+**Backend (`backend-new/`)**
+
+- `app/modules/calls/services/call_service.py` — `accept_call()` reordered. Previously: set status → `await LiveKitService.create_room()` (a real network round trip to the LiveKit Docker container) → *then* notify the caller. Any latency or hiccup in room creation directly delayed the Mother's "call accepted" push/WS event, which is what the ring-out UI is waiting on. Now: status flips to `ACCEPTED`, `answered_at` is stamped (once, here — this is the single source of truth the timer reads from), the DB commit happens, and the caller is notified via `asyncio.create_task` — all *before* `create_room()` is even called. Room creation now happens after the caller already knows the call was accepted; if it fails, both the caller and the nurse get a `call_failed` event (previously only the caller did, leaving the nurse's screen stuck).
+
+**Both apps — Android background call survival (Issue 4)**
+
+- New `lib/callForegroundService.ts` in both apps, using `notifee.registerForegroundService()` with `AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MICROPHONE`. This is independent of (and unaffected by) the `EXPO_PUBLIC_ENABLE_CALLKEEP` kill switch — Android will suspend the mic/audio pipeline and can kill the activity a few seconds after the app is backgrounded unless a foreground service is actively running for the duration of the call. Started when `status === 'CONNECTED'`, stopped on call end, in both `components/CallModals.tsx` files.
+- `mobile-app` didn't have `@notifee/react-native` at all before (only the Nurse app did) — added the dependency and a copy of `plugins/withNotifeeAndroid.js`, since the Mother's own outgoing/active call needs the same background guarantee the Nurse's incoming call already had.
+- Both `app.json`s: added `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MICROPHONE` Android permissions (required for a `MICROPHONE`-typed foreground service on modern Android targeting API 34+).
+- Both `index.js`: `registerCallForegroundService()` called at boot, before any screen can try to start the service.
+
+**`mobile-app` — unified call screen (Issue 6)**
+
+- `components/CallModals.tsx` rewritten as a single `<Modal>` that switches its *internal content* by state (failed / mic-required / preparing-audio / connect-timeout / connected `<LiveKitRoom>` / outgoing-ringing), instead of the previous pattern of `app/nurse/connecting.tsx` rendering its own full screen with its own ringback/cancel UI, which then got replaced by a *different* component's UI once the call connected. That hand-off was the visible "screen flash / multiple transitions" symptom.
+- `app/nurse/connecting.tsx` reduced to a trigger-only route: calls `requestCall()` once, then immediately backs out of the navigation stack. It renders nothing. CallModals (mounted once, globally, in `_layout.tsx`) is now the only thing that ever draws the outgoing-call UI.
+
+**Both apps — re-render audit (Issue 7)**
+
+- `components/CallModals.tsx` in both apps: replaced whole-store destructuring (`const { status, remoteParticipant, ... } = useCallStore()`, which re-renders on *any* store field changing) with per-field selectors (`const status = useCallStore((s) => s.status)`, etc.), so a change to one field — e.g. a mid-call `remoteParticipant` update — doesn't force an unrelated timer display to re-render too.
+
+**Both apps — hospital affiliation display (Issue 8) and duplicated-implementation cleanup (Issue 9)**
+
+- The data was already being fetched into `remoteParticipant`/`callerInfo` in both apps but wasn't rendered prominently. Both `CallModals.tsx` files now show it with an icon, sourced from the same participant object both apps already populate from the backend — no new data source introduced. `mobile-app/app/nurse/call.tsx` and `rating.tsx` remain confirmed-dead (nothing navigates to them, hardcoded mock data) — left in place, not deleted, since deletion wasn't explicitly requested.
+
+**Both apps — audio output selector (Issue 12) and logging (Issue 14)**
+
+- Audio picker enhanced with per-device icons (bluetooth/headset/speaker/earpiece via Feather icons), highlighting of the currently-selected output, and auto-refresh on LiveKit's `MediaDevicesChanged` event (previously only populated once on mount).
+- Added a `useCallLogger()` hook (`AppState.addEventListener('change', ...)`) logging background/foreground transitions, plus full `RoomEvent` coverage (`Connected`, `ParticipantConnected/Disconnected`, `Reconnecting/Reconnected`, `TrackSubscriptionFailed`, `ConnectionQualityChanged`, etc.) — previously only a handful of events were logged.
+
+**Verified but not changed (Issues 3, 5, 10, 11, 13)** — re-read rather than rebuilt, per the "don't redesign" constraint:
+
+- **Issue 3 (timer sync)**: `answered_at` is now the single stamp point (see backend change above); both apps' timers already derived elapsed time from a server timestamp rather than a local `setInterval` start, so this was consistent once the backend stopped racing itself.
+- **Issue 5 (background incoming calls)**: already handled by CallKeep + PushKit VoIP (iOS) and CallKeep self-managed `ConnectionService` + notifee full-screen fallback (Android) from Round 2 — foreground service (this round) closes the remaining "call drops after ~1 min backgrounded" gap for Android.
+- **Issue 10/11 (mute, speaker routing)**: `room.localParticipant.setMicrophoneEnabled()` and `lib/audioSession.ts`'s `selectAudioOutput`/`showNativeAudioRoutePicker` were already correct; no changes needed beyond the picker UI polish above.
+- **Issue 13 (performance)**: addressed via the re-render audit (Issue 7) and the unified-screen consolidation (Issue 6) — no separate profiling changes made.
+
+---
+
+## Round 4: proactive microphone permission during onboarding (not on first call)
+
+**Root cause**: `Audio.requestPermissionsAsync()` (from `expo-av`) was only ever called inside `components/CallModals.tsx`, gated on `isActive && roomToken` — i.e. the very first time either app asked for microphone access was mid-call-setup, for both the Mother (outgoing) and Nurse (incoming/accept) sides. `app/(auth)/permissions.tsx` (byte-identical in both apps) already sat in the signup flow with cards for Notifications/Location/Emergency Contacts, but every card — including the one for Notifications — was 100% cosmetic: `onPress` just flipped local React state, no permission API was ever called. Microphone wasn't listed on that screen at all. Real notification permission was actually requested separately and silently, later, by `NotificationContext`'s `initPush()` effect.
+
+**New: `lib/permissions.ts`** (identical file, both apps) — a centralized permission manager wrapping `expo-av` (microphone) and `expo-notifications` (notifications), normalizing both into one `'granted' | 'denied' | 'blocked' | 'undetermined'` status. `blocked` means the OS has permanently denied and won't show its own dialog again (`canAskAgain: false`) — the only way out is `openAppSettings()` (`Linking.openSettings()`). `requestMicrophonePermission()`/`requestNotificationPermission()` both check current status first and only trigger a real native prompt when still `undetermined`, so they're safe to call from multiple places without ever double-prompting. Bluetooth is exposed as `getBluetoothPermissionStatus()` returning `'granted'` unconditionally, documented in-file: both apps only *route* audio to already-paired devices (`lib/audioSession.ts`), never scan for or connect to new ones, so no runtime `BLUETOOTH_CONNECT`/`BLUETOOTH_SCAN` permission is actually needed today — this function exists so that fact is recorded in one place rather than being a silent gap.
+
+**`app/(auth)/permissions.tsx`** (both apps) — Notifications and Microphone cards now call the real request functions in that order (matching the product's expected flow); a `useEffect` on mount also re-reads current status so revisiting the screen (or granting from Settings and coming back) reflects reality instead of resetting to "not granted". A `blocked` status changes the button to "Open Settings" instead of "Grant Permission". Location and Emergency Contacts cards are untouched (unrelated to calling, no permission API exists for them yet).
+
+**Existing-user gap**: the onboarding stack (`(auth)`) is only ever shown to unauthenticated users — once someone has a session token, `app/index.tsx` sends them straight to `(tabs)` and they'd never see the new Microphone card. Fixed with a bootstrap effect added to `context/NotificationContext.tsx` (both apps, right next to the existing `initPush()` effect): as soon as `user` becomes truthy, `requestMicrophonePermission()` fires once. It's a no-op for anyone already `granted`/`blocked`, so this only actually prompts existing accounts that predate this change.
+
+**`components/CallModals.tsx`** (both apps) — the mic-request effect (gated on `isActive && roomToken`) now calls `getMicrophonePermissionStatus()` (read-only, never prompts) first; it only falls through to `requestMicrophonePermission()` for the genuinely-`undetermined` edge case (e.g. a session that hasn't hit the bootstrap effect yet). In normal operation — onboarding or the bootstrap already resolved it — this is a same-tick synchronous-feeling read, so a call starts or is accepted with no dialog in the way. The existing "Microphone Required" gating screen is kept as a safety net (denied/revoked mid-session) and now branches on `blocked` to show an "Open Settings" button instead of a dead-end retry loop.
+
+**No native/manifest changes needed** — `NSMicrophoneUsageDescription` (iOS) and `android.permission.RECORD_AUDIO` were already declared via the `@config-plugins/react-native-webrtc` plugin in both `app.json`s and already present in both apps' generated native projects. This round is JS-only; a Metro/JS reload is sufficient, no `expo prebuild` or native rebuild required.
+
+---
+
+## Round 5: fixed the crash on call accept (both apps) — notifee foreground-service type mismatch
+
+**Symptom**: on a real device, the instant a call reached CONNECTED after Accept, both apps crashed - not a JS red-screen, an unconditional native crash with no catchable error.
+
+**Root cause, confirmed by unzipping the actual AAR** (`node_modules/@notifee/react-native/android/libs/app/notifee/core/*/core-*.aar`, `AndroidManifest.xml` inside it): notifee's own bundled `ForegroundService` component is declared as
+
+```xml
+<service android:name="app.notifee.core.ForegroundService" android:foregroundServiceType="shortService" />
+```
+
+`shortService` is an Android 14+ (API 34+) type meant for tasks under ~3 minutes - unrelated to microphone/calls. Round 3's `lib/callForegroundService.ts`, however, starts that exact same service requesting `AndroidForegroundServiceType.FOREGROUND_SERVICE_TYPE_MICROPHONE` the moment a call connects. Both apps target API 35 (Expo SDK 54's default), and on API 34+ the OS requires the type passed to `startForeground()` to be a subset of what that `Service`'s manifest entry declares - a mismatch throws a fatal `MissingForegroundServiceTypeException` at the OS level, which cannot be caught by any JS `try/catch`. This explains why it looked like an instant, simultaneous crash on both apps: both run the identical `callForegroundService.ts` against the identical notifee AAR, triggered by the identical `status === 'CONNECTED'` condition.
+
+**Fix**: `plugins/withNotifeeAndroid.js` (both apps) now does two things instead of one - it still injects notifee's local Maven repo into `build.gradle`, and it now also uses `withAndroidManifest` to re-declare `app.notifee.core.ForegroundService` in the app's own generated `AndroidManifest.xml` with `android:foregroundServiceType="microphone"` and `tools:replace="android:foregroundServiceType"` (plus `AndroidConfig.Manifest.ensureToolsAvailable()` to add the `xmlns:tools` namespace the `tools:replace` attribute requires). Android's manifest merger gives the app module's own manifest priority over a library/AAR manifest for the same component, and `tools:replace` is what tells it to resolve the attribute conflict with the app's value instead of erroring at build time. Verified by running the plugin's exact mod logic against the real generated `mobile-app/android/app/src/main/AndroidManifest.xml` and confirming the output XML contains the corrected `<service>` tag with both attributes present.
+
+**This requires a native rebuild** (`npx expo prebuild --clean` + a fresh native build for both apps) - it edits `AndroidManifest.xml`, which only regenerates from `app.json`/config plugins during prebuild, not on a JS/Metro reload.
+
+---
+
+## Round 6: root-caused and fixed the real reason CallKeep was disabled, re-enabled native call UI
+
+The prior "third, undiagnosed CallKeep crash" that led to shipping with `EXPO_PUBLIC_ENABLE_CALLKEEP=false` (the screenshot showing a plain notifee notification banner instead of a real call screen) is now root-caused and fixed - not by disabling anything further, but by finding the actual missing native wiring.
+
+**Root cause, confirmed against `react-native-callkeep`'s own official install docs** (`docs/android-installation.md` - not bundled in the npm package, fetched directly from the `react-native-webrtc/react-native-callkeep` GitHub repo): self-managed `ConnectionService` mode requires the consuming app to manually declare, in its own `AndroidManifest.xml`:
+
+```xml
+<uses-permission android:name="android.permission.BIND_TELECOM_CONNECTION_SERVICE"/>
+<service android:name="io.wazo.callkeep.VoiceConnectionService"
+    android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"
+    android:foregroundServiceType="microphone">
+  <intent-filter>
+    <action android:name="android.telecom.ConnectionService" />
+  </intent-filter>
+</service>
+```
+
+`react-native-callkeep` ships **no Android Expo config plugin at all** (confirmed - no `app.plugin.js` in the package; the only plugin that existed, `withCallKeepIOS.js`, is iOS-only entitlements). Neither the library's own bundled `AndroidManifest.xml` (which only declares `<uses-permission>` entries) nor either app's generated manifest ever declared this `<service>` - confirmed by grepping both for `VoiceConnectionService` and finding nothing. `CK.setup({ android: { selfManaged: true } })` calls `TelecomManager.registerPhoneAccount()`, and `displayIncomingCall()`/`startCall()` call `telecomManager.addNewIncomingCall()`/`.placeCall()` - all of which hand off to Android's Telecom subsystem, which then needs to bind to `VoiceConnectionService` to actually run the call. With no manifest entry to bind to, Telecom has nothing to route to - a well-documented cause of a hard crash at exactly the moment a call is accepted or placed, on **both** apps (mobile-app calls `CK.setup`/`CK.startCall` for outgoing calls, loni-server-app calls it for incoming calls - both against the same unpatched library).
+
+Also missing, per the library's README ("Android Self Managed Mode" section): the `READ_CALL_LOG` permission, required specifically for self-managed mode and not present in the library's own manifest either. And, separately from the crash: `hasPhoneAccount()` (which gates `displayIncomingCall`/`startCall`/etc. - they silently no-op rather than throw if it's false) requires `CALL_PHONE`, `RECORD_AUDIO`, and `READ_PHONE_NUMBERS`/`READ_PHONE_STATE` to already be runtime-granted, and nothing in either app ever requested them - so even after the crash was fixed, the native call UI would have kept silently doing nothing.
+
+**Fix, all verified against real generated files, not just written and hoped for:**
+
+- New `plugins/withCallKeepAndroid.js` (both apps) - adds the `BIND_TELECOM_CONNECTION_SERVICE` permission and the `VoiceConnectionService` `<service>`/intent-filter declaration via `withAndroidManifest`, same pattern as Round 5's notifee fix.
+- `android.permission.READ_CALL_LOG` added to both `app.json`'s `android.permissions`.
+- New `requestCallKeepAndroidPermissions()` in `lib/permissions.ts` (both apps) - uses React Native's built-in `PermissionsAndroid.requestMultiple` (no new dependency) for `CALL_PHONE`, `READ_PHONE_NUMBERS`/`READ_PHONE_STATE` (branches on API level), and `READ_CALL_LOG`. Called from `setupCallKeep()` in both `lib/callKeepService.ts` files, before `CK.setup()`.
+- `loni-server-app/lib/callKeepService.ts` also now listens for `showIncomingCallUi` and `createIncomingConnectionFailed` - self-managed-mode-specific events the app previously never handled at all (logged for visibility; notifee's notification already renders independently of these, so no functional gap, but their absence made a Telecom-level rejection invisible/silent).
+- **Verification**: ran the plugin's exact logic against both apps' real generated `AndroidManifest.xml` and confirmed the output. Then went further - ran an actual `npx expo prebuild --platform android` in a sandboxed environment for both apps (not just a dry-run simulation) and confirmed the final, real generated manifests contain the `BIND_TELECOM_CONNECTION_SERVICE` permission, the correctly-configured `VoiceConnectionService` service block, and `READ_CALL_LOG`, with no plugin errors or manifest-merge conflicts with Round 5's notifee fix (both plugins coexist correctly). A full Gradle build wasn't possible in this sandbox (no network access to the Gradle distribution, no Android SDK) - that step still needs to happen on a real machine/CI.
+- `EXPO_PUBLIC_ENABLE_CALLKEEP` flipped back to `true` in both apps' `.env` now that the actual root cause is fixed with verified evidence, not a guess.
+
+**This requires `npx expo prebuild --clean` + a fresh native build on both apps** - manifest and permission changes, not JS.
+
+**If it still crashes or misbehaves on a real device**: capture `adb logcat *:S RNCallKeep:V AndroidRuntime:E ActivityManager:E` during the crash and share that output - every fix in this project's CallKeep history so far has come from reading actual source/docs against a real symptom, not from guessing at a fourth possible cause blind.
+
+**What's still unverified (needs a real device, this sandbox can't test it):**
+
+- Whether `hasPhoneAccount()` actually returns `true` after the new runtime permission requests - Android may still show its own "select phone account" or "enable calling account" system prompt (driven by the `alertTitle`/`alertDescription`/`cancelButton`/`okButton` options already passed to `CK.setup()`) on first run, which the user needs to accept once.
+- iOS CallKit: the code path (`setup()`, `displayIncomingCall`, `startCall`, event listeners) has been in place since Round 2 and wasn't touched this round because the reported crash was Android-only and the root cause found was Android-specific (self-managed `ConnectionService` manifest wiring has no iOS equivalent - CallKit doesn't need anything like it). iOS VoIP push (`lib/voipPush.ts`, `backend-new/app/modules/notifications/voip_service.py`) still needs real Apple Developer credentials (`APNS_VOIP_AUTH_KEY`/`APNS_KEY_ID`/`APNS_TEAM_ID` in `backend-new/.env`, currently unset) and a physical iOS device to test at all - VoIP pushes don't work in the Simulator.
+- The notifee fallback notification's ringtone (`sound: 'default'` on the `calls_v2` channel, `index.js`) uses the phone's default *notification* sound, not its *ringtone* - a real, if secondary, gap versus "the device's native incoming call ringtone" when CallKeep is the one actually driving the call (which it now should be, most of the time). Not changed this round; flagged here as a known remaining gap rather than guessed at.
+- Battery-optimization exemption prompting (`Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`) - not implemented. Most calling apps prompt for this once during onboarding since OEM battery managers (especially Samsung/Xiaomi/Huawei) can kill background call-handling processes despite a correctly-configured foreground service. Would need a small native module or `expo-intent-launcher`; flagged as a recommended follow-up rather than added speculatively.
+
+---
+
+## Round 7: fixed a regression Round 6 introduced - background incoming calls showed nothing at all until the app was opened
+
+**Symptom, reported after testing Round 6 on an emulator**: no incoming-call UI while backgrounded/killed - not the native CallKit UI, not even the notifee fallback. Opening the app afterward showed the call fine.
+
+**Root cause**: `loni-server-app/index.js`'s FCM background handler used to always fall back to notifee's full-screen notification unless CallKeep had "handled" the call - gated on `usedCallKeep = !!displayIncomingCall(callId, callerName)`. `displayIncomingCall()` (`lib/callKeepService.ts`) calls a `void` native bridge method on Android with no return value indicating success - the JS wrapper returns a non-null UUID as soon as the native module loads, regardless of whether Telecom's self-managed `ConnectionService` actually accepted and displayed anything. The Java implementation silently no-ops (just logs a warning, doesn't throw) when the self-managed phone account isn't registered/enabled yet - which is the default state on first run, and is particularly unreliable on emulators/AVDs where the "enable calling account" system flow doesn't always surface the way it does on real hardware. Net effect: as soon as Round 6 re-enabled CallKeep, `usedCallKeep` became `true` purely because the bridge call didn't throw, the notifee fallback was skipped, and if Telecom's side silently failed to show anything (as it reliably does pre-account-registration), the result was no UI at all - exactly the reported symptom, and a straightforward explanation for why it regressed exactly when CallKeep was turned back on.
+
+**Fix**: removed the `usedCallKeep` gate entirely. CallKeep is now called best-effort (still useful when it works - native lock-screen UI, system ringtone, Telecom integration), but notifee's full-screen notification is unconditional, since it's the one path in this project that's actually been proven reliable end to end (this is also literally the mechanism the very first screenshot in this conversation showed working, before CallKeep was ever turned on). A real device where CallKeep succeeds may briefly show both the Telecom call UI and the notifee notification - a minor cosmetic overlap, not a functional problem, and a much smaller risk than calls not ringing at all.
+
+**This is a pure JS change** (`index.js`) - a Metro/JS reload picks it up, no `expo prebuild` or native rebuild required, unlike Round 6's manifest fix.

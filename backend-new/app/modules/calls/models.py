@@ -10,6 +10,7 @@ class CallStatusEnum(str, enum.Enum):
     ACCEPTED = 'ACCEPTED'
     CONNECTING = 'CONNECTING'
     CONNECTED = 'CONNECTED'
+    RECONNECTING = 'RECONNECTING'
     MISSED = 'MISSED'
     REJECTED = 'REJECTED'
     CANCELLED = 'CANCELLED'
@@ -33,6 +34,8 @@ class Call(Base):
     answered_at = Column(DateTime(timezone=True), nullable=True)
     ended_at = Column(DateTime(timezone=True), nullable=True)
     duration_seconds = Column(Integer, default=0, nullable=False)
+    rating = Column(Integer, nullable=True)
+    feedback = Column(String(1000), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

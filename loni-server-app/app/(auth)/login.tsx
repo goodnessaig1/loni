@@ -82,7 +82,7 @@ export default function LoginScreen() {
           </HelixaText>
 
           <Formik
-            initialValues={{ email: 'goodness6337@gmail.com', password: 'goodness' }}
+            initialValues={{ email: 'goodness6337+nurse@gmail.com', password: 'goodness' }}
             validationSchema={LoginSchema}
             onSubmit={handleLogin}
           >

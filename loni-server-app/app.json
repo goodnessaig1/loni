@@ -11,6 +11,7 @@
       "tsconfigPaths": true
     },
     "plugins": [
+      "./plugins/withNotificationSound.js",
       "expo-font",
       "expo-router",
       "expo-secure-store",
@@ -31,9 +32,22 @@
         {
           "ios": {
             "useFrameworks": "static"
+          },
+          "android": {
+            "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      [
+        "./plugins/withCallKeepIOS.js",
+        {
+          "apsEnvironment": "development"
+        }
+      ],
+      "./plugins/withNotifeeAndroid.js",
+      "./plugins/withLiveKitAndroid.js",
+      "./plugins/withCallKeepAndroid.js",
+      "./plugins/withMainActivityLocked.js"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -70,7 +84,12 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.BLUETOOTH",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_FULL_SCREEN_INTENT",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.READ_CALL_LOG"
       ]
     }
   }

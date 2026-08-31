@@ -11,6 +11,7 @@
       "tsconfigPaths": true
     },
     "plugins": [
+      "./plugins/withNotificationSound.js",
       "expo-font",
       "expo-router",
       "expo-secure-store",
@@ -23,13 +24,23 @@
         }
       ],
       [
+        "@react-native-firebase/app",
+        {}
+      ],
+      [
         "expo-build-properties",
         {
+          "ios": {
+            "useFrameworks": "static"
+          },
           "android": {
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/withNotifeeAndroid.js",
+      "./plugins/withLiveKitAndroid.js",
+      "./plugins/withCallKeepAndroid.js"
     ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -46,7 +57,10 @@
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "bitcode": false,
-      "bundleIdentifier": "com.loni.app"
+      "bundleIdentifier": "com.loni.app",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -63,7 +77,11 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.WAKE_LOCK",
-        "android.permission.BLUETOOTH"
+        "android.permission.BLUETOOTH",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.READ_CALL_LOG"
       ]
     }
   }

@@ -52,7 +52,7 @@ export default function ChatHistoryScreen() {
         { text: "Cancel", style: "cancel" },
         { 
           text: "Save", 
-          onPress: (text: string) => {
+          onPress: (text?: string) => {
             if (text && text.trim().length > 0) {
               updateSessionTitle(id, text.trim());
             }
