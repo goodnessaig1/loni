@@ -33,6 +33,19 @@ app = FastAPI(
                 "These responses DO include the correct answer."
             ),
         },
+        {
+            "name": "rides",
+            "description": (
+                "Emergency ride dispatch. A mother calls `POST /rides/request`; "
+                "the backend fans the request out to nearby online drivers as "
+                "offers, first-accept-wins. State transitions (accepted, "
+                "arrived, started, completed, cancelled) and the driver's live "
+                "location are pushed over the same `/calls/ws` socket (with FCM "
+                "as the backgrounded-app fallback). Google Maps powers routing, "
+                "ETA and nearest-hospital lookup; falls back to straight-line "
+                "estimates when `GOOGLE_MAPS_API_KEY` is unset."
+            ),
+        },
     ],
 )
 

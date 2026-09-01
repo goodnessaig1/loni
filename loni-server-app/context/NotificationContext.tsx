@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { AuthContext } from './AuthContext';
 import { apiClient } from '../api/client';
+import { router } from 'expo-router';
 import { connectCallSocket, disconnectCallSocket } from '../api/socket';
 import { applyServerCallEvent, acceptCallDirect, rejectCallDirect } from '../lib/callEvents';
 import { useCallStore } from '../store/callStore';
@@ -12,6 +13,7 @@ import { setupCallKeep } from '../lib/callKeepService';
 import { setupVoipPush } from '../lib/voipPush';
 import { requestMicrophonePermission } from '../lib/permissions';
 import { handleAccountApproved, registerAuthRefresh } from '../lib/accountStatus';
+import { applyServerRideEvent, parseRideData, acceptRideDirect, declineRideDirect } from '../lib/rideEvents';
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -61,6 +63,42 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       // de-duped in handleAccountApproved.)
       if (data?.type === 'account_approved') {
         handleAccountApproved();
+        return;
+      }
+
+      // Emergency ride dispatch events (driver side).
+      if (typeof data?.type === 'string' && data.type.startsWith('ride_')) {
+        const parsed = parseRideData(data);
+        applyServerRideEvent(data.type, parsed);
+        if (data.type === 'ride_request' && Platform.OS === 'android') {
+          const { AndroidImportance } = require('@notifee/react-native');
+          const rideId = Number(parsed.ride_id ?? parsed.id);
+          const channelId = await notifee.createChannel({
+            id: 'ride_requests',
+            name: 'Emergency Ride Requests',
+            vibration: true,
+            importance: AndroidImportance.HIGH,
+            sound: 'notification',
+          });
+          await notifee.displayNotification({
+            id: `ride-${rideId}`,
+            title: 'Emergency Transport Request',
+            body: `${parsed.pickup_address || 'A mother'} → ${parsed.dropoff_name || 'hospital'}`,
+            data: { type: 'ride_request', ride_id: String(rideId) },
+            android: {
+              channelId,
+              importance: AndroidImportance.HIGH,
+              pressAction: { id: 'default', launchActivity: 'default' },
+              actions: [
+                { title: 'Decline', pressAction: { id: 'ride_decline' } },
+                { title: 'Accept', pressAction: { id: 'ride_accept', launchActivity: 'default' } },
+              ],
+            },
+          });
+        } else if (['ride_taken', 'ride_cancelled'].includes(data.type)) {
+          const rideId = Number(parsed.ride_id ?? parsed.id);
+          await notifee.cancelNotification(`ride-${rideId}`).catch(() => {});
+        }
         return;
       }
 
@@ -146,6 +184,21 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
      *    foreground and the same notification is still showing/tapped.
      */
     return notifee.onForegroundEvent(async ({ type, detail }) => {
+      // Ride-request action buttons / body tap.
+      const rideData = detail.notification?.data as any;
+      if (rideData?.type === 'ride_request') {
+        const rideId = Number(rideData.ride_id);
+        await notifee.cancelNotification(detail.notification!.id!).catch(() => {});
+        if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'ride_accept') {
+          try { await acceptRideDirect(rideId); router.replace(`/driver/trip/${rideId}`); } catch {}
+        } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'ride_decline') {
+          try { await declineRideDirect(rideId); } catch {}
+        } else if (type === EventType.PRESS) {
+          router.push(`/driver/request/${rideId}`);
+        }
+        return;
+      }
+
       const callId = detail.notification?.data?.call_id;
       if (!callId) return;
       const id = Number(callId);
@@ -207,19 +260,22 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     // fully killed and the tap cold-started it.
     const importMessaging = require('@react-native-firebase/messaging').default;
 
-    const unsubscribeOpened = importMessaging().onNotificationOpenedApp((remoteMessage: any) => {
-      if (remoteMessage?.data?.type === 'account_approved') {
+    const handleOpen = (remoteMessage: any) => {
+      const t = remoteMessage?.data?.type;
+      if (t === 'account_approved') {
         handleAccountApproved();
-      }
-    });
-
-    importMessaging()
-      .getInitialNotification()
-      .then((remoteMessage: any) => {
-        if (remoteMessage?.data?.type === 'account_approved') {
-          handleAccountApproved();
+      } else if (typeof t === 'string' && t.startsWith('ride_')) {
+        const parsed = parseRideData(remoteMessage.data);
+        const rideId = Number(parsed.ride_id ?? parsed.id);
+        if (t === 'ride_request') router.push(`/driver/request/${rideId}`);
+        else if (['ride_accepted', 'ride_started', 'ride_driver_arrived'].includes(t)) {
+          router.push(`/driver/trip/${rideId}`);
         }
-      });
+      }
+    };
+
+    const unsubscribeOpened = importMessaging().onNotificationOpenedApp(handleOpen);
+    importMessaging().getInitialNotification().then((m: any) => m && handleOpen(m));
 
     return () => unsubscribeOpened();
   }, []);

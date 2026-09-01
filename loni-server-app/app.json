@@ -28,6 +28,15 @@
         {}
       ],
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Loni uses your location while you are online so we can match you with nearby emergency ride requests and share your live position with the mother you are driving to.",
+          "locationWhenInUsePermission": "Loni uses your location to match you with nearby emergency ride requests and to navigate to the pickup and hospital.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {
@@ -66,7 +75,7 @@
       "bitcode": false,
       "bundleIdentifier": "com.loni.server",
       "infoPlist": {
-        "UIBackgroundModes": ["audio", "voip", "fetch", "remote-notification"]
+        "UIBackgroundModes": ["audio", "voip", "fetch", "remote-notification", "location"]
       }
     },
     "android": {
@@ -89,6 +98,10 @@
         "android.permission.USE_FULL_SCREEN_INTENT",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.READ_CALL_LOG"
       ]
     }

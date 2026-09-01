@@ -86,6 +86,24 @@ class Settings(BaseSettings):
     ABACUS_API_KEY: str = ""
     AI_ENVIRONMENT: str = "production" # "production" or "local"
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
+
+    # --- Emergency ride dispatch (drivers) ---
+    # Server-side Google Maps key used for Directions, Places (nearest
+    # hospital) and Geocoding. Leave unset in dev: the maps service falls
+    # back to straight-line (haversine) distance + a null route polyline so
+    # the whole dispatch flow still works without a key.
+    GOOGLE_MAPS_API_KEY: Optional[str] = None
+    # Fare model (Naira). fare = max(RIDE_MIN_FARE,
+    #   RIDE_BASE_FARE + RIDE_PER_KM * km + RIDE_PER_MIN * minutes), rounded to ₦100.
+    RIDE_BASE_FARE: int = 1500
+    RIDE_PER_KM: int = 200
+    RIDE_PER_MIN: int = 50
+    RIDE_MIN_FARE: int = 2000
+    # How far (km) to look for available drivers, and how long a ride may sit
+    # in SEARCHING before we widen the search once more / give up.
+    RIDE_SEARCH_RADIUS_KM: float = 8.0
+    RIDE_SEARCH_RADIUS_MAX_KM: float = 20.0
+    RIDE_OFFER_TIMEOUT_SECONDS: int = 30
     
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

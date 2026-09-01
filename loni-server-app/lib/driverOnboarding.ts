@@ -23,7 +23,9 @@ export const ONBOARDING_ROUTE: Record<DriverOnboarding['current_step'], Href> = 
   vehicle: '/(auth)/complete-profile-vehicle',
   documents: '/(auth)/complete-profile-documents',
   under_review: '/(auth)/verification-progress',
-  approved: '/(tabs)',
+  // An approved driver gets the driver-only dashboard + navigation stack,
+  // not the nurse tabs.
+  approved: '/(driver)',
 };
 
 /**
@@ -41,7 +43,7 @@ export function getPostAuthRoute(user: User | null): Href {
   }
 
   if (user.user_type === 'driver') {
-    if (user.account_status === 'active') return '/(tabs)';
+    if (user.account_status === 'active') return '/(driver)';
     const ob = user.driver_onboarding;
     if (!ob) return '/(auth)/driver-training';
     return ONBOARDING_ROUTE[ob.current_step] ?? '/(auth)/driver-training';

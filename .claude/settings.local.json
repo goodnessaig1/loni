@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./venv/bin/python -c \"import app.api.router; import app.modules.rides.router; import app.modules.rides.services.ride_service; print\\('rides imports OK'\\)\")",
+      "Bash(./venv/bin/alembic heads *)",
+      "Bash(./venv/bin/python -c ' *)",
+      "Bash(./venv/bin/python -c \"import app.main; print\\('app.main imports OK'\\)\")",
+      "Bash(./venv/bin/python -m pytest -q)",
+      "Bash(./venv/bin/python -c \"from app.core.config import settings; print\\('DB set:', bool\\(settings.DATABASE_URL\\)\\); print\\('MAPS key set:', bool\\(settings.GOOGLE_MAPS_API_KEY\\)\\)\")",
+      "Bash(./venv/bin/alembic upgrade *)",
+      "mcp__de686585-1596-40d7-aa31-35b3831e6763__get_screenshot",
+      "Bash(curl -sL -o pinkcard.png \"https://www.figma.com/api/mcp/asset/c0e8d228-d523-4308-96f4-2c4b8ccbff0c.png\")",
+      "Bash(sips -g pixelWidth -g pixelHeight pinkcard.png)",
+      "Bash(./venv/bin/alembic current *)",
+      "Bash(sips -g pixelWidth -g pixelHeight -g hasAlpha assets/images/hero.png)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/expo/bundledNativeModules.json'\\)['expo-haptics']\\)\")",
+      "Bash(node -e \"const b=require\\('./node_modules/expo/bundledNativeModules.json'\\); console.log\\('expo-haptics', b['expo-haptics']||'\\(not listed\\)'\\); console.log\\('expo-audio', b['expo-audio']||'\\(not listed\\)'\\); console.log\\('expo-av', b['expo-av']||'\\(not listed\\)'\\);\")"
+    ]
+  }
+}
