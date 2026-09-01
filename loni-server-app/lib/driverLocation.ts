@@ -41,13 +41,21 @@ async function postFix(lat: number, lng: number, heading: number | null) {
   }
 }
 
-TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
-  if (error || !data) return;
-  const { locations } = data as { locations: Location.LocationObject[] };
-  const last = locations?.[locations.length - 1];
-  if (!last) return;
-  await postFix(last.coords.latitude, last.coords.longitude, last.coords.heading ?? null);
-});
+// Guarded: on a build that predates the expo-task-manager / expo-location
+// native modules, `defineTask` at import time would throw and take down
+// every screen that imports this file. A driver can still go online - they
+// just won't stream location until the app is rebuilt.
+try {
+  TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
+    if (error || !data) return;
+    const { locations } = data as { locations: Location.LocationObject[] };
+    const last = locations?.[locations.length - 1];
+    if (!last) return;
+    await postFix(last.coords.latitude, last.coords.longitude, last.coords.heading ?? null);
+  });
+} catch (e) {
+  console.warn('[driverLocation] task registration unavailable', e);
+}
 
 export async function ensureLocationPermission(background = false): Promise<boolean> {
   const fg = await Location.requestForegroundPermissionsAsync();
@@ -62,19 +70,25 @@ export async function ensureLocationPermission(background = false): Promise<bool
 /** Foreground-only streaming - used while the dashboard is open and online. */
 export async function startForegroundLocation() {
   if (mode === 'foreground') return;
-  await stopDriverLocation();
-  const ok = await ensureLocationPermission(false);
-  if (!ok) return;
-  mode = 'foreground';
-  watcher = await Location.watchPositionAsync(
-    { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 25 },
-    (loc) => postFix(loc.coords.latitude, loc.coords.longitude, loc.coords.heading ?? null),
-  );
+  try {
+    await stopDriverLocation();
+    const ok = await ensureLocationPermission(false);
+    if (!ok) return;
+    mode = 'foreground';
+    watcher = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.High, timeInterval: 5000, distanceInterval: 25 },
+      (loc) => postFix(loc.coords.latitude, loc.coords.longitude, loc.coords.heading ?? null),
+    );
+  } catch (e) {
+    mode = 'off';
+    console.warn('[driverLocation] foreground start failed', e);
+  }
 }
 
 /** Background streaming with a foreground service - used during an active trip. */
 export async function startTripLocation() {
   if (mode === 'background') return;
+  try {
   await stopDriverLocation();
   const ok = await ensureLocationPermission(true);
   if (!ok) {
@@ -98,12 +112,16 @@ export async function startTripLocation() {
     },
     activityType: Location.ActivityType.AutomotiveNavigation,
   });
+  } catch (e) {
+    mode = 'off';
+    console.warn('[driverLocation] trip start failed', e);
+  }
 }
 
 export async function stopDriverLocation() {
   mode = 'off';
   if (watcher) {
-    watcher.remove();
+    try { watcher.remove(); } catch { /* ignore */ }
     watcher = null;
   }
   try {

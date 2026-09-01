@@ -159,6 +159,14 @@ class RideService:
             if hospitals:
                 h = hospitals[0]
                 return h.location.lat, h.location.lng, h.address, h.name, h.place_id
+            # Dev / no-Google-key fallback so the flow still works end to end:
+            # a synthetic destination ~2 km north-east of the pickup.
+            logger.warning("No hospital results for (%s, %s) - using synthetic fallback destination",
+                           payload.pickup.lat, payload.pickup.lng)
+            return (
+                payload.pickup.lat + 0.018, payload.pickup.lng + 0.006,
+                None, "Nearest hospital", None,
+            )
         raise HTTPException(status_code=400, detail="A destination hospital is required")
 
     @staticmethod
@@ -240,7 +248,7 @@ class RideService:
 
     @staticmethod
     async def _candidate_drivers(db: AsyncSession, ride: Ride, radius_km: float,
-                                 exclude: set[str]) -> list[tuple[User, DriverProfile, int]]:
+                                 exclude: set[str]) -> list[tuple[User, DriverProfile, Optional[int]]]:
         res = await db.execute(
             select(User, DriverProfile)
             .join(DriverProfile, DriverProfile.user_id == User.id)
@@ -250,20 +258,25 @@ class RideService:
                 User.is_online.is_(True),
                 DriverProfile.is_available.is_(True),
                 DriverProfile.active_ride_id.is_(None),
-                DriverProfile.current_lat.isnot(None),
-                DriverProfile.current_lng.isnot(None),
             )
         )
-        out = []
+        out: list[tuple[User, DriverProfile, Optional[int]]] = []
         for user, profile in res.all():
             if user.id in exclude:
+                continue
+            if profile.current_lat is None or profile.current_lng is None:
+                # Driver is online but hasn't reported a GPS fix yet (location
+                # perms not granted, or the app build predates location). Still
+                # offer them the ride - we just can't rank them by distance or
+                # pre-compute their route to pickup.
+                out.append((user, profile, None))
                 continue
             dist = haversine_meters(
                 ride.pickup_lat, ride.pickup_lng, profile.current_lat, profile.current_lng
             )
             if dist <= radius_km * 1000:
                 out.append((user, profile, dist))
-        out.sort(key=lambda t: t[2])
+        out.sort(key=lambda t: (t[2] is None, t[2] or 0))
         return out
 
     @staticmethod
@@ -272,7 +285,23 @@ class RideService:
         Returns the number of drivers offered this round."""
         already = await db.execute(select(RideOffer.driver_id).where(RideOffer.ride_id == ride.id))
         exclude = {r for r in already.scalars().all()}
+
+        online_total = (await db.execute(
+            select(func.count(User.id))
+            .join(DriverProfile, DriverProfile.user_id == User.id)
+            .where(
+                User.user_type == UserTypeEnum.driver,
+                User.is_online.is_(True),
+                DriverProfile.is_available.is_(True),
+                DriverProfile.active_ride_id.is_(None),
+            )
+        )).scalar() or 0
+
         candidates = await RideService._candidate_drivers(db, ride, radius_km, exclude)
+        logger.info(
+            "dispatch ride=%s radius=%skm: %s online+available driver(s), %s within range/eligible",
+            ride.id, radius_km, online_total, len(candidates),
+        )
         if not candidates:
             return 0
 
@@ -302,9 +331,10 @@ class RideService:
         }
         for user, profile, dist in candidates:
             body_txt = f"{ride.pickup_address or 'A mother'} -> {ride.dropoff_name or 'hospital'}"
+            away = f" - {round(dist / 1000, 1)}km away" if dist is not None else ""
             asyncio.create_task(_emit(
                 user.id, "ride_request", "Emergency Transport Request",
-                f"{body_txt} - {round(dist/1000, 1)}km away", {**payload, "driver_distance_meters": dist},
+                f"{body_txt}{away}", {**payload, "driver_distance_meters": dist},
             ))
         return len(candidates)
 
