@@ -36,9 +36,13 @@ async def get_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    The authenticated user. For drivers, `data.user.driver_onboarding` carries
+    the signup state machine (same shape as `GET /driver-training/onboarding`)
+    so the app can resume the flow at the right step on launch.
+    """
     user_data = enrich_user_data(current_user)
     if current_user.user_type == UserTypeEnum.driver:
-        # Lets the app resume the signup flow at the right step on every launch.
         user_data["driver_onboarding"] = await build_status(db, current_user)
     return {"success": True, "data": {"user": user_data}}
 
@@ -381,7 +385,7 @@ async def update_nurse_profile(
     await db.commit()
     return {"success": True, "message": "Nurse profile updated"}
 
-@router.post("/profile/driver", response_model=StandardResponse)
+@router.post("/profile/driver", response_model=StandardResponse, deprecated=True)
 async def update_driver_profile(
     vehicle_type: str = Form(...),
     has_ac: str = Form(...),
@@ -400,6 +404,12 @@ async def update_driver_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    """
+    **Deprecated** - single-shot multipart submit of the whole driver profile.
+    Use the incremental steps instead: `PATCH /users/profile/driver/personal`
+    -> `/vehicle` -> `/documents` -> `POST /users/profile/driver/submit`.
+    Still gated on training + aptitude being complete.
+    """
     # Training + aptitude must be complete before a driver profile can be filed.
     status = await build_status(db, current_user)
     require_step(status, "personal")
@@ -487,13 +497,28 @@ async def _get_driver_profile_or_start(db: AsyncSession, user: User) -> DriverPr
     return profile
 
 
-@router.patch("/profile/driver/personal", response_model=StandardResponse)
+_ONBOARDING_STEP_RESPONSES = {
+    403: {"description": "An earlier onboarding step is not complete yet"},
+    400: {"description": "Required data missing from the payload"},
+}
+
+
+@router.patch(
+    "/profile/driver/personal",
+    response_model=StandardResponse,
+    responses=_ONBOARDING_STEP_RESPONSES,
+)
 async def update_driver_personal_info(
     data: DriverPersonalInfoRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Step 3 - personal info. Requires training + aptitude to be done."""
+    """
+    Driver onboarding step 3 - personal info. Upload the photo first via
+    `POST /users/profile-picture` (or pass `profile_photo` as a URL). Requires
+    training + the aptitude test to be complete. `data` is the refreshed
+    onboarding status.
+    """
     status = await build_status(db, current_user)
     require_step(status, "personal")
 
@@ -515,13 +540,21 @@ async def update_driver_personal_info(
     return {"success": True, "message": "Personal information saved", "data": await build_status(db, current_user)}
 
 
-@router.patch("/profile/driver/vehicle", response_model=StandardResponse)
+@router.patch(
+    "/profile/driver/vehicle",
+    response_model=StandardResponse,
+    responses=_ONBOARDING_STEP_RESPONSES,
+)
 async def update_driver_vehicle_info(
     data: DriverVehicleInfoRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Step 4 - vehicle info. Requires the personal step to be done."""
+    """
+    Driver onboarding step 4 - vehicle details and the 4 vehicle photos
+    (upload each via `POST /users/upload-document` and pass back the URLs).
+    Requires the personal step. `data` is the refreshed onboarding status.
+    """
     status = await build_status(db, current_user)
     require_step(status, "vehicle")
 
@@ -547,13 +580,21 @@ async def update_driver_vehicle_info(
     return {"success": True, "message": "Vehicle information saved", "data": await build_status(db, current_user)}
 
 
-@router.patch("/profile/driver/documents", response_model=StandardResponse)
+@router.patch(
+    "/profile/driver/documents",
+    response_model=StandardResponse,
+    responses=_ONBOARDING_STEP_RESPONSES,
+)
 async def update_driver_documents(
     data: DriverDocumentsRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Step 5 - documents. Requires the vehicle step to be done."""
+    """
+    Driver onboarding step 5 - licence, government ID and vehicle papers
+    (upload each via `POST /users/upload-document`, pass back the URLs). Then
+    call `POST /users/profile/driver/submit`. Requires the vehicle step.
+    """
     status = await build_status(db, current_user)
     require_step(status, "documents")
 
@@ -570,12 +611,20 @@ async def update_driver_documents(
     return {"success": True, "message": "Documents saved", "data": await build_status(db, current_user)}
 
 
-@router.post("/profile/driver/submit", response_model=StandardResponse)
+@router.post(
+    "/profile/driver/submit",
+    response_model=StandardResponse,
+    responses={403: {"description": "One or more onboarding steps are still incomplete"}},
+)
 async def submit_driver_application(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Finalize the driver application. Every prior step must be complete."""
+    """
+    Finalize the driver application and send it for review (sets
+    `submitted_at`, moves `current_step` to `under_review`). Every prior step
+    must be complete. Idempotent - a second call just returns the status.
+    """
     status = await build_status(db, current_user)
     if status["submitted"]:
         return {"success": True, "message": "Application already submitted", "data": status}

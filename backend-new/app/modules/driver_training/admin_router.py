@@ -26,11 +26,12 @@ def _validate_answer_index(answer_index: int, options: List[str]) -> None:
 
 @router.get("/questions", response_model=List[AdminQuestion])
 async def list_questions(
-    is_visible: Optional[bool] = Query(None),
-    category: Optional[str] = Query(None),
+    is_visible: Optional[bool] = Query(None, description="Filter by visibility"),
+    category: Optional[str] = Query(None, description="Filter by category"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
+    """The full question bank, **including the correct answer** (admin only)."""
     query = select(AptitudeQuestion).order_by(AptitudeQuestion.id)
     if is_visible is not None:
         query = query.where(AptitudeQuestion.is_visible.is_(is_visible))
@@ -46,6 +47,7 @@ async def create_question(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
+    """Add a question to the bank (beyond the bundled seed set)."""
     _validate_answer_index(data.answer_index, data.options)
     existing = await db.execute(select(AptitudeQuestion).where(AptitudeQuestion.key == data.key))
     if existing.scalar_one_or_none():
@@ -72,6 +74,7 @@ async def update_question(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
+    """Edit a question's text, options, correct answer, category or visibility."""
     result = await db.execute(select(AptitudeQuestion).where(AptitudeQuestion.id == question_id))
     question = result.scalar_one_or_none()
     if not question:
@@ -98,6 +101,7 @@ async def toggle_question_visibility(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
+    """Show or hide a single question. Hidden questions are never served or graded."""
     result = await db.execute(select(AptitudeQuestion).where(AptitudeQuestion.id == question_id))
     question = result.scalar_one_or_none()
     if not question:
@@ -115,6 +119,7 @@ async def delete_question(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
+    """Permanently remove a question. Prefer toggling visibility off instead."""
     result = await db.execute(select(AptitudeQuestion).where(AptitudeQuestion.id == question_id))
     question = result.scalar_one_or_none()
     if not question:
@@ -135,10 +140,11 @@ async def seed_questions(
 
 @router.get("/attempts")
 async def list_attempts(
-    user_id: Optional[str] = Query(None),
+    user_id: Optional[str] = Query(None, description="Filter to one driver's attempts"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_admin_user),
 ):
+    """Audit log of graded aptitude attempts (newest first)."""
     query = select(AptitudeAttempt).order_by(AptitudeAttempt.created_at.desc())
     if user_id:
         query = query.where(AptitudeAttempt.user_id == user_id)

@@ -48,7 +48,7 @@ async def update_user_status(
     admin: User = Depends(get_admin_user)
 ):
     """
-    Update a user's account status (e.g., approve a pending account).
+    Update a user's account status (e.g., active,pending or suspended account).
     Requires admin privileges.
     """
     result = await db.execute(

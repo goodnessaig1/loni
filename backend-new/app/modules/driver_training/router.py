@@ -22,6 +22,8 @@ from app.modules.users.models import DriverProfile, User, UserTypeEnum
 
 router = APIRouter()
 
+_GATE_RESPONSES = {403: {"description": "A required earlier step is not complete, or the role can't take driver training"}}
+
 # Driver training happens during onboarding, before `user_type` is switched to
 # `driver` (that only occurs when the driver profile is submitted). So we only
 # block roles that clearly should never take the driver assessment.
@@ -71,20 +73,26 @@ async def start_onboarding(
     return await build_status(db, current_user)
 
 
-@router.get("/onboarding", response_model=OnboardingStatus)
+@router.get("/onboarding", response_model=OnboardingStatus, responses=_GATE_RESPONSES)
 async def onboarding_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Full driver-signup state machine. The mobile app calls this on launch to
+    decide which onboarding screen to show; the same object is also returned
+    inline on `GET /users/me` as `driver_onboarding`.
+    """
     _require_driver(current_user)
     return await build_status(db, current_user)
 
 
-@router.get("/modules", response_model=ModulesResponse)
+@router.get("/modules", response_model=ModulesResponse, responses=_GATE_RESPONSES)
 async def list_modules(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """The 5 pre-trip training modules (static content) plus this driver's progress."""
     _require_driver(current_user)
     progress = await service.get_or_create_progress(db, current_user.id)
     await db.commit()
@@ -94,31 +102,46 @@ async def list_modules(
     )
 
 
-@router.post("/modules/complete", response_model=TrainingProgress)
+@router.post("/modules/complete", response_model=TrainingProgress, responses=_GATE_RESPONSES)
 async def complete_module(
     data: CompleteModuleRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Mark one training module as read. Idempotent; returns updated progress."""
     _require_driver(current_user)
     progress = await service.complete_module(db, current_user.id, data.module_id)
     return _progress_payload(progress)
 
 
-@router.get("/aptitude/status", response_model=AptitudeStatus)
+@router.get("/aptitude/status", response_model=AptitudeStatus, responses=_GATE_RESPONSES)
 async def aptitude_status(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """Attempts used/remaining, pass threshold, and whether the driver has passed."""
     _require_driver(current_user)
     return await service.get_status(db, current_user.id)
 
 
-@router.get("/aptitude/questions", response_model=QuestionsResponse)
+@router.get(
+    "/aptitude/questions",
+    response_model=QuestionsResponse,
+    responses={
+        **_GATE_RESPONSES,
+        400: {"description": "The driver has already passed"},
+        503: {"description": "Not enough visible questions in the bank yet"},
+    },
+)
 async def aptitude_questions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    A fresh random set of `question_count` questions for a new attempt.
+    **The correct answer is never included.** Fails if the driver has no
+    attempts left or has already passed.
+    """
     _require_driver(current_user)
     questions, status = await service.get_questions(db, current_user.id)
     return QuestionsResponse(
@@ -130,12 +153,24 @@ async def aptitude_questions(
     )
 
 
-@router.post("/aptitude/submit", response_model=SubmitAttemptResponse)
+@router.post(
+    "/aptitude/submit",
+    response_model=SubmitAttemptResponse,
+    responses={
+        **_GATE_RESPONSES,
+        400: {"description": "Already passed, or the payload references unknown questions"},
+    },
+)
 async def submit_aptitude(
     data: SubmitAttemptRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Grade one attempt server-side and record it. Counts against the driver's
+    3 attempts. `breakdown` says which answers were right (not what the right
+    answer was).
+    """
     _require_driver(current_user)
     score, total, passed, breakdown, status = await service.submit_attempt(
         db, current_user.id, data.answers
