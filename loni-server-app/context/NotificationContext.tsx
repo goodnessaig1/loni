@@ -11,6 +11,7 @@ import { useCallStore } from '../store/callStore';
 import { setupCallKeep } from '../lib/callKeepService';
 import { setupVoipPush } from '../lib/voipPush';
 import { requestMicrophonePermission } from '../lib/permissions';
+import { handleAccountApproved, registerAuthRefresh } from '../lib/accountStatus';
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -21,7 +22,15 @@ const NotificationContext = createContext<NotificationContextType | null>(null);
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
   const [pushToken, setPushToken] = useState<string | null>(null);
 
-  const { user } = useContext(AuthContext);
+  const { user, refreshUser } = useContext(AuthContext);
+
+  useEffect(() => {
+    // Let module-scope code (the call socket, FCM tap handlers) trigger a
+    // user refresh after an account-approval event - `refreshUser` lives on
+    // the React context and can't be imported directly there.
+    registerAuthRefresh(refreshUser);
+    return () => registerAuthRefresh(null);
+  }, [refreshUser]);
 
   useEffect(() => {
     // Redundant-safe: index.js already calls both of these at module load
@@ -46,6 +55,15 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     const importMessaging = require('@react-native-firebase/messaging').default;
     const unsubscribeFirebase = importMessaging().onMessage(async (remoteMessage: any) => {
       const data = remoteMessage.data;
+
+      // Account approved while the app is foregrounded: refresh the user and
+      // jump to the dashboard. (The WebSocket usually beats this; both are
+      // de-duped in handleAccountApproved.)
+      if (data?.type === 'account_approved') {
+        handleAccountApproved();
+        return;
+      }
+
       if (data?.type) {
         const parsed: any = { ...data };
         for (const key of ['caller', 'receiver']) {
@@ -180,6 +198,30 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         });
       }
     });
+  }, []);
+
+  useEffect(() => {
+    // Account-approval push tapped from the system tray. Firebase (not
+    // notifee) owns these notification+data messages: onNotificationOpenedApp
+    // fires when the app was backgrounded, getInitialNotification when it was
+    // fully killed and the tap cold-started it.
+    const importMessaging = require('@react-native-firebase/messaging').default;
+
+    const unsubscribeOpened = importMessaging().onNotificationOpenedApp((remoteMessage: any) => {
+      if (remoteMessage?.data?.type === 'account_approved') {
+        handleAccountApproved();
+      }
+    });
+
+    importMessaging()
+      .getInitialNotification()
+      .then((remoteMessage: any) => {
+        if (remoteMessage?.data?.type === 'account_approved') {
+          handleAccountApproved();
+        }
+      });
+
+    return () => unsubscribeOpened();
   }, []);
 
   useEffect(() => {

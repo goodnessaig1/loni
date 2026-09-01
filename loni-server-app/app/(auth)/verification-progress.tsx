@@ -1,11 +1,11 @@
-import React from 'react';
-import { 
-  View, 
-  Pressable, 
-  StyleSheet, 
+import React, { useCallback, useEffect, useRef } from 'react';
+import {
+  View,
+  Pressable,
+  StyleSheet,
   Image
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
@@ -15,11 +15,47 @@ import { VerificationIcon } from '../../components/VerificationIcon';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function VerificationProgressScreen() {
-  const { logoutUser } = useAuth();
+  const { user, logoutUser, refreshUser } = useAuth();
+  const navigatedRef = useRef(false);
+
+  const goToDashboardIfApproved = useCallback(() => {
+    if (navigatedRef.current) return;
+    if (user?.account_status === 'active') {
+      navigatedRef.current = true;
+      router.replace('/(tabs)');
+    }
+  }, [user?.account_status]);
+
+  // React immediately if the user object is already (or becomes) active -
+  // e.g. a push / WebSocket approval landed while this screen was mounted.
+  useEffect(goToDashboardIfApproved, [goToDashboardIfApproved]);
+
+  // Fallback for when neither the push nor the socket reached us: while the
+  // screen is focused, re-check the account status every 15s.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      const check = async () => {
+        try {
+          await refreshUser();
+        } catch {
+          /* offline / transient - try again next tick */
+        }
+      };
+      check();
+      const id = setInterval(() => {
+        if (!cancelled) check();
+      }, 15000);
+      return () => {
+        cancelled = true;
+        clearInterval(id);
+      };
+    }, [refreshUser])
+  );
 
   const handleCheckBack = async () => {
     await logoutUser();
-    router.replace('/(auth)'); 
+    router.replace('/(auth)');
   };
 
   return (
