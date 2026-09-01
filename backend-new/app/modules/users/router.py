@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks, Form
+from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks, Form, HTTPException
 from typing import Optional
+from datetime import datetime, timezone
 import cloudinary
 import cloudinary.uploader
 import asyncio
@@ -10,8 +11,10 @@ from sqlalchemy.orm import selectinload
 from app.core.security import verify_password, get_password_hash
 from app.modules.users.schemas import (
     UpdateContactPermissions, ChangePasswordRequest,
-    ToggleOnlineRequest, UpdateNurseProfileRequest, UpdateUserProfileRequest
+    ToggleOnlineRequest, UpdateNurseProfileRequest, UpdateUserProfileRequest,
+    DriverPersonalInfoRequest, DriverVehicleInfoRequest, DriverDocumentsRequest
 )
+from app.modules.driver_training.onboarding import build_status, require_step
 from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.modules.users.models import User, EmergencyContact, NurseProfile, DriverProfile, UserTypeEnum
@@ -29,8 +32,14 @@ from app.utils.user_enrichment import enrich_user_data, calculate_pregnancy_star
 router = APIRouter()
 
 @router.get("/me", response_model=StandardResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+async def get_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     user_data = enrich_user_data(current_user)
+    if current_user.user_type == UserTypeEnum.driver:
+        # Lets the app resume the signup flow at the right step on every launch.
+        user_data["driver_onboarding"] = await build_status(db, current_user)
     return {"success": True, "data": {"user": user_data}}
 
 @router.patch("/update-profile", response_model=StandardResponse)
@@ -391,6 +400,10 @@ async def update_driver_profile(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    # Training + aptitude must be complete before a driver profile can be filed.
+    status = await build_status(db, current_user)
+    require_step(status, "personal")
+
     # Upload documents to Cloudinary concurrently
     async def upload_single_doc(doc_file: UploadFile):
         result = await asyncio.to_thread(
@@ -451,9 +464,134 @@ async def update_driver_profile(
         db.add(profile)
 
     current_user.user_type = UserTypeEnum.driver
+    if profile.full_name is None:
+        profile.full_name = current_user.name
+    if profile.profile_photo is None:
+        profile.profile_photo = current_user.profile_picture
+    profile.submitted_at = datetime.now(timezone.utc)
     db.add(current_user)
     await db.commit()
     return {"success": True, "message": "Driver profile updated"}
+
+
+async def _get_driver_profile_or_start(db: AsyncSession, user: User) -> DriverProfile:
+    result = await db.execute(select(DriverProfile).where(DriverProfile.user_id == user.id))
+    profile = result.scalars().first()
+    if profile is None:
+        profile = DriverProfile(user_id=user.id, verification_documents={})
+        db.add(profile)
+        await db.flush()
+    if user.user_type == UserTypeEnum.user:
+        user.user_type = UserTypeEnum.driver
+        db.add(user)
+    return profile
+
+
+@router.patch("/profile/driver/personal", response_model=StandardResponse)
+async def update_driver_personal_info(
+    data: DriverPersonalInfoRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Step 3 - personal info. Requires training + aptitude to be done."""
+    status = await build_status(db, current_user)
+    require_step(status, "personal")
+
+    profile = await _get_driver_profile_or_start(db, current_user)
+    photo = data.profile_photo or current_user.profile_picture or profile.profile_photo
+    if not photo:
+        raise HTTPException(status_code=400, detail="A profile photo is required")
+
+    profile.full_name = data.full_name
+    profile.date_of_birth = data.date_of_birth
+    profile.profile_photo = photo
+
+    current_user.name = data.full_name
+    if data.profile_photo:
+        current_user.profile_picture = data.profile_photo
+    db.add(profile)
+    db.add(current_user)
+    await db.commit()
+    return {"success": True, "message": "Personal information saved", "data": await build_status(db, current_user)}
+
+
+@router.patch("/profile/driver/vehicle", response_model=StandardResponse)
+async def update_driver_vehicle_info(
+    data: DriverVehicleInfoRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Step 4 - vehicle info. Requires the personal step to be done."""
+    status = await build_status(db, current_user)
+    require_step(status, "vehicle")
+
+    profile = await _get_driver_profile_or_start(db, current_user)
+    profile.vehicle_type = data.vehicle_type
+    profile.has_ac = data.has_ac
+    profile.vehicle_brand = data.vehicle_brand
+    profile.vehicle_year = data.vehicle_year
+    profile.vehicle_model = data.vehicle_model
+    profile.plate_number = data.plate_number
+    profile.vehicle_color = data.vehicle_color
+
+    docs = dict(profile.verification_documents or {})
+    docs.update({
+        "front_view": data.front_view,
+        "back_view": data.back_view,
+        "vin": data.vin,
+        "interior": data.interior,
+    })
+    profile.verification_documents = docs
+    db.add(profile)
+    await db.commit()
+    return {"success": True, "message": "Vehicle information saved", "data": await build_status(db, current_user)}
+
+
+@router.patch("/profile/driver/documents", response_model=StandardResponse)
+async def update_driver_documents(
+    data: DriverDocumentsRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Step 5 - documents. Requires the vehicle step to be done."""
+    status = await build_status(db, current_user)
+    require_step(status, "documents")
+
+    profile = await _get_driver_profile_or_start(db, current_user)
+    docs = dict(profile.verification_documents or {})
+    docs.update({
+        "driver_license": data.driver_license,
+        "government_id": data.government_id,
+        "vehicle_papers": data.vehicle_papers,
+    })
+    profile.verification_documents = docs
+    db.add(profile)
+    await db.commit()
+    return {"success": True, "message": "Documents saved", "data": await build_status(db, current_user)}
+
+
+@router.post("/profile/driver/submit", response_model=StandardResponse)
+async def submit_driver_application(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Finalize the driver application. Every prior step must be complete."""
+    status = await build_status(db, current_user)
+    if status["submitted"]:
+        return {"success": True, "message": "Application already submitted", "data": status}
+    if not status["can_submit"]:
+        incomplete = next((s["label"] for s in status["steps"] if not s["complete"]), "a required step")
+        raise HTTPException(status_code=403, detail=f"Cannot submit yet - {incomplete} is not complete")
+
+    result = await db.execute(select(DriverProfile).where(DriverProfile.user_id == current_user.id))
+    profile = result.scalars().first()
+    profile.submitted_at = datetime.now(timezone.utc)
+    current_user.user_type = UserTypeEnum.driver
+    db.add(profile)
+    db.add(current_user)
+    await db.commit()
+    return {"success": True, "message": "Application submitted for review", "data": await build_status(db, current_user)}
+
 
 @router.patch("/online-status", response_model=StandardResponse)
 async def toggle_online_status(

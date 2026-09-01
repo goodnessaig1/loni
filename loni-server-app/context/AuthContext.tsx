@@ -20,6 +20,7 @@ export type User = {
   account_status?: 'pending' | 'active' | 'suspended';
   nurse_profile?: any;
   driver_profile?: any;
+  driver_onboarding?: import('../lib/driverOnboarding').DriverOnboarding;
 };
 
 type AuthContextType = {

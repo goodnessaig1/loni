@@ -51,9 +51,9 @@ export default function VerifyPhoneScreen() {
 
   const handleVerify = async () => {
     try {
-      // await verifyPhone({
-      //   otp: code.join(''),
-      // });
+      await verifyPhone({
+        otp: code.join(''),
+      });
       router.push('/(auth)/permissions');
     } catch (error: any) {
       console.error('Phone verification failed:', error.response?.data || error.message);

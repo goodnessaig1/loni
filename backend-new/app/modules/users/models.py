@@ -93,6 +93,10 @@ class DriverProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(String(12), ForeignKey('users.id'), unique=True, nullable=False)
+    # Personal info step (collected during onboarding, before vehicle details).
+    full_name = Column(String(255), nullable=True)
+    date_of_birth = Column(String(50), nullable=True)
+    profile_photo = Column(String(500), nullable=True)
     vehicle_type = Column(String(100), nullable=True)
     has_ac = Column(Boolean, nullable=True)
     vehicle_brand = Column(String(100), nullable=True)
@@ -101,6 +105,9 @@ class DriverProfile(Base):
     plate_number = Column(String(100), nullable=True)
     vehicle_color = Column(String(100), nullable=True)
     verification_documents = Column(JSON, nullable=True)
+    # Set when the driver taps "Submit for Review" on the final step. Until then
+    # the profile rows exist but the application is still in progress.
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

@@ -52,6 +52,10 @@ def enrich_user_data(user: User) -> dict:
         }
     elif user.user_type and user.user_type.value == 'driver' and hasattr(user, 'driver_profile') and user.driver_profile:
         user_data["driver_profile"] = {
+            "full_name": user.driver_profile.full_name,
+            "date_of_birth": user.driver_profile.date_of_birth,
+            "profile_photo": user.driver_profile.profile_photo,
+            "submitted_at": user.driver_profile.submitted_at.isoformat() if user.driver_profile.submitted_at else None,
             "vehicle_type": user.driver_profile.vehicle_type,
             "has_ac": user.driver_profile.has_ac,
             "vehicle_brand": user.driver_profile.vehicle_brand,

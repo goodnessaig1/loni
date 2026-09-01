@@ -1,35 +1,63 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Pressable, 
-  StyleSheet, 
-  ScrollView,
-  TextInput,
-  TouchableOpacity
-} from 'react-native';
+import { View, Pressable, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { DatePickerInput } from '../../components/DatePickerInput';
 import { UploadBox } from '../../components/UploadBox';
+import { useAuth, useUploadProfilePicture } from '../../hooks/useAuth';
+import { useSavePersonalInfo } from '../../hooks/useDriverTraining';
 
 export default function CompleteProfileDriverScreen() {
-  const [fullName, setFullName] = useState('Sarah Chen');
-  const [phone, setPhone] = useState('+1 (555) 234 - 5678');
-  const [dob, setDob] = useState('');
-  
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoName, setPhotoName] = useState<string | null>(null);
+  const { user } = useAuth();
+  const saved = user?.driver_profile ?? {};
 
-  const handleContinue = () => {
-    router.push('/(auth)/complete-profile-vehicle');
+  const [fullName, setFullName] = useState(saved.full_name ?? user?.name ?? '');
+  const phone = user?.phone ?? '';
+  const [dob, setDob] = useState(saved.date_of_birth ?? '');
+
+  // A newly picked local photo; if null we reuse the already-saved remote one.
+  const [photoUri, setPhotoUri] = useState<string | null>(saved.profile_photo ?? null);
+  const [photoName, setPhotoName] = useState<string | null>(saved.profile_photo ? 'profile-photo.jpg' : null);
+  const [photoChanged, setPhotoChanged] = useState(false);
+
+  const { mutateAsync: uploadPhoto } = useUploadProfilePicture();
+  const { mutateAsync: savePersonalInfo, isPending } = useSavePersonalInfo();
+  const [submitting, setSubmitting] = useState(false);
+
+  const hasPhoto = photoUri !== null;
+  const isFormValid = fullName.trim() !== '' && dob.trim() !== '' && hasPhoto;
+
+  const handlePickPhoto = (uri: string) => {
+    setPhotoUri(uri);
+    setPhotoChanged(true);
   };
 
-  const isFormValid = fullName.trim() !== '' && phone.trim() !== '' && dob.trim() !== '' && photoUri !== null;
+  const handleContinue = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      if (photoChanged && photoUri) {
+        // Sets the user's profile picture server-side; the PATCH below picks
+        // it up as the driver profile photo when we don't pass one explicitly.
+        const form = new FormData();
+        form.append('image', { uri: photoUri, name: photoName ?? 'photo.jpg', type: 'image/jpeg' } as any);
+        await uploadPhoto(form);
+      }
+      await savePersonalInfo({
+        full_name: fullName.trim(),
+        date_of_birth: dob.trim(),
+      });
+      router.replace('/(auth)/complete-profile-vehicle');
+    } catch (e: any) {
+      Alert.alert('Could not save', e?.message ?? 'Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -40,17 +68,18 @@ export default function CompleteProfileDriverScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
         <CalText style={styles.heading}>Complete Your Profile</CalText>
         <HelixaText style={styles.subtext}>Driver Information</HelixaText>
 
         <View style={styles.formGroup}>
           <HelixaText style={styles.label}>Full Name</HelixaText>
-          <View style={[styles.inputContainer, styles.inputDisabled]}>
-            <TextInput 
-              style={[styles.input, { color: '#9CA3AF' }]}
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
               value={fullName}
-              editable={false}
+              onChangeText={setFullName}
+              placeholder="Your full name"
+              placeholderTextColor="#9CA3AF"
             />
           </View>
         </View>
@@ -58,77 +87,45 @@ export default function CompleteProfileDriverScreen() {
         <View style={styles.formGroup}>
           <HelixaText style={styles.label}>Phone Number</HelixaText>
           <View style={[styles.inputContainer, styles.inputDisabled]}>
-            <TextInput 
-              style={[styles.input, { color: '#9CA3AF' }]}
-              value={phone}
-              editable={false}
-            />
+            <TextInput style={[styles.input, { color: '#9CA3AF' }]} value={phone} editable={false} />
           </View>
         </View>
 
-        <DatePickerInput 
-          label="Date of Birth"
-          value={dob}
-          onChangeText={setDob}
-        />
+        <DatePickerInput label="Date of Birth" value={dob} onChangeText={setDob} />
 
         <View style={styles.formGroup}>
-        <UploadBox label="Profile Photo *" fileUri={photoUri} fileName={photoName} setUri={setPhotoUri} setName={setPhotoName} defaultFileName="photo.jpg" />
-        </View>
-
-        <View style={styles.buttonWrapper}>
-          <Button 
-            title="Continue"
-            onPress={handleContinue}
-            disabled={!isFormValid}
+          <UploadBox
+            label="Profile Photo *"
+            fileUri={photoUri}
+            fileName={photoName}
+            setUri={handlePickPhoto}
+            setName={setPhotoName}
+            defaultFileName="photo.jpg"
           />
         </View>
 
+        <View style={styles.buttonWrapper}>
+          <Button
+            title="Continue"
+            onPress={handleContinue}
+            disabled={!isFormValid || submitting || isPending}
+            isLoading={submitting || isPending}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
-  heading: {
-    fontSize: 28,
-    lineHeight: 34,
-    color: '#000000',
-    marginBottom: 8,
-  },
-  subtext: {
-    fontSize: 16,
-    color: '#9CA3AF',
-    marginBottom: 32,
-  },
-  formGroup: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 8,
-  },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 8 },
+  backButton: { width: 40, height: 40, justifyContent: 'center' },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
+  heading: { fontSize: 28, lineHeight: 34, color: '#000000', marginBottom: 8 },
+  subtext: { fontSize: 16, color: '#9CA3AF', marginBottom: 32 },
+  formGroup: { marginBottom: 24 },
+  label: { fontSize: 14, fontWeight: '500', color: '#000000', marginBottom: 8 },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -139,56 +136,7 @@ const styles = StyleSheet.create({
     height: 52,
     backgroundColor: '#FAFAFA',
   },
-  inputDisabled: {
-    backgroundColor: '#F3F4F6',
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: '#000',
-    height: '100%',
-  },
-  uploadBox: {
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    backgroundColor: '#FAFAFA',
-  },
-  uploadText: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 12,
-  },
-  plusBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#6B7280',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  uploadedFileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF0F5',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 12,
-  },
-  fileName: {
-    fontSize: 14,
-    color: '#D62D88',
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  fileSize: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  buttonWrapper: {
-    marginTop: 16,
-  }
+  inputDisabled: { backgroundColor: '#F3F4F6' },
+  input: { flex: 1, fontSize: 15, color: '#000', height: '100%' },
+  buttonWrapper: { marginTop: 16 },
 });

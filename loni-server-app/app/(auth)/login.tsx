@@ -17,6 +17,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { useLogin, useAuth } from '../../hooks/useAuth';
+import { getPostAuthRoute } from '../../lib/driverOnboarding';
 import { useEffect } from 'react';
 
 const LoginSchema = Yup.object().shape({
@@ -31,25 +32,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (user) {
-      if (user.user_type === 'nurse') {
-        if (!user.nurse_profile) {
-          router.replace('/(auth)/complete-profile-nurse');
-        } else if (user.account_status === 'pending') {
-          router.replace('/(auth)/verification-progress');
-        } else {
-          router.replace('/(tabs)');
-        }
-      } else if (user.user_type === 'driver') {
-        if (!user.driver_profile) {
-          router.replace('/(auth)/complete-profile-vehicle');
-        } else if (user.account_status === 'pending') {
-          router.replace('/(auth)/verification-progress');
-        } else {
-          router.replace('/(tabs)');
-        }
-      } else {
-        router.replace('/(auth)/role-selection');
-      }
+      router.replace(getPostAuthRoute(user));
     }
   }, [user]);
 
@@ -142,7 +125,7 @@ export default function LoginScreen() {
 
           <View style={styles.signUpContainer}>
             <HelixaText style={styles.signUpText}>
-              Don't have an account? <HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
+              {"Don't have an account? "}<HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
             </HelixaText>
           </View>
 

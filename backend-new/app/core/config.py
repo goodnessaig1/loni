@@ -75,6 +75,13 @@ class Settings(BaseSettings):
     # token from the wrong environment will be silently rejected (BadDeviceToken).
     APNS_USE_SANDBOX: bool = True
 
+    # --- Driver aptitude test ---
+    # Number of questions served per attempt, how many attempts a driver gets,
+    # and the minimum number of correct answers required to pass.
+    APTITUDE_QUESTION_COUNT: int = 10
+    APTITUDE_MAX_ATTEMPTS: int = 3
+    APTITUDE_PASS_SCORE: int = 8
+
     OPENAI_API_KEY: str = ""
     ABACUS_API_KEY: str = ""
     AI_ENVIRONMENT: str = "production" # "production" or "local"

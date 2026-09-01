@@ -42,13 +42,13 @@ export default function RegisterScreen() {
       validationSchema={validationSchema}
       onSubmit={async (values, { setSubmitting, setFieldError }) => {
         try {
-          // await registerUser({
-          //   name: values.name,
-          //   email: values.email,
-          //   password: values.password,
-          //   phone: values.phone,
-          // } as any);
-          
+          await registerUser({
+            name: values.name,
+            email: values.email,
+            password: values.password,
+            phone: values.phone,
+          } as any);
+
           router.push({ pathname: '/(auth)/verify', params: { email: values.email } } as any);
         } catch (error: any) {
           console.error('Registration failed:', error.response?.data || error.message);

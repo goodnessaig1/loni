@@ -1,0 +1,153 @@
+[
+  {
+    "id": "understanding-loni",
+    "order": 1,
+    "title": "Understanding LONI",
+    "subtitle": "What LONI is and why your role matters.",
+    "icon": "understanding-icon",
+    "hero": "module1",
+    "layout": "checklist",
+    "sections": [
+      {
+        "title": "What LONI is",
+        "body": "LONI is a maternal support platform. It gives mothers AI pregnancy guidance, access to nurses through voice calls, and emergency transportation when they need to get to care quickly."
+      },
+      {
+        "title": "The Driver's role",
+        "body": "As a LONI Driver, you provide safe, calm emergency transportation. You receive a request, pick up the mother, and take her to her selected or assigned hospital."
+      },
+      {
+        "title": "Why safe transportation matters",
+        "body": "A mother in an emergency relies on you. Calm, careful driving and respectful support can make a real difference to her safety and wellbeing."
+      }
+    ]
+  },
+  {
+    "id": "basic-rules-of-safe-driving",
+    "order": 2,
+    "title": "Basic Rules of Safe Driving",
+    "subtitle": "The habits that keep every trip safe.",
+    "icon": "basic-rules-icon",
+    "hero": "module2",
+    "layout": "checklist",
+    "sections": [
+      {
+        "title": "Defensive driving",
+        "body": "Anticipate hazards before they happen. Keep a safe following distance and always be ready to react."
+      },
+      {
+        "title": "Speed awareness",
+        "body": "Respect speed limits and slow down near hospitals, schools, and busy areas. Arriving safely matters more than arriving fast."
+      },
+      {
+        "title": "Seatbelts",
+        "body": "Wear your seatbelt at all times and make sure every passenger is buckled before you move."
+      },
+      {
+        "title": "Avoid distractions",
+        "body": "Do not use your phone while driving. Set navigation before you move and pull over safely if you need to adjust it."
+      },
+      {
+        "title": "Difficult weather",
+        "body": "In rain or poor visibility, reduce speed, increase following distance, and use your lights."
+      }
+    ]
+  },
+  {
+    "id": "supporting-a-mother",
+    "order": 3,
+    "title": "Supporting a Mother",
+    "subtitle": "How to care for a mother respectfully.",
+    "icon": "supporting-a-mother-icon",
+    "hero": "module3",
+    "layout": "checklist",
+    "sections": [
+      {
+        "title": "Treat mothers respectfully",
+        "body": "Speak kindly and give the mother space. Ask before helping and never rush her."
+      },
+      {
+        "title": "Protect privacy",
+        "body": "Never share a mother's name, destination, or situation with anyone else. What happens on a trip stays private."
+      },
+      {
+        "title": "Communicate calmly",
+        "body": "A calm voice helps a worried mother feel safe. Explain what you're doing in simple, reassuring words."
+      },
+      {
+        "title": "Help her enter and exit",
+        "body": "Open the door and offer a steady hand or arm if needed. Be patient and let her move at her own pace."
+      },
+      {
+        "title": "What you should and should not do",
+        "body": "You are NOT a medical professional. Do not diagnose, treat, or give medical advice. Your job is safe, calm transport - if a mother needs medical help, get her to care and alert support."
+      }
+    ]
+  },
+  {
+    "id": "how-to-pick-up-a-mother",
+    "order": 4,
+    "title": "How to Pick Up a Mother",
+    "subtitle": "The exact LONI pickup flow, step by step.",
+    "icon": "how-to-pick-a-mother-icon",
+    "hero": "module4",
+    "layout": "checklist",
+    "sections": [
+      {
+        "title": "The flow",
+        "body": "Request received -> Accept request -> Navigate to pickup -> Arrive -> Confirm mother -> Start trip."
+      },
+      {
+        "title": "Navigate to pickup",
+        "body": "Start navigation as soon as you accept. Share your ETA so the mother knows when to expect you."
+      },
+      {
+        "title": "Arrive",
+        "body": "Pull up safely at the pickup point and mark that you've arrived."
+      },
+      {
+        "title": "Confirm the mother",
+        "body": "Before she gets in, confirm you have the right passenger. Gently ask her name and match it to the request. This prevents picking up the wrong person."
+      },
+      {
+        "title": "Start the trip",
+        "body": "Only start the trip once the mother is safely seated and buckled in."
+      }
+    ]
+  },
+  {
+    "id": "payments-safety-no-tip-policy",
+    "order": 5,
+    "title": "Payments, Safety & LONI's No-Tip Policy",
+    "subtitle": "Safety comes first. Your safety and the mother's safety come before completing a trip. LONI handles the mother's payment. Learn what you must never ask for, and how to report payment issues.",
+    "icon": "payment-safety-icon",
+    "hero": "module5",
+    "layout": "reading",
+    "sections": [
+      {
+        "title": "Your Safety",
+        "bullets": [
+          "Always follow traffic laws.",
+          "Never speed because a trip is marked as an emergency.",
+          "Never use a phone while driving unless using a safe hands-free method.",
+          "Always wear a seatbelt.",
+          "Ensure the mother has access to a seatbelt where applicable.",
+          "Never drive when tired, impaired, or unable to drive safely.",
+          "Keep the vehicle roadworthy.",
+          "Do not allow unsafe passengers or situations.",
+          "If continuing the trip would put anyone in immediate danger, prioritize safety and contact LONI."
+        ]
+      },
+      {
+        "title": "When Something Goes Wrong",
+        "body": "Report issues through LONI rather than trying to resolve serious problems yourself.",
+        "note": "You are not a medical professional. If the mother appears to require medical attention, follow LONI's emergency procedure and contact emergency support - do not attempt treatment."
+      },
+      {
+        "title": "How Payment Works",
+        "body": "You don't need to collect payment from the mother. LONI manages the payment process.",
+        "note": "Remain professional regardless of whether a mother offers a tip. If LONI's policy does not support tips, politely decline."
+      }
+    ]
+  }
+]
