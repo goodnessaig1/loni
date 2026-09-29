@@ -13,7 +13,7 @@ import { setupCallKeep } from '../lib/callKeepService';
 import { setupVoipPush } from '../lib/voipPush';
 import { requestMicrophonePermission } from '../lib/permissions';
 import { handleAccountApproved, registerAuthRefresh } from '../lib/accountStatus';
-import { applyServerRideEvent, parseRideData, acceptRideDirect, declineRideDirect } from '../lib/rideEvents';
+import { applyServerRideEvent, parseRideData, acceptRideDirect, declineRideDirect, openRideRequest } from '../lib/rideEvents';
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -194,7 +194,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'ride_decline') {
           try { await declineRideDirect(rideId); } catch {}
         } else if (type === EventType.PRESS) {
-          router.push(`/driver/request/${rideId}`);
+          openRideRequest(rideId);
         }
         return;
       }
@@ -267,7 +267,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       } else if (typeof t === 'string' && t.startsWith('ride_')) {
         const parsed = parseRideData(remoteMessage.data);
         const rideId = Number(parsed.ride_id ?? parsed.id);
-        if (t === 'ride_request') router.push(`/driver/request/${rideId}`);
+        if (t === 'ride_request') openRideRequest(rideId);
         else if (['ride_accepted', 'ride_started', 'ride_driver_arrived'].includes(t)) {
           router.push(`/driver/trip/${rideId}`);
         }

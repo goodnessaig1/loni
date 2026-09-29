@@ -45,6 +45,8 @@ def _ride_to_response(ride, *, viewer_id: str) -> dict:
         "arrived_at": ride.arrived_at,
         "started_at": ride.started_at,
         "completed_at": ride.completed_at,
+        "rider_rating": ride.rider_rating,
+        "driver_rating": ride.driver_rating,
         "rider": _rider_info(rider).model_dump() if rider else None,
         "driver": _driver_info(driver, getattr(driver, "driver_profile", None)).model_dump() if driver else None,
     }

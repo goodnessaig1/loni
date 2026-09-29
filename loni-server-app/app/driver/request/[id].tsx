@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { MapView, Marker, Polyline, PROVIDER_GOOGLE, MAPS_AVAILABLE } from '../../../components/MapsCompat';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,17 +26,24 @@ export default function RideRequestSheet() {
   const [busy, setBusy] = useState<'accept' | 'decline' | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(offer?.expires_in_seconds ?? 30);
 
+  const closed = useRef(false);
+  const closeOnce = () => {
+    if (closed.current) return;
+    closed.current = true;
+    router.back();
+  };
+
   // Countdown; auto-close when it runs out or the offer is pulled (ride_taken).
   useEffect(() => {
     const t = setInterval(() => setSecondsLeft((v) => Math.max(0, v - 1)), 1000);
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
-    if (!offer && !busy) router.back();
-  }, [offer, busy, router]);
+    if (!offer && !busy) closeOnce();
+  }, [offer, busy]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (secondsLeft <= 0 && !busy) router.back();
-  }, [secondsLeft, busy, router]);
+    if (secondsLeft <= 0 && !busy) closeOnce();
+  }, [secondsLeft, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const routeCoords = useMemo(() => {
     // We only have straight pickup/dropoff here; draw a simple line.
@@ -57,18 +64,20 @@ export default function RideRequestSheet() {
 
   const onAccept = async () => {
     setBusy('accept');
+    closed.current = true; // we're navigating away deliberately
     try {
       await acceptRideDirect(rideId);
       router.replace(`/driver/trip/${rideId}`);
     } catch (e: any) {
+      closed.current = false;
       setBusy(null);
-      router.back();
+      Alert.alert('Could not accept', e?.message || 'This request may have been taken or cancelled.');
     }
   };
 
   const onDecline = async () => {
     setBusy('decline');
-    try { await declineRideDirect(rideId); } finally { router.back(); }
+    try { await declineRideDirect(rideId); } finally { closeOnce(); }
   };
 
   return (
@@ -93,6 +102,14 @@ export default function RideRequestSheet() {
             </Marker>
             <Polyline coordinates={routeCoords} strokeColor={PINK} strokeWidth={4} />
           </MapView>
+          {!MAPS_AVAILABLE && (
+            <View style={styles.mapFallback}>
+              <MaterialCommunityIcons name="map-marker-path" size={26} color="#9CA3AF" />
+              <HelixaText style={styles.mapFallbackText}>
+                {(offer.pickup_address || 'Pickup')} → {(offer.dropoff_name || 'Hospital')}
+              </HelixaText>
+            </View>
+          )}
           <View style={styles.timerPill}>
             <Feather name="clock" size={13} color="#FFF" />
             <HelixaText weight="bold" style={styles.timerText}>{secondsLeft}s</HelixaText>
@@ -143,7 +160,9 @@ const styles = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#FFF', borderTopLeftRadius: 28, borderTopRightRadius: 28, overflow: 'hidden' },
   grabber: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: '#E5E7EB', marginTop: 10 },
-  mapWrap: { height: 180, marginTop: 12, marginHorizontal: 16, borderRadius: 18, overflow: 'hidden', backgroundColor: '#EEF' },
+  mapWrap: { height: 180, marginTop: 12, marginHorizontal: 16, borderRadius: 18, overflow: 'hidden', backgroundColor: '#E9EAEE' },
+  mapFallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 20 },
+  mapFallbackText: { fontSize: 13, color: '#6B7280', textAlign: 'center' },
   timerPill: {
     position: 'absolute', top: 10, right: 10, flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5,

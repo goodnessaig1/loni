@@ -103,7 +103,11 @@ class Settings(BaseSettings):
     # in SEARCHING before we widen the search once more / give up.
     RIDE_SEARCH_RADIUS_KM: float = 8.0
     RIDE_SEARCH_RADIUS_MAX_KM: float = 20.0
-    RIDE_OFFER_TIMEOUT_SECONDS: int = 30
+    # How long each dispatch round waits for a driver to accept. The
+    # dispatcher runs two rounds before giving up with NO_DRIVERS. If no
+    # driver is within radius the request still goes to the nearest online
+    # driver(s), so NO_DRIVERS means nobody is online at all.
+    RIDE_OFFER_TIMEOUT_SECONDS: int = 120
     
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

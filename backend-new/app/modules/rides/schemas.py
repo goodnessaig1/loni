@@ -145,6 +145,9 @@ class RideResponse(BaseModel):
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
+    rider_rating: Optional[int] = None    # mother -> driver
+    driver_rating: Optional[int] = None   # driver -> mother
+
     rider: Optional[RiderInfo] = None
     driver: Optional[DriverInfo] = None
 

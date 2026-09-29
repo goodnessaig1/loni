@@ -26,8 +26,14 @@ export default function TripComplete() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  // Already rated (e.g. re-opened from Recent Activity)? skip the form.
+  const alreadyRated = ride?.driver_rating != null;
+
   useEffect(() => {
-    ridesApi.get(rideId).then(setRide).catch(() => {});
+    ridesApi.get(rideId).then((r) => {
+      setRide(r);
+      if (r.driver_rating != null) { setRating(r.driver_rating); setDone(true); }
+    }).catch(() => {});
   }, [rideId]);
 
   const submit = async () => {
@@ -60,7 +66,7 @@ export default function TripComplete() {
           <HelixaText style={styles.earnMeta}>{km(ride?.distance_meters)} trip</HelixaText>
         </View>
 
-        {!done ? (
+        {!done && !alreadyRated ? (
           <>
             <HelixaText weight="bold" style={styles.rateLabel}>Rate your passenger</HelixaText>
             <View style={styles.stars}>
@@ -79,9 +85,23 @@ export default function TripComplete() {
             </Pressable>
           </>
         ) : (
-          <Pressable style={styles.primary} onPress={finish}>
-            <HelixaText weight="bold" style={styles.primaryText}>Back to dashboard</HelixaText>
-          </Pressable>
+          <>
+            {(done || alreadyRated) && (
+              <View style={styles.starsReadonly}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <MaterialCommunityIcons
+                    key={n}
+                    name={n <= rating ? 'star' : 'star-outline'}
+                    size={22}
+                    color={n <= rating ? '#FFC53D' : '#D1D5DB'}
+                  />
+                ))}
+              </View>
+            )}
+            <Pressable style={styles.primary} onPress={finish}>
+              <HelixaText weight="bold" style={styles.primaryText}>Back to dashboard</HelixaText>
+            </Pressable>
+          </>
         )}
       </View>
     </SafeAreaView>
@@ -97,6 +117,7 @@ const styles = StyleSheet.create({
   earnCard: { backgroundColor: '#F9FAFB', borderRadius: 20, paddingVertical: 24, paddingHorizontal: 40, alignItems: 'center', marginBottom: 20 },
   earnLabel: { fontSize: 13, color: '#6B7280' },
   earnValue: { fontSize: 32, color: PINK, marginVertical: 6 },
+  starsReadonly: { flexDirection: 'row', gap: 6, marginVertical: 4 },
   earnMeta: { fontSize: 13, color: '#9CA3AF' },
   rateLabel: { fontSize: 15, color: '#111', marginTop: 8 },
   stars: { flexDirection: 'row', gap: 10, marginVertical: 12 },

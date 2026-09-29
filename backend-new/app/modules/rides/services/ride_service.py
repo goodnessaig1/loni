@@ -127,6 +127,8 @@ def _ride_payload(ride: Ride, *, rider: Optional[User] = None,
         "arrived_at": ride.arrived_at.isoformat() if ride.arrived_at else None,
         "started_at": ride.started_at.isoformat() if ride.started_at else None,
         "completed_at": ride.completed_at.isoformat() if ride.completed_at else None,
+        "rider_rating": ride.rider_rating,
+        "driver_rating": ride.driver_rating,
     }
     ri = _rider_info(rider)
     di = _driver_info(driver, driver_profile)
@@ -260,24 +262,31 @@ class RideService:
                 DriverProfile.active_ride_id.is_(None),
             )
         )
-        out: list[tuple[User, DriverProfile, Optional[int]]] = []
+        eligible: list[tuple[User, DriverProfile, Optional[int]]] = []
+        within: list[tuple[User, DriverProfile, Optional[int]]] = []
         for user, profile in res.all():
             if user.id in exclude:
                 continue
             if profile.current_lat is None or profile.current_lng is None:
-                # Driver is online but hasn't reported a GPS fix yet (location
-                # perms not granted, or the app build predates location). Still
-                # offer them the ride - we just can't rank them by distance or
-                # pre-compute their route to pickup.
-                out.append((user, profile, None))
+                # Online but no GPS fix yet - offer anyway, can't rank by distance.
+                eligible.append((user, profile, None))
+                within.append((user, profile, None))
                 continue
             dist = haversine_meters(
                 ride.pickup_lat, ride.pickup_lng, profile.current_lat, profile.current_lng
             )
+            eligible.append((user, profile, dist))
             if dist <= radius_km * 1000:
-                out.append((user, profile, dist))
-        out.sort(key=lambda t: (t[2] is None, t[2] or 0))
-        return out
+                within.append((user, profile, dist))
+
+        # Prefer drivers inside the radius; but if none qualify (common in
+        # dev when emulators default to far-apart locations, and a valid
+        # "nobody nearby but here's the closest" case in prod), fall back to
+        # every eligible driver, nearest first. NO_DRIVERS then means there
+        # is genuinely nobody online.
+        chosen = within if within else eligible
+        chosen.sort(key=lambda t: (t[2] is None, t[2] or 0))
+        return chosen
 
     @staticmethod
     async def _dispatch(db: AsyncSession, ride: Ride, radius_km: float) -> int:
@@ -299,8 +308,8 @@ class RideService:
 
         candidates = await RideService._candidate_drivers(db, ride, radius_km, exclude)
         logger.info(
-            "dispatch ride=%s radius=%skm: %s online+available driver(s), %s within range/eligible",
-            ride.id, radius_km, online_total, len(candidates),
+            "dispatch ride=%s: %s online+available driver(s) total, offering to %s (excl. %s already offered)",
+            ride.id, online_total, len(candidates), len(exclude),
         )
         if not candidates:
             return 0
@@ -355,36 +364,31 @@ class RideService:
 
     @staticmethod
     async def _offer_timeout_watchdog(ride_id: int):
-        await asyncio.sleep(settings.RIDE_OFFER_TIMEOUT_SECONDS)
-        async with AsyncSessionLocal() as db:
-            res = await db.execute(select(Ride).where(Ride.id == ride_id).with_for_update())
-            ride = res.scalar_one_or_none()
-            if not ride or ride.status != RideStatusEnum.SEARCHING:
-                return
-            # Expire the outstanding offers and try once more with a wider net.
-            offers = (await db.execute(
-                select(RideOffer).where(
-                    RideOffer.ride_id == ride_id,
-                    RideOffer.status == RideOfferStatusEnum.OFFERED,
-                )
-            )).scalars().all()
-            for o in offers:
-                o.status = RideOfferStatusEnum.EXPIRED
-                o.responded_at = datetime.now(timezone.utc)
-            await db.commit()
+        # Two rounds: after the first timeout we re-offer (drivers who were
+        # already offered stay offered, plus any new ones). Only after the
+        # second timeout with still nobody eligible do we give up.
+        for round_no in range(2):
+            await asyncio.sleep(settings.RIDE_OFFER_TIMEOUT_SECONDS)
+            async with AsyncSessionLocal() as db:
+                res = await db.execute(select(Ride).where(Ride.id == ride_id).with_for_update())
+                ride = res.scalar_one_or_none()
+                if not ride or ride.status != RideStatusEnum.SEARCHING:
+                    return  # accepted / cancelled - done
 
-            widened = await RideService._dispatch(db, ride, settings.RIDE_SEARCH_RADIUS_MAX_KM)
-            if widened == 0:
-                await RideService._mark_no_drivers(db, ride_id)
-            else:
-                # Final deadline.
-                async def _final():
-                    await asyncio.sleep(settings.RIDE_OFFER_TIMEOUT_SECONDS)
-                    async with AsyncSessionLocal() as db2:
-                        r = (await db2.execute(select(Ride).where(Ride.id == ride_id))).scalar_one_or_none()
-                        if r and r.status == RideStatusEnum.SEARCHING:
-                            await RideService._mark_no_drivers(db2, ride_id)
-                asyncio.create_task(_final())
+                # Any drivers offered and not yet resolved? keep waiting on them.
+                pending = (await db.execute(
+                    select(func.count(RideOffer.id)).where(
+                        RideOffer.ride_id == ride_id,
+                        RideOffer.status == RideOfferStatusEnum.OFFERED,
+                    )
+                )).scalar() or 0
+
+                # Re-dispatch to pick up anyone who came online since.
+                new_offered = await RideService._dispatch(db, ride, settings.RIDE_SEARCH_RADIUS_MAX_KM)
+
+                if pending == 0 and new_offered == 0 and round_no == 1:
+                    await RideService._mark_no_drivers(db, ride_id)
+                    return
 
     @staticmethod
     async def _alert_contacts(rider_id: str, ride_id: int):

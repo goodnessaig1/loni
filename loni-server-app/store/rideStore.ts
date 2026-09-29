@@ -85,6 +85,8 @@ export interface Ride {
   route_polyline?: string | null;
   fare_estimate?: number | null;
   fare_final?: number | null;
+  rider_rating?: number | null;
+  driver_rating?: number | null;
   rider?: RiderInfo | null;
   driver?: DriverInfo | null;
   next_route?: RouteInfo | null;

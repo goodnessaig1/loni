@@ -1,9 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Pressable, ActivityIndicator, Linking, Platform } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import { View, StyleSheet, Pressable, ActivityIndicator, Linking, Platform, Alert } from 'react-native';
 import * as Location from 'expo-location';
-import * as Speech from 'expo-speech';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MapView, Marker, Polyline, PROVIDER_GOOGLE, MAPS_AVAILABLE } from '../../../components/MapsCompat';
+
+// expo-speech is optional too - guard so a build without it doesn't crash.
+let Speech: { speak: (t: string, o?: any) => void; stop: () => void };
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  Speech = require('expo-speech');
+} catch {
+  Speech = { speak: () => {}, stop: () => {} };
+}
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -33,7 +41,7 @@ export default function TripNavigation() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const rideId = Number(id);
   const router = useRouter();
-  const mapRef = useRef<MapView | null>(null);
+  const mapRef = useRef<any>(null);
 
   const ride = useRideStore((s) => s.ride);
   const setRide = useRideStore((s) => s.setRide);
@@ -86,6 +94,21 @@ export default function TripNavigation() {
       }
     })();
     return () => { alive = false; };
+  }, [rideId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- keep the ride state fresh (WS/FCM may not land) ---------------
+  useEffect(() => {
+    const poll = setInterval(async () => {
+      try {
+        const r = await ridesApi.get(rideId);
+        patchRide(r);
+        if (['COMPLETED', 'CANCELLED'].includes(r.status)) {
+          Speech.stop();
+          router.replace(r.status === 'COMPLETED' ? `/driver/trip/${rideId}/complete` : '/(driver)');
+        }
+      } catch { /* keep going */ }
+    }, 6000);
+    return () => clearInterval(poll);
   }, [rideId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- position stream ------------------------------------------------
@@ -149,7 +172,7 @@ export default function TripNavigation() {
 
   // --- camera follow -----------------------------------------------
   useEffect(() => {
-    if (!pos || !mapRef.current) return;
+    if (!MAPS_AVAILABLE || !pos || !mapRef.current?.animateCamera) return;
     mapRef.current.animateCamera(
       {
         center: { latitude: pos.latitude, longitude: pos.longitude },
@@ -185,8 +208,8 @@ export default function TripNavigation() {
         Speech.stop();
         router.replace(`/driver/trip/${rideId}/complete`);
       }
-    } catch (e) {
-      /* surface via toast in a later pass */
+    } catch (e: any) {
+      Alert.alert('Action failed', e?.response?.data?.message || e?.message || 'Please try again.');
     } finally {
       setActing(false);
     }
@@ -258,6 +281,14 @@ export default function TripNavigation() {
         </Marker>
       </MapView>
 
+      {!MAPS_AVAILABLE && (
+        <SafeAreaView edges={['top']} style={styles.noMap} pointerEvents="none">
+          <MaterialCommunityIcons name="navigation-variant" size={30} color="#6B7280" />
+          <HelixaText style={styles.noMapText}>{headline}</HelixaText>
+          <HelixaText style={styles.noMapSub}>Map view needs an app rebuild with react-native-maps</HelixaText>
+        </SafeAreaView>
+      )}
+
       {/* Maneuver banner */}
       <SafeAreaView edges={['top']} style={styles.topSafe}>
         <View style={styles.banner}>
@@ -277,9 +308,13 @@ export default function TripNavigation() {
         )}
       </SafeAreaView>
 
-      <Pressable style={styles.recenter} onPress={() => pos && mapRef.current?.animateCamera({ center: pos, zoom: 17, pitch: 45 })}>
-        <MaterialCommunityIcons name="crosshairs-gps" size={20} color="#111" />
-      </Pressable>
+      {MAPS_AVAILABLE && (
+        <Pressable
+          style={styles.recenter}
+          onPress={() => pos && mapRef.current?.animateCamera?.({ center: pos, zoom: 17, pitch: 45 })}>
+          <MaterialCommunityIcons name="crosshairs-gps" size={20} color="#111" />
+        </Pressable>
+      )}
       <Pressable style={styles.extNav} onPress={openExternalNav}>
         <MaterialCommunityIcons name="google-maps" size={18} color="#111" />
         <HelixaText style={styles.extNavText}>Google Maps</HelixaText>
@@ -313,8 +348,11 @@ export default function TripNavigation() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E5E7EB' },
+  container: { flex: 1, backgroundColor: '#E9EAEE' },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF' },
+  noMap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 40, paddingTop: 120 },
+  noMapText: { fontSize: 18, color: '#374151', textAlign: 'center' },
+  noMapSub: { fontSize: 12, color: '#9CA3AF', textAlign: 'center' },
   topSafe: { position: 'absolute', top: 0, left: 0, right: 0 },
   banner: {
     flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#111',

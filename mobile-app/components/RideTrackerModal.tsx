@@ -134,7 +134,7 @@ export default function RideTrackerModal({ onClose }: RideTrackerModalProps) {
           </View>
         )}
 
-        {st === 'COMPLETED' && (
+        {st === 'COMPLETED' && ride?.rider_rating == null && (
           <View style={styles.ratingRow}>
             <HelixaText style={styles.ratingLabel}>Rate your driver</HelixaText>
             <View style={{ flexDirection: 'row', gap: 6 }}>
@@ -146,6 +146,21 @@ export default function RideTrackerModal({ onClose }: RideTrackerModalProps) {
                     color={n <= rating ? '#FFC53D' : '#6B7280'}
                   />
                 </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+        {st === 'COMPLETED' && ride?.rider_rating != null && (
+          <View style={styles.ratingRow}>
+            <HelixaText style={styles.ratingLabel}>Thanks for rating</HelixaText>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <MaterialCommunityIcons
+                  key={n}
+                  name={n <= (ride.rider_rating || 0) ? 'star' : 'star-outline'}
+                  size={20}
+                  color={n <= (ride.rider_rating || 0) ? '#FFC53D' : '#6B7280'}
+                />
               ))}
             </View>
           </View>
@@ -172,7 +187,7 @@ export default function RideTrackerModal({ onClose }: RideTrackerModalProps) {
             )}
             <TouchableOpacity
               style={[styles.doneBtn, busy && { opacity: 0.6 }]}
-              onPress={st === 'COMPLETED' ? submitRating : handleDismiss}
+              onPress={st === 'COMPLETED' && ride?.rider_rating == null ? submitRating : handleDismiss}
               disabled={busy}>
               <HelixaText style={styles.doneBtnText}>{st === 'COMPLETED' ? 'Done' : 'Dismiss'}</HelixaText>
             </TouchableOpacity>

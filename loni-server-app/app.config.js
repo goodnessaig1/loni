@@ -1,15 +1,20 @@
 // Dynamic config layer over app.json.
 //
-// The only thing this does today is inject the Google Maps API key
-// (used by react-native-maps for the driver's turn-by-turn navigation and
-// the mother's live-tracking map) from an environment variable, so the key
-// never has to be committed. Set it in `.env` / your EAS build env:
+// Injects the Google Maps API key (react-native-maps, used for the driver's
+// turn-by-turn navigation and the mother's live-tracking map) from an
+// environment variable so the key is never committed. Set it in `.env` /
+// your EAS build env:
 //
 //   EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIza...
 //
-// Everything else still comes from app.json.
+// When no key is set we deliberately DON'T write an empty
+// `com.google.android.geo.API_KEY` meta-data entry - an empty value makes
+// the Maps SDK throw "API key not found" on the first <MapView> render.
+// (The app keeps working; the ride screens just show a non-map fallback -
+// see components/MapsCompat.tsx.)
 module.exports = ({ config }) => {
-  const googleMapsApiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+  const googleMapsApiKey = (process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '').trim();
+  if (!googleMapsApiKey) return config;
 
   return {
     ...config,

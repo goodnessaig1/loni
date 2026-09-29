@@ -76,6 +76,21 @@ export async function declineRideDirect(rideId: number): Promise<void> {
   }
 }
 
+// `ride_request` is delivered over BOTH the WebSocket and FCM (by design),
+// so without this guard the request sheet gets pushed twice.
+let lastPushedRideId = 0;
+let lastPushedAt = 0;
+
+/** Open the request sheet for a ride, at most once per ride per minute. */
+export function openRideRequest(rideId: number) {
+  if (!rideId) return;
+  const now = Date.now();
+  if (lastPushedRideId === rideId && now - lastPushedAt < 60_000) return;
+  lastPushedRideId = rideId;
+  lastPushedAt = now;
+  router.push(`/driver/request/${rideId}`);
+}
+
 export function applyServerRideEvent(type: string, raw: any) {
   const store = useRideStore.getState();
   const data = parseRideData(raw);
@@ -91,7 +106,7 @@ export function applyServerRideEvent(type: string, raw: any) {
       }
       store.upsertOffer(toOffer(data));
       // Emergency: surface the request immediately when the app is open.
-      router.push(`/driver/request/${rideId}`);
+      openRideRequest(rideId);
       return;
     }
 
