@@ -1,6 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { API_URL } from './client';
 import { applyServerCallEvent } from '../lib/callEvents';
+import { handleAccountApproved } from '../lib/accountStatus';
+import { applyServerRideEvent } from '../lib/rideEvents';
 
 /**
  * Real-time call signaling socket (Issue 1, 2, 8, 10, 11).
@@ -69,6 +71,14 @@ export async function connectCallSocket(): Promise<void> {
     try {
       const msg = JSON.parse(event.data as string);
       if (msg.type === 'pong') return;
+      if (msg.type === 'account_status') {
+        if (msg.data?.account_status === 'active') handleAccountApproved();
+        return;
+      }
+      if (typeof msg.type === 'string' && msg.type.startsWith('ride_')) {
+        applyServerRideEvent(msg.type, msg.data);
+        return;
+      }
       applyServerCallEvent(msg.type, msg.data);
     } catch (e) {
       console.warn('[CallSocket] malformed message', e);

@@ -14,7 +14,39 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    openapi_tags=[
+        {
+            "name": "driver-training",
+            "description": (
+                "Driver signup: pre-trip training modules, the aptitude test "
+                "(random 10 questions, 3 attempts, answers never exposed), and "
+                "the onboarding state machine that tells the app which screen "
+                "to show. `POST /driver-training/start` begins the flow."
+            ),
+        },
+        {
+            "name": "admin-aptitude",
+            "description": (
+                "Admin-only management of the aptitude question bank - CRUD, "
+                "per-question visibility toggle, re-seed, and the attempts log. "
+                "These responses DO include the correct answer."
+            ),
+        },
+        {
+            "name": "rides",
+            "description": (
+                "Emergency ride dispatch. A mother calls `POST /rides/request`; "
+                "the backend fans the request out to nearby online drivers as "
+                "offers, first-accept-wins. State transitions (accepted, "
+                "arrived, started, completed, cancelled) and the driver's live "
+                "location are pushed over the same `/calls/ws` socket (with FCM "
+                "as the backgrounded-app fallback). Google Maps powers routing, "
+                "ETA and nearest-hospital lookup; falls back to straight-line "
+                "estimates when `GOOGLE_MAPS_API_KEY` is unset."
+            ),
+        },
+    ],
 )
 
 import certifi

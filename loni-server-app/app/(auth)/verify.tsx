@@ -15,6 +15,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { useVerifyEmail, useResendOtp, useAuth } from '../../hooks/useAuth';
+import { getPostAuthRoute } from '../../lib/driverOnboarding';
 import { useEffect } from 'react';
 
 export default function VerifyScreen() {
@@ -27,25 +28,7 @@ export default function VerifyScreen() {
 
   useEffect(() => {
     if (user) {
-      if (user.user_type === 'nurse') {
-        if (!user.nurse_profile) {
-          router.replace('/(auth)/complete-profile-nurse');
-        } else if (user.account_status === 'pending') {
-          router.replace('/(auth)/verification-progress');
-        } else {
-          router.replace('/(tabs)');
-        }
-      } else if (user.user_type === 'driver') {
-        if (!user.driver_profile) {
-          router.replace('/(auth)/complete-profile-vehicle');
-        } else if (user.account_status === 'pending') {
-          router.replace('/(auth)/verification-progress');
-        } else {
-          router.replace('/(tabs)');
-        }
-      } else {
-        router.replace('/(auth)/role-selection');
-      }
+      router.replace(getPostAuthRoute(user));
     }
   }, [user]);
 
@@ -87,6 +70,7 @@ export default function VerifyScreen() {
         otp: code.join(''),
         type: 'email_verification'
       });
+
       // Navigation is handled by the useEffect above when user context updates
     } catch (error: any) {
       console.error('Verification failed:', error.response?.data || error.message);

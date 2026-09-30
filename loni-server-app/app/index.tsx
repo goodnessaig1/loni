@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { View } from 'react-native';
 import { useAuth } from '../hooks/useAuth';
+import { getPostAuthRoute } from '../lib/driverOnboarding';
 import WebView from 'react-native-webview';
 
 export default function Index() {
@@ -24,30 +25,5 @@ export default function Index() {
     );
   }
 
-  if (user) {
-    if (user.user_type === 'user') {
-      return <Redirect href="/(auth)/role-selection" />;
-    } else if (user.user_type === 'nurse') {
-      if (!user.nurse_profile) {
-        return <Redirect href="/(auth)/complete-profile-nurse" />;
-      }
-      if (user.account_status === 'pending') {
-        return <Redirect href="/(auth)/verification-progress" />;
-      }
-      return <Redirect href="/(tabs)" />;
-    } else if (user.user_type === 'driver') {
-      if (!user.driver_profile) {
-        return <Redirect href="/(auth)/complete-profile-vehicle" />;
-      }
-      if (user.account_status === 'pending') {
-        return <Redirect href="/(auth)/verification-progress" />;
-      }
-      return <Redirect href="/(tabs)" />;
-    } else {
-      // Catch-all for any other roles trying to use the provider app
-      return <Redirect href="/(auth)/role-selection" />;
-    }
-  } else {
-    return <Redirect href="/(auth)" />;
-  }
+  return <Redirect href={getPostAuthRoute(user)} />;
 }

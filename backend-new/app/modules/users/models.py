@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Boolean, DateTime, Enum, Integer, ForeignKey, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Enum, Integer, Float, ForeignKey, JSON
 from sqlalchemy.orm import relationship as sa_relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -93,6 +93,10 @@ class DriverProfile(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(String(12), ForeignKey('users.id'), unique=True, nullable=False)
+    # Personal info step (collected during onboarding, before vehicle details).
+    full_name = Column(String(255), nullable=True)
+    date_of_birth = Column(String(50), nullable=True)
+    profile_photo = Column(String(500), nullable=True)
     vehicle_type = Column(String(100), nullable=True)
     has_ac = Column(Boolean, nullable=True)
     vehicle_brand = Column(String(100), nullable=True)
@@ -101,6 +105,29 @@ class DriverProfile(Base):
     plate_number = Column(String(100), nullable=True)
     vehicle_color = Column(String(100), nullable=True)
     verification_documents = Column(JSON, nullable=True)
+    # Set when the driver taps "Submit for Review" on the final step. Until then
+    # the profile rows exist but the application is still in progress.
+    submitted_at = Column(DateTime(timezone=True), nullable=True)
+
+    # --- Live dispatch state (emergency ride module) ---
+    # Last reported GPS fix, pushed by the driver app while online / on a
+    # trip via POST /rides/location. Used to pick the nearest driver and to
+    # stream the car's position to the waiting mother.
+    current_lat = Column(Float, nullable=True)
+    current_lng = Column(Float, nullable=True)
+    heading = Column(Float, nullable=True)  # degrees, 0-360
+    location_updated_at = Column(DateTime(timezone=True), nullable=True)
+    # "Accepting rides" - distinct from User.is_online ("app is open"). A
+    # driver on an active trip is is_online=True but is_available=False.
+    is_available = Column(Boolean, default=True, server_default='true', nullable=False)
+    active_ride_id = Column(Integer, nullable=True)
+    # Cumulative, updated on trip completion. rating_avg/count come from the
+    # mother's post-trip star rating.
+    rating_avg = Column(Float, default=0, nullable=False, server_default='0')
+    rating_count = Column(Integer, default=0, nullable=False, server_default='0')
+    total_trips = Column(Integer, default=0, nullable=False, server_default='0')
+    total_earnings = Column(Integer, default=0, nullable=False, server_default='0')  # whole Naira
+
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

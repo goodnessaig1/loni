@@ -6,23 +6,24 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import RideTrackerModal from '../../components/RideTrackerModal';
 import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
+import { useRideStore } from '../../store/rideStore';
+import { useActiveRideSync } from '../../hooks/useRides';
 
 export default function HomeTab() {
   const { user } = useAuth();
   const router = useRouter();
-  const params = useLocalSearchParams<{ startRide?: string }>();
-  const [rideActive, setRideActive] = React.useState(false);
   const [isInviteModalVisible, setIsInviteModalVisible] = React.useState(false);
 
-  React.useEffect(() => {
-    if (params.startRide === 'true') {
-      setRideActive(true);
-      // Clear the param so it doesn't re-trigger on remount, router.setParams isn't synchronously easy but this works for demo
-    }
-  }, [params.startRide]);
+  // The tracker is shown whenever there's a live ride in the store - set by
+  // the request screen, by `ride_*` WebSocket/FCM events, or rehydrated from
+  // the server on launch.
+  const ride = useRideStore((s) => s.ride);
+  const clearRide = useRideStore((s) => s.clear);
+  useActiveRideSync(!!user);
+  const rideActive = !!ride && ride.status !== 'IDLE';
 
   const hour = new Date().getHours();
   let greeting = 'Evening';
@@ -33,7 +34,7 @@ export default function HomeTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      {rideActive && <RideTrackerModal onClose={() => setRideActive(false)} />}
+      {rideActive && <RideTrackerModal onClose={() => clearRide('IDLE')} />}
       
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 120 }}>
 

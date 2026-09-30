@@ -65,6 +65,46 @@ registerCallForegroundService();
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   console.log('Background message received:', remoteMessage?.data?.type);
 
+  const rtype = remoteMessage?.data?.type;
+
+  // Emergency ride request while the app is backgrounded / killed (driver).
+  if (rtype === 'ride_request') {
+    const rideId = String(remoteMessage.data.ride_id || remoteMessage.data.id || '');
+    let pickup = remoteMessage.data.pickup_address || 'A mother';
+    let dropoff = remoteMessage.data.dropoff_name || 'hospital';
+    const channelId = await notifee.createChannel({
+      id: 'ride_requests',
+      name: 'Emergency Ride Requests',
+      vibration: true,
+      importance: AndroidImportance.HIGH,
+      sound: 'notification',
+    });
+    await notifee.displayNotification({
+      id: `ride-${rideId}`,
+      title: 'Emergency Transport Request',
+      body: `${pickup} → ${dropoff}. Tap to view.`,
+      data: { type: 'ride_request', ride_id: rideId },
+      android: {
+        channelId,
+        importance: AndroidImportance.HIGH,
+        category: AndroidCategory.CALL,
+        visibility: AndroidVisibility.PUBLIC,
+        fullScreenAction: { id: 'default', mainComponent: 'loni-server-app' },
+        pressAction: { id: 'default', launchActivity: 'default' },
+        actions: [
+          { title: 'Decline', pressAction: { id: 'ride_decline' } },
+          { title: 'Accept', pressAction: { id: 'ride_accept', launchActivity: 'default' } },
+        ],
+      },
+    });
+    return;
+  }
+  if (rtype === 'ride_taken' || rtype === 'ride_cancelled') {
+    const rideId = String(remoteMessage.data.ride_id || remoteMessage.data.id || '');
+    await notifee.cancelNotification(`ride-${rideId}`).catch(() => {});
+    return;
+  }
+
   if (remoteMessage.data && remoteMessage.data.type === 'incoming_call') {
     const callId = Number(remoteMessage.data.call_id);
     let callerName = remoteMessage.data.caller_name || 'Someone';
@@ -205,6 +245,33 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
  */
 notifee.onBackgroundEvent(async ({ type, detail }) => {
   const data = detail.notification?.data;
+
+  // Ride-request action presses (driver).
+  if (data?.type === 'ride_request') {
+    const rideId = Number(data.ride_id);
+    if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'ride_accept') {
+      await notifee.cancelNotification(detail.notification.id).catch(() => {});
+      try {
+        const { acceptRideDirect } = require('./lib/rideEvents');
+        await acceptRideDirect(rideId);
+      } catch (e) {
+        console.error('[Notifee/bg] ride accept failed', e);
+      }
+    } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'ride_decline') {
+      await notifee.cancelNotification(detail.notification.id).catch(() => {});
+      try {
+        const { declineRideDirect } = require('./lib/rideEvents');
+        await declineRideDirect(rideId);
+      } catch (e) {
+        console.error('[Notifee/bg] ride decline failed', e);
+      }
+    }
+    // PRESS (body tap): fullScreenAction/pressAction launches the app;
+    // NotificationContext's getInitialNotification handler routes to the
+    // request screen once foregrounded.
+    return;
+  }
+
   const callId = data?.call_id ? Number(data.call_id) : null;
   if (!callId) return;
 

@@ -49,6 +49,33 @@ class DriverProfileRequest(BaseModel):
 class ToggleOnlineRequest(BaseModel):
     is_online: bool
 
+
+# --- Incremental driver onboarding steps (JSON, files uploaded separately) ---
+class DriverPersonalInfoRequest(BaseModel):
+    full_name: str
+    date_of_birth: str
+    profile_photo: Optional[str] = None  # falls back to the user's profile picture
+
+
+class DriverVehicleInfoRequest(BaseModel):
+    vehicle_type: str
+    has_ac: bool
+    vehicle_brand: str
+    vehicle_year: str
+    vehicle_model: str
+    plate_number: str
+    vehicle_color: str
+    front_view: str
+    back_view: str
+    vin: str
+    interior: str
+
+
+class DriverDocumentsRequest(BaseModel):
+    driver_license: str
+    government_id: str
+    vehicle_papers: str
+
 class UpdateUserProfileRequest(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None

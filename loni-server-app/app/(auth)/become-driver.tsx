@@ -1,10 +1,5 @@
 import React from 'react';
-import { 
-  View, 
-  Pressable, 
-  StyleSheet,
-  ScrollView 
-} from 'react-native';
+import { View, Pressable, StyleSheet, ScrollView, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,10 +7,18 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useStartOnboarding } from '../../hooks/useDriverTraining';
 
 export default function BecomeDriverScreen() {
-  const handleContinue = () => {
-    router.push('/(auth)/complete-profile-driver');
+  const { mutateAsync: startOnboarding, isPending } = useStartOnboarding();
+
+  const handleContinue = async () => {
+    try {
+      await startOnboarding();
+      router.push('/(auth)/driver-training');
+    } catch (e: any) {
+      Alert.alert('Something went wrong', e?.message ?? 'Please try again.');
+    }
   };
 
   return (
@@ -48,9 +51,10 @@ export default function BecomeDriverScreen() {
           </View>
         </View>
 
-        <Button 
+        <Button
           title="Continue"
           onPress={handleContinue}
+          isLoading={isPending}
           style={styles.button}
         />
 

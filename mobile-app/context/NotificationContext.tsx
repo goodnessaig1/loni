@@ -6,6 +6,7 @@ import { AuthContext } from './AuthContext';
 import { apiClient } from '../api/client';
 import { connectCallSocket, disconnectCallSocket } from '../api/socket';
 import { applyServerCallEvent } from '../lib/callEvents';
+import { applyServerRideEvent } from '../lib/rideEvents';
 import { setupCallKeep } from '../lib/callKeepService';
 import { requestMicrophonePermission } from '../lib/permissions';
 
@@ -47,6 +48,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     const importMessaging = require('@react-native-firebase/messaging').default;
     const unsubscribeFirebase = importMessaging().onMessage(async (remoteMessage: any) => {
       const data = remoteMessage.data;
+      if (typeof data?.type === 'string' && data.type.startsWith('ride_')) {
+        applyServerRideEvent(data.type, data);
+        return;
+      }
       if (data?.type) {
         const parsed: any = { ...data };
         for (const key of ['caller', 'receiver']) {

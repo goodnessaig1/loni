@@ -23,8 +23,6 @@ export default function RoleSelectionScreen() {
       router.push('/(auth)/complete-profile-nurse');
     } else if (selectedRole === 'driver') {
       router.push('/(auth)/become-driver');
-    } else if (selectedRole) {
-      router.push('/(auth)/phone'); // Fallback for other roles
     }
   };
 

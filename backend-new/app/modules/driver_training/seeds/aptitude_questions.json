@@ -1,0 +1,288 @@
+[
+  {
+    "key": "purpose-of-loni",
+    "category": "understanding",
+    "question": "What is the core purpose of LONI?",
+    "options": [
+      "A general ride-hailing service",
+      "A maternal support platform for mothers",
+      "A food delivery network",
+      "A courier service"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "driver-primary-job",
+    "category": "understanding",
+    "question": "What is a LONI Driver's primary job?",
+    "options": [
+      "To negotiate fares with mothers",
+      "To provide medical diagnosis",
+      "To safely transport mothers to their hospital",
+      "To schedule appointments"
+    ],
+    "answer_index": 2,
+    "is_visible": true
+  },
+  {
+    "key": "drivers-are-not-medical",
+    "category": "supporting-a-mother",
+    "question": "Are LONI Drivers medical professionals?",
+    "options": [
+      "Yes, they can give medical advice",
+      "No, they only provide safe transport",
+      "Yes, they can prescribe treatment",
+      "Only during emergencies"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "treat-a-mother",
+    "category": "supporting-a-mother",
+    "question": "How should you treat a mother during a trip?",
+    "options": [
+      "Rush her to move faster",
+      "Share her details with others",
+      "Respectfully, and protect her privacy",
+      "Ignore her until you arrive"
+    ],
+    "answer_index": 2,
+    "is_visible": true
+  },
+  {
+    "key": "cannot-locate-mother",
+    "category": "pickup",
+    "question": "What should you do if you cannot locate the mother?",
+    "options": [
+      "Leave immediately",
+      "Cancel without notice",
+      "Use the call option, then follow LONI's procedure",
+      "Wait indefinitely without reporting"
+    ],
+    "answer_index": 2,
+    "is_visible": true
+  },
+  {
+    "key": "mother-appears-distressed",
+    "category": "supporting-a-mother",
+    "question": "If a mother appears distressed, you should...",
+    "options": [
+      "Ignore it and drive faster",
+      "Stay calm, reassure her, and alert support if needed",
+      "Ask her to exit the vehicle",
+      "Diagnose her condition"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "difficult-weather",
+    "category": "safe-driving",
+    "question": "In difficult weather you should...",
+    "options": [
+      "Drive faster to finish sooner",
+      "Reduce speed and increase following distance",
+      "Turn off your lights",
+      "Follow other cars closely"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "chat-with-mother",
+    "category": "supporting-a-mother",
+    "question": "Can you chat with the mother in-app?",
+    "options": [
+      "Yes, anytime about anything",
+      "No, communicate by voice call only if needed",
+      "Yes, to negotiate payment",
+      "Only about fares"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "before-starting-trip",
+    "category": "pickup",
+    "question": "What should you do before starting a trip?",
+    "options": [
+      "Confirm you have the correct passenger",
+      "Call support",
+      "Leave the pickup point",
+      "Set a new destination"
+    ],
+    "answer_index": 0,
+    "is_visible": true
+  },
+  {
+    "key": "pickup-flow-order",
+    "category": "pickup",
+    "question": "What is the correct LONI pickup flow?",
+    "options": [
+      "Accept request → Start trip → Navigate → Arrive",
+      "Request received → Accept request → Navigate to pickup → Arrive → Confirm mother → Start trip",
+      "Arrive → Confirm mother → Accept request → Start trip",
+      "Navigate → Start trip → Accept request → Arrive"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "when-to-start-trip",
+    "category": "pickup",
+    "question": "When should you start the trip?",
+    "options": [
+      "As soon as you arrive at the pickup point",
+      "Once the mother is safely seated and buckled in",
+      "Before the mother gets in, to save time",
+      "After you have driven a few minutes"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "protecting-privacy",
+    "category": "supporting-a-mother",
+    "question": "How should you handle a mother's personal information?",
+    "options": [
+      "Share it with family and friends",
+      "Post about the trip on social media",
+      "Never share her name, destination, or situation with anyone",
+      "Discuss it with other drivers"
+    ],
+    "answer_index": 2,
+    "is_visible": true
+  },
+  {
+    "key": "speed-and-emergencies",
+    "category": "safe-driving",
+    "question": "A trip is marked as an emergency. How fast should you drive?",
+    "options": [
+      "As fast as possible, ignoring speed limits",
+      "Within the speed limit, driving calmly and safely",
+      "Faster than usual through busy areas",
+      "Whatever speed the mother asks for"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "seatbelt-rule",
+    "category": "safe-driving",
+    "question": "What is the rule on seatbelts?",
+    "options": [
+      "Only the driver needs to wear one",
+      "Wear yours and make sure every passenger is buckled before you move",
+      "Seatbelts are optional on short trips",
+      "Only required on the highway"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "phone-while-driving",
+    "category": "safe-driving",
+    "question": "How should you use your phone while driving?",
+    "options": [
+      "Hold it to read messages at traffic lights",
+      "Do not use it; set navigation before you move and pull over safely to adjust",
+      "Use it freely since the app needs it",
+      "Only for calls to the mother"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "mother-needs-medical-help",
+    "category": "safety",
+    "question": "The mother appears to need medical attention. What do you do?",
+    "options": [
+      "Attempt first aid or treatment yourself",
+      "Give her medical advice",
+      "Follow LONI's emergency procedure and contact emergency support",
+      "Wait and see if it improves"
+    ],
+    "answer_index": 2,
+    "is_visible": true
+  },
+  {
+    "key": "confirm-the-mother",
+    "category": "pickup",
+    "question": "Why do you confirm the mother's name before she gets in?",
+    "options": [
+      "To make small talk",
+      "To make sure you are picking up the right person",
+      "To record it for LONI",
+      "It is not necessary"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "no-tip-policy",
+    "category": "payments",
+    "question": "A mother offers you a tip. What should you do?",
+    "options": [
+      "Insist on a larger amount",
+      "Remain professional and politely decline if LONI's policy does not support tips",
+      "Refuse to continue the trip without one",
+      "Ask for cash instead"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "who-handles-payment",
+    "category": "payments",
+    "question": "Who handles the mother's payment for a trip?",
+    "options": [
+      "The driver collects cash from the mother",
+      "LONI manages the payment process",
+      "The hospital pays the driver",
+      "Payment is arranged trip by trip"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "unfit-to-drive",
+    "category": "safety",
+    "question": "You feel tired and unfit to drive safely. What should you do?",
+    "options": [
+      "Accept the request anyway because it is an emergency",
+      "Do not drive; only drive when you are fit and the vehicle is roadworthy",
+      "Drive slowly with the windows down",
+      "Ask the mother to help you stay awake"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "something-goes-wrong",
+    "category": "safety",
+    "question": "Something serious goes wrong during a trip. What is the right step?",
+    "options": [
+      "Resolve the serious problem yourself",
+      "Report the issue through LONI and follow their guidance",
+      "End the trip and drive away",
+      "Ignore it and keep driving"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  },
+  {
+    "key": "helping-mother-in-out",
+    "category": "supporting-a-mother",
+    "question": "How should you help a mother enter or exit the vehicle?",
+    "options": [
+      "Pull her by the arm to speed things up",
+      "Open the door, offer a steady hand if needed, and let her move at her own pace",
+      "Stay in your seat and wait",
+      "Tell her to hurry"
+    ],
+    "answer_index": 1,
+    "is_visible": true
+  }
+]
