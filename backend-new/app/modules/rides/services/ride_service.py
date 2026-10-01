@@ -719,8 +719,23 @@ class RideService:
         if not ride:
             raise HTTPException(status_code=404, detail="Ride not found")
         if user_id not in (ride.rider_id, ride.driver_id):
-            raise HTTPException(status_code=403, detail="Not your ride")
+            if not (ride.notify_contacts and await RideService._is_connected_partner(db, ride.rider_id, user_id)):
+                raise HTTPException(status_code=403, detail="Not your ride")
         return ride
+
+    @staticmethod
+    async def _is_connected_partner(db: AsyncSession, rider_id: str, viewer_id: str) -> bool:
+        """True when `viewer_id` is an emergency contact of `rider_id` with
+        emergency alerts enabled - lets a connected partner track a ride the
+        mother chose to notify contacts about (see `_alert_contacts`)."""
+        res = await db.execute(
+            select(EmergencyContact.id).where(
+                EmergencyContact.user_id == rider_id,
+                EmergencyContact.contact_user_id == viewer_id,
+                EmergencyContact.emergency.is_(True),
+            )
+        )
+        return res.scalar_one_or_none() is not None
 
     @staticmethod
     async def active_ride(db: AsyncSession, user_id: str) -> Optional[Ride]:

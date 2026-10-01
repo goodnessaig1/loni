@@ -43,6 +43,8 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="(driver)" />
               <Stack.Screen name="driver" />
+              <Stack.Screen name="(partner)" />
+              <Stack.Screen name="partner" />
             </Stack>
             <CallModals />
             <StatusBar style="auto" />

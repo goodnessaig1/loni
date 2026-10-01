@@ -70,6 +70,9 @@ class EmergencyContact(Base):
     location = Column(Boolean, default=True, nullable=False)
     updates = Column(Boolean, default=True, nullable=False)
     emergency = Column(Boolean, default=True, nullable=False)
+    # Set once, in verify_partner_setup, when status flips to 'connected' -
+    # distinct from created_at (when the invite was sent).
+    connected_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = sa_relationship("User", foreign_keys=[user_id], back_populates="emergency_contacts")

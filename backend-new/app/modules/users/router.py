@@ -27,7 +27,9 @@ from app.modules.auth.email_service import (
     send_partner_removal_user_email,
     send_partner_removal_partner_email
 )
+from app.modules.rides.models import Ride, TERMINAL_STATUSES
 from app.utils.user_enrichment import enrich_user_data, calculate_pregnancy_start_date
+from app.utils.partner_content import get_latest_updates
 
 router = APIRouter()
 
@@ -163,6 +165,130 @@ async def get_emergency_contacts(
                 "created_at": contact.created_at
             })
     return {"success": True, "data": {"contacts": contacts_data}}
+
+@router.get("/partner-connection", response_model=StandardResponse)
+async def get_partner_connection(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    For a signed-in partner: who invited them and what that inviter has
+    chosen to share. Read-only from here - the inviter controls these
+    toggles via PATCH /emergency-contacts/{id}/permissions.
+    """
+    if current_user.user_type != UserTypeEnum.partner:
+        raise HTTPException(status_code=403, detail="Only partners have a connection to view")
+
+    stmt = select(EmergencyContact).where(
+        EmergencyContact.contact_user_id == current_user.id
+    ).options(selectinload(EmergencyContact.user))
+    result = await db.execute(stmt)
+    contact = result.scalars().first()
+
+    if not contact or not contact.user:
+        raise HTTPException(status_code=404, detail="No connection found")
+
+    return {
+        "success": True,
+        "data": {
+            "inviter_name": contact.user.name,
+            "relationship": contact.relationship,
+            "status": contact.status.value if contact.status else "pending",
+            "connected_at": contact.connected_at.isoformat() if contact.connected_at else None,
+            "location": contact.location,
+            "updates": contact.updates,
+            "emergency": contact.emergency,
+        }
+    }
+
+@router.get("/partner-dashboard", response_model=StandardResponse)
+async def get_partner_dashboard(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Everything the partner home screen needs in one call: who they're
+    connected to, her current pregnancy/recovery week, her latest
+    week-by-week updates (if shared), and any in-flight emergency ride she
+    asked her contacts to be notified about (if shared). There is no
+    "idle" location - a partner only ever sees where she is while she's
+    actually in an emergency ride with a driver, via `active_alert`.
+    """
+    if current_user.user_type != UserTypeEnum.partner:
+        raise HTTPException(status_code=403, detail="Only partners have a dashboard")
+
+    stmt = select(EmergencyContact).where(
+        EmergencyContact.contact_user_id == current_user.id
+    ).options(selectinload(EmergencyContact.user))
+    result = await db.execute(stmt)
+    contact = result.scalars().first()
+    if not contact or not contact.user:
+        raise HTTPException(status_code=404, detail="No connection found")
+
+    inviter = contact.user
+
+    current_week = None
+    if inviter.pregnancy_start_date:
+        start = inviter.pregnancy_start_date
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        diff_days = (datetime.now(timezone.utc) - start).total_seconds() / 86400
+        current_week = max(int(diff_days // 7), 0)
+
+    status_val = inviter.status.value if inviter.status else None
+
+    data: dict = {
+        "partner": {"name": current_user.name, "profile_picture": current_user.profile_picture},
+        "inviter": {
+            "id": inviter.id,
+            "name": inviter.name,
+            "profile_picture": inviter.profile_picture,
+            "status": status_val,
+            "week": current_week,
+        },
+        "sharing": {
+            "location": contact.location,
+            "updates": contact.updates,
+            "emergency": contact.emergency,
+        },
+        "updates": [],
+        "active_alert": None,
+    }
+
+    if contact.updates and current_week is not None and status_val:
+        data["updates"] = get_latest_updates(status_val, current_week)
+
+    if contact.emergency:
+        ride_stmt = select(Ride).where(
+            Ride.rider_id == inviter.id,
+            Ride.status.notin_(list(TERMINAL_STATUSES)),
+            Ride.notify_contacts.is_(True),
+        ).options(
+            selectinload(Ride.driver).selectinload(User.driver_profile)
+        ).order_by(Ride.requested_at.desc())
+        ride_result = await db.execute(ride_stmt)
+        ride = ride_result.scalars().first()
+        if ride:
+            driver_profile = getattr(ride.driver, "driver_profile", None)
+            driver_location = None
+            if driver_profile and driver_profile.current_lat is not None and driver_profile.current_lng is not None:
+                driver_location = {
+                    "lat": driver_profile.current_lat,
+                    "lng": driver_profile.current_lng,
+                    "updated_at": driver_profile.location_updated_at.isoformat() if driver_profile.location_updated_at else None,
+                }
+            data["active_alert"] = {
+                "ride_id": ride.id,
+                "status": ride.status.value,
+                "pickup": {"lat": ride.pickup_lat, "lng": ride.pickup_lng},
+                "pickup_address": ride.pickup_address,
+                "dropoff_name": ride.dropoff_name,
+                "driver_name": ride.driver.name if ride.driver else None,
+                "driver_location": driver_location,
+                "requested_at": ride.requested_at.isoformat() if ride.requested_at else None,
+            }
+
+    return {"success": True, "data": data}
 
 @router.post("/invite-partner", response_model=StandardResponse)
 async def invite_partner(

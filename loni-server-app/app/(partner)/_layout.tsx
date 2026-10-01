@@ -1,0 +1,111 @@
+import React from 'react';
+import { View, Pressable, StyleSheet } from 'react-native';
+import { Tabs } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
+import { HelixaText } from '../../components/HelixaText';
+
+// Same glyphs as the driver tab bar (material-symbols:home-outline-rounded,
+// gg:profile) so the two role shells feel like the same app.
+const HomeIcon = ({ color }: { color: string }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M6 19H9V14C9 13.7167 9.096 13.4793 9.288 13.288C9.48 13.0967 9.71733 13.0007 10 13H14C14.2833 13 14.521 13.096 14.713 13.288C14.905 13.48 15.0007 13.7173 15 14V19H18V10L12 5.5L6 10V19ZM4 19V10C4 9.68333 4.071 9.38333 4.213 9.1C4.355 8.81667 4.55067 8.58333 4.8 8.4L10.8 3.9C11.15 3.63333 11.55 3.5 12 3.5C12.45 3.5 12.85 3.63333 13.2 3.9L19.2 8.4C19.45 8.58333 19.646 8.81667 19.788 9.1C19.93 9.38333 20.0007 9.68333 20 10V19C20 19.55 19.804 20.021 19.412 20.413C19.02 20.805 18.5493 21.0007 18 21H14C13.7167 21 13.4793 20.904 13.288 20.712C13.0967 20.52 13.0007 20.2827 13 20V15H11V20C11 20.2833 10.904 20.521 10.712 20.713C10.52 20.905 10.2827 21.0007 10 21H6C5.45 21 4.97933 20.8043 4.588 20.413C4.19667 20.0217 4.00067 19.5507 4 19Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+const ProfileIcon = ({ color }: { color: string }) => (
+  <Svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <Path fillRule="evenodd" clipRule="evenodd" d="M16 9C16 10.0609 15.5786 11.0783 14.8284 11.8284C14.0783 12.5786 13.0609 13 12 13C10.9391 13 9.92172 12.5786 9.17157 11.8284C8.42143 11.0783 8 10.0609 8 9C8 7.93913 8.42143 6.92172 9.17157 6.17157C9.92172 5.42143 10.9391 5 12 5C13.0609 5 14.0783 5.42143 14.8284 6.17157C15.5786 6.92172 16 7.93913 16 9ZM14 9C14 9.53043 13.7893 10.0391 13.4142 10.4142C13.0391 10.7893 12.5304 11 12 11C11.4696 11 10.9609 10.7893 10.5858 10.4142C10.2107 10.0391 10 9.53043 10 9C10 8.46957 10.2107 7.96086 10.5858 7.58579C10.9609 7.21071 11.4696 7 12 7C12.5304 7 13.0391 7.21071 13.4142 7.58579C13.7893 7.96086 14 8.46957 14 9Z" fill={color} />
+    <Path fillRule="evenodd" clipRule="evenodd" d="M12 1C5.925 1 1 5.925 1 12C1 18.075 5.925 23 12 23C18.075 23 23 18.075 23 12C23 5.925 18.075 1 12 1ZM3 12C3 14.09 3.713 16.014 4.908 17.542C5.74744 16.4401 6.83015 15.5471 8.07164 14.9327C9.31312 14.3183 10.6798 13.9991 12.065 14C13.4324 13.9984 14.7821 14.3091 16.0111 14.9084C17.2402 15.5077 18.3162 16.3797 19.157 17.458C20.0234 16.3216 20.6068 14.9952 20.8589 13.5886C21.111 12.182 21.0244 10.7355 20.6065 9.36898C20.1886 8.00243 19.4512 6.75505 18.4555 5.73004C17.4598 4.70503 16.2343 3.93186 14.8804 3.47451C13.5265 3.01716 12.0832 2.88877 10.6699 3.09997C9.25652 3.31117 7.91379 3.85589 6.75277 4.68905C5.59175 5.52222 4.64581 6.61987 3.99323 7.8912C3.34065 9.16252 3.00018 10.571 3 12ZM12 21C9.93391 21.0033 7.93014 20.2926 6.328 18.988C6.97281 18.0646 7.83119 17.3107 8.83008 16.7905C9.82896 16.2702 10.9388 15.999 12.065 16C13.1772 15.999 14.2735 16.2635 15.263 16.7713C16.2524 17.2792 17.1064 18.0158 17.754 18.92C16.1395 20.267 14.1026 21.0033 12 21Z" fill={color} />
+  </Svg>
+);
+
+const ICONS: Record<string, (color: string) => React.ReactNode> = {
+  index: (color) => <HomeIcon color={color} />,
+  profile: (color) => <ProfileIcon color={color} />,
+};
+
+const LABELS: Record<string, string> = {
+  index: 'Home',
+  profile: 'Profile',
+};
+
+function PartnerTabBar({ state, navigation }: any) {
+  return (
+    <SafeAreaView edges={['bottom']} style={styles.safeArea} pointerEvents="box-none">
+      <View style={styles.bar}>
+        {state.routes.map((route: any, index: number) => {
+          const focused = state.index === index;
+          const icon = ICONS[route.name]?.(focused ? '#FFFFFF' : '#9A9A9A');
+          const label = LABELS[route.name] ?? route.name;
+
+          return (
+            <Pressable
+              key={route.key}
+              onPress={() => {
+                const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+                if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+              }}
+              style={[styles.item, focused && styles.itemActive]}
+            >
+              {icon}
+              <HelixaText style={[styles.label, { color: focused ? '#FFFFFF' : '#9A9A9A' }]} weight={focused ? 'bold' : 'regular'}>
+                {label}
+              </HelixaText>
+            </Pressable>
+          );
+        })}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+export default function PartnerTabsLayout() {
+  return (
+    <Tabs tabBar={(props) => <PartnerTabBar {...props} />} screenOptions={{ headerShown: false }}>
+      <Tabs.Screen name="index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
+    </Tabs>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
+  bar: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    backgroundColor: '#000000',
+    borderRadius: 999,
+    padding: 6,
+    gap: 6,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  item: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+  },
+  itemActive: {
+    backgroundColor: '#D62D88',
+  },
+  label: {
+    fontSize: 14,
+  },
+});
