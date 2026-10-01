@@ -8,9 +8,11 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Avatar } from '../../components/Avatar';
 import { UpdateDetailModal } from '../../components/partner/UpdateDetailModal';
+import { EmergencyAlertCard } from '../../components/partner/EmergencyAlertCard';
 import { useAuth } from '../../hooks/useAuth';
 import { usePartnerDashboard } from '../../hooks/usePartnerDashboard';
-import { relativeTime, relativeTimeWithClock } from '../../lib/relativeTime';
+import { useNotifications } from '../../hooks/useNotifications';
+import { relativeTime } from '../../lib/relativeTime';
 import type { PartnerDashboardUpdate } from '../../api/partner';
 
 const CARD_COLORS = [
@@ -95,6 +97,8 @@ function PregnancyJourneyCard({ status, week }: { status: 'pregnant' | 'newMom' 
 export default function PartnerDashboard() {
   const { user } = useAuth();
   const { data } = usePartnerDashboard();
+  const { data: notifications } = useNotifications();
+  const unreadCount = notifications?.unread_count ?? 0;
   const firstName = (user?.name || '').split(' ')[0] || 'there';
   const [selected, setSelected] = useState<{ update: PartnerDashboardUpdate; colors: { bg: string; pill: string } } | null>(null);
 
@@ -103,33 +107,22 @@ export default function PartnerDashboard() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Avatar uri={user?.profilePicture || null} name={user?.name || 'You'} style={styles.avatar} />
-          <View style={styles.bellButton}>
+          <Pressable style={styles.bellButton} onPress={() => router.push('/partner/notifications' as any)}>
             <Feather name="bell" size={18} color="#000" />
-          </View>
+            {!!unreadCount && <View style={styles.bellBadge} />}
+          </Pressable>
         </View>
 
         <CalText style={styles.greeting}>{greeting()}, {firstName}</CalText>
         <HelixaText style={styles.subGreeting}>Stay connected to her journey.</HelixaText>
 
         {data?.active_alert && (
-          <Pressable
-            style={styles.alertCard}
-            onPress={() => router.push(`/partner/ride/${data.active_alert!.ride_id}` as any)}
-          >
-            <View style={styles.alertTextBlock}>
-              <CalText style={styles.alertTitle}>Emergency alert</CalText>
-              <HelixaText style={styles.alertBody} weight="bold">
-                {data.inviter.name} may need your help.
-              </HelixaText>
-              <HelixaText style={styles.alertTime} weight="bold">
-                {relativeTimeWithClock(data.active_alert.requested_at)}
-              </HelixaText>
-              <View style={styles.alertButton}>
-                <HelixaText style={styles.alertButtonText} weight="black">Open emergency alert</HelixaText>
-              </View>
-            </View>
-            <Image source={require('../../assets/images/partner-3d-alert.png')} style={styles.alertImage} />
-          </Pressable>
+          <EmergencyAlertCard
+            inviterName={data.inviter.name}
+            rideId={data.active_alert.ride_id}
+            requestedAt={data.active_alert.requested_at}
+            style={styles.alertCardSpacing}
+          />
         )}
 
         {data?.inviter.week != null && (
@@ -207,31 +200,14 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22, backgroundColor: '#F5F5F5',
     alignItems: 'center', justifyContent: 'center',
   },
+  bellBadge: {
+    position: 'absolute', top: 10, right: 11, width: 9, height: 9, borderRadius: 4.5,
+    backgroundColor: '#FA3532', borderWidth: 1.5, borderColor: '#FFFFFF',
+  },
   greeting: { fontSize: 24, lineHeight: 30, color: '#000000', marginBottom: 6 },
   subGreeting: { fontSize: 15, color: '#6B7280', marginBottom: 20 },
 
-  alertCard: {
-    backgroundColor: '#000000',
-    borderWidth: 1,
-    borderColor: 'rgba(250,53,50,0.24)',
-    borderRadius: 25,
-    padding: 18,
-    marginBottom: 16,
-    overflow: 'visible',
-  },
-  alertTextBlock: { gap: 14 },
-  alertTitle: { fontSize: 16, color: '#FFFFFF' },
-  alertBody: { fontSize: 15, color: '#FFFFFF', opacity: 0.84, marginTop: 2 },
-  alertTime: { fontSize: 13, color: '#FFFFFF', opacity: 0.84 },
-  alertButton: {
-    backgroundColor: '#FFFFFF', borderRadius: 26, paddingVertical: 14,
-    alignItems: 'center', marginTop: 4,
-  },
-  alertButtonText: { fontSize: 13, color: '#000000' },
-  alertImage: {
-    position: 'absolute', top: -26, right: -12, width: 92, height: 94,
-    transform: [{ rotate: '6deg' }],
-  },
+  alertCardSpacing: { marginBottom: 16 },
 
   journeyCard: {
     height: 232, borderRadius: 23, overflow: 'hidden', marginBottom: 16, justifyContent: 'space-between',

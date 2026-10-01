@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.ws_manager import manager as ws_manager
 from app.modules.notifications.service import NotificationService
+from app.modules.notifications.models import NotificationLog
 from app.modules.users.models import (
     User, UserTypeEnum, DriverProfile, EmergencyContact,
 )
@@ -53,6 +54,45 @@ async def _emit(user_id: str, event_type: str, title: str, body: str, data: dict
     asyncio.create_task(
         NotificationService.notify_user(user_id, title, body, {"type": event_type, **data})
     )
+
+
+async def _fanout_to_contacts(db: AsyncSession, ride: Ride, event_type: str, title: str, body: str,
+                               data: dict, *, ws_only: bool = False, log: bool = False) -> None:
+    """
+    Mirror a ride event to every connected emergency contact (the partner
+    app), so a mother in an emergency ride is tracked live by whoever she
+    asked to be notified - not just the driver's own trip. Only fires when
+    she opted in (`ride.notify_contacts`) and only to contacts with
+    `emergency` alerts enabled.
+
+    `ws_only` skips FCM entirely - used for the high-frequency location
+    heartbeat, where a push per GPS tick would be noisy and wasteful for a
+    recipient who isn't even looking at the app. `log` additionally
+    persists a NotificationLog row (for events worth keeping in the
+    partner's Notification Centre, not just live state).
+    """
+    if not ride.notify_contacts:
+        return
+    contacts = (await db.execute(
+        select(EmergencyContact).where(
+            EmergencyContact.user_id == ride.rider_id,
+            EmergencyContact.emergency.is_(True),
+        )
+    )).scalars().all()
+    for c in contacts:
+        if ws_only:
+            try:
+                await ws_manager.send_to_user(c.contact_user_id, event_type, data)
+            except Exception as e:
+                logger.warning("contact fanout WS emit failed: %s", e)
+        else:
+            await _emit(c.contact_user_id, event_type, title, body, data)
+        if log:
+            db.add(NotificationLog(
+                user_id=c.contact_user_id, type=event_type, title=title, body=body, data=data,
+            ))
+    if log and contacts:
+        await db.commit()
 
 
 def _rider_info(user: Optional[User]) -> Optional[RiderInfo]:
@@ -397,25 +437,19 @@ class RideService:
             ride = (await db.execute(select(Ride).where(Ride.id == ride_id))).scalar_one_or_none()
             if not rider or not ride:
                 return
-            contacts = (await db.execute(
-                select(EmergencyContact)
-                .where(EmergencyContact.user_id == rider_id, EmergencyContact.emergency.is_(True))
-            )).scalars().all()
-            for c in contacts:
-                data = {
-                    "ride_id": str(ride.id),
-                    "id": ride.id,
-                    "status": ride.status.value,
-                    "rider_name": rider.name,
-                    "pickup_address": ride.pickup_address,
-                    "dropoff_name": ride.dropoff_name,
-                }
-                await _emit(
-                    c.contact_user_id, "ride_contact_alert",
-                    f"{rider.name} requested an emergency ride",
-                    f"Heading to {ride.dropoff_name or 'the hospital'} from {ride.pickup_address or 'their location'}.",
-                    data,
-                )
+            data = {
+                "ride_id": str(ride.id),
+                "id": ride.id,
+                "status": ride.status.value,
+                "rider_name": rider.name,
+                "pickup_address": ride.pickup_address,
+                "dropoff_name": ride.dropoff_name,
+                "requested_at": ride.requested_at.isoformat() if ride.requested_at else None,
+            }
+            await _fanout_to_contacts(
+                db, ride, "ride_contact_alert", "Emergency alert",
+                f"{rider.name} may need your help.", data, log=True,
+            )
 
     # ---- driver: available offers ------------------------------------
     @staticmethod
@@ -557,6 +591,10 @@ class RideService:
         payload = _ride_payload(ride, rider=rider, driver=driver)
         await _emit(ride.rider_id, "ride_driver_arrived", "Your driver has arrived",
                     "Your driver is waiting outside.", payload)
+        await _fanout_to_contacts(
+            db, ride, "ride_driver_arrived", "Driver has arrived",
+            f"{driver.name if driver else 'The driver'} is waiting for {rider.name if rider else 'her'}.", payload,
+        )
         return payload
 
     @staticmethod
@@ -574,6 +612,10 @@ class RideService:
         payload = _ride_payload(ride, rider=rider, driver=driver, next_route=to_dest)
         await _emit(ride.rider_id, "ride_started", "On the way to hospital",
                     f"Heading to {ride.dropoff_name or 'the hospital'}.", payload)
+        await _fanout_to_contacts(
+            db, ride, "ride_started", "On the way to the hospital",
+            f"{rider.name if rider else 'She'} is heading to {ride.dropoff_name or 'the hospital'}.", payload,
+        )
         return payload
 
     @staticmethod
@@ -608,6 +650,10 @@ class RideService:
         payload = _ride_payload(ride, rider=rider, driver=driver, driver_profile=profile)
         await _emit(ride.rider_id, "ride_completed", "You've arrived",
                     f"Trip complete. Fare: ₦{ride.fare_final:,}", payload)
+        await _fanout_to_contacts(
+            db, ride, "ride_completed", "Trip completed",
+            f"{rider.name if rider else 'She'} has arrived safely.", payload, log=True,
+        )
         return payload
 
     @staticmethod
@@ -648,6 +694,10 @@ class RideService:
         if other:
             await _emit(other, "ride_cancelled", "Ride cancelled",
                         "The ride was cancelled." + (f" ({reason})" if reason else ""), payload)
+        await _fanout_to_contacts(
+            db, ride, "ride_cancelled", "Ride cancelled",
+            "The emergency ride was cancelled.", payload, log=True,
+        )
         return payload
 
     # ---- driver location heartbeat --------------------------------
@@ -667,16 +717,18 @@ class RideService:
             return
         ride = (await db.execute(select(Ride).where(Ride.id == profile.active_ride_id))).scalar_one_or_none()
         if ride and ride.status in ACTIVE_STATUSES:
+            location_data = {
+                "ride_id": str(ride.id),
+                "id": ride.id,
+                "lat": lat, "lng": lng, "heading": heading,
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }
             # WS only - high frequency, no FCM.
             try:
-                await ws_manager.send_to_user(ride.rider_id, "ride_driver_location", {
-                    "ride_id": str(ride.id),
-                    "id": ride.id,
-                    "lat": lat, "lng": lng, "heading": heading,
-                    "ts": datetime.now(timezone.utc).isoformat(),
-                })
+                await ws_manager.send_to_user(ride.rider_id, "ride_driver_location", location_data)
             except Exception as e:
                 logger.warning("driver location WS emit failed: %s", e)
+            await _fanout_to_contacts(db, ride, "ride_driver_location", "", "", location_data, ws_only=True)
 
     # ---- rating / history / stats --------------------------------
     @staticmethod

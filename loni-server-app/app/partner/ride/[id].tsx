@@ -37,11 +37,14 @@ export default function PartnerRideTrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const rideId = Number(id);
 
+  // Status transitions arrive live over the WebSocket (lib/partnerEvents.ts
+  // invalidates this exact query key; ride_driver_location patches it
+  // directly). The interval below is just a safety net for a dropped socket.
   const { data: ride } = useQuery({
     queryKey: ['partner', 'ride', rideId],
     queryFn: () => ridesApi.get(rideId),
     enabled: Number.isFinite(rideId),
-    refetchInterval: (query) => (query.state.data && TERMINAL.includes(query.state.data.status) ? false : 5000),
+    refetchInterval: (query) => (query.state.data && TERMINAL.includes(query.state.data.status) ? false : 20_000),
   });
 
   const driverFix = ride?.driver?.current_lat != null && ride?.driver?.current_lng != null

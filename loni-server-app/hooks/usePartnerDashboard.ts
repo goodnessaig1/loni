@@ -6,14 +6,18 @@ export const partnerDashboardKeys = {
   dashboard: ['partner', 'dashboard'] as const,
 };
 
-/** Polls so the emergency alert card and last-known location stay fresh
- * without needing a dedicated WebSocket channel for the partner app. */
+/**
+ * Live-updated via the WebSocket (lib/partnerEvents.ts invalidates this
+ * query on every ride/emergency/pregnancy-update event). The interval here
+ * is just a safety net for a dropped/reconnecting socket, not the primary
+ * update path.
+ */
 export const usePartnerDashboard = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: partnerDashboardKeys.dashboard,
     queryFn: partnerApi.getDashboard,
     enabled: user?.user_type === 'partner',
-    refetchInterval: 30_000,
+    refetchInterval: 5 * 60_000,
   });
 };

@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks, Form, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, BackgroundTasks, Form, HTTPException, Query
 from typing import Optional
 from datetime import datetime, timezone
 import cloudinary
 import cloudinary.uploader
 import asyncio
 from app.core.config import settings
+from sqlalchemy import func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
@@ -28,6 +29,9 @@ from app.modules.auth.email_service import (
     send_partner_removal_partner_email
 )
 from app.modules.rides.models import Ride, TERMINAL_STATUSES
+from app.modules.notifications.models import NotificationLog
+from app.modules.notifications.service import NotificationService
+from app.core.ws_manager import manager as ws_manager
 from app.utils.user_enrichment import enrich_user_data, calculate_pregnancy_start_date
 from app.utils.partner_content import get_latest_updates
 
@@ -256,7 +260,34 @@ async def get_partner_dashboard(
     }
 
     if contact.updates and current_week is not None and status_val:
-        data["updates"] = get_latest_updates(status_val, current_week)
+        updates = get_latest_updates(status_val, current_week)
+        data["updates"] = updates
+        # Lazily detect "she just reached a new milestone" - no scheduler
+        # needed since this runs every time the dashboard is viewed, and a
+        # NotificationLog row makes it idempotent (logged once per week).
+        if updates:
+            latest = updates[0]
+            last_logged = (await db.execute(
+                select(NotificationLog)
+                .where(NotificationLog.user_id == current_user.id, NotificationLog.type == "pregnancy_update")
+                .order_by(NotificationLog.created_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+            if not (last_logged and (last_logged.data or {}).get("week") == latest["week"]):
+                title = "New pregnancy update" if status_val == "pregnant" else "New recovery update"
+                body = f"{inviter.name} shared an update for week {latest['week']}."
+                notif_data = {"week": latest["week"], "title": latest["title"]}
+                db.add(NotificationLog(
+                    user_id=current_user.id, type="pregnancy_update", title=title, body=body, data=notif_data,
+                ))
+                await db.commit()
+                try:
+                    await ws_manager.send_to_user(current_user.id, "pregnancy_update", notif_data)
+                except Exception:
+                    pass
+                asyncio.create_task(
+                    NotificationService.notify_user(current_user.id, title, body, {"type": "pregnancy_update", **notif_data})
+                )
 
     if contact.emergency:
         ride_stmt = select(Ride).where(
@@ -289,6 +320,62 @@ async def get_partner_dashboard(
             }
 
     return {"success": True, "data": data}
+
+@router.get("/notifications", response_model=StandardResponse)
+async def get_notifications(
+    limit: int = Query(50, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    The signed-in user's notification history (newest first), plus how many
+    are unread - used for the bell badge. Every row here was also pushed via
+    FCM/WS at the time it happened; this is the durable, re-visitable copy.
+    """
+    result = await db.execute(
+        select(NotificationLog)
+        .where(NotificationLog.user_id == current_user.id)
+        .order_by(NotificationLog.created_at.desc())
+        .limit(limit)
+    )
+    logs = result.scalars().all()
+    unread_result = await db.execute(
+        select(func.count()).select_from(NotificationLog)
+        .where(NotificationLog.user_id == current_user.id, NotificationLog.read_at.is_(None))
+    )
+    unread_count = unread_result.scalar_one()
+
+    return {
+        "success": True,
+        "data": {
+            "unread_count": unread_count,
+            "notifications": [
+                {
+                    "id": n.id,
+                    "type": n.type,
+                    "title": n.title,
+                    "body": n.body,
+                    "data": n.data,
+                    "read": n.read_at is not None,
+                    "created_at": n.created_at.isoformat() if n.created_at else None,
+                }
+                for n in logs
+            ],
+        },
+    }
+
+@router.post("/notifications/mark-read", response_model=StandardResponse)
+async def mark_notifications_read(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(
+        update(NotificationLog)
+        .where(NotificationLog.user_id == current_user.id, NotificationLog.read_at.is_(None))
+        .values(read_at=datetime.now(timezone.utc))
+    )
+    await db.commit()
+    return {"success": True, "message": "Notifications marked as read"}
 
 @router.post("/invite-partner", response_model=StandardResponse)
 async def invite_partner(
