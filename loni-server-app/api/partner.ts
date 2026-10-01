@@ -3,6 +3,8 @@ import { apiClient } from './client';
 export interface PartnerDashboardUpdate {
   week: number;
   title: string;
+  body: string;
+  expect: string[];
 }
 
 export interface PartnerDashboardAlert {

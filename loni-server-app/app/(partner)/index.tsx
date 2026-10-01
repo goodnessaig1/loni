@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Image, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -7,9 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Avatar } from '../../components/Avatar';
+import { UpdateDetailModal } from '../../components/partner/UpdateDetailModal';
 import { useAuth } from '../../hooks/useAuth';
 import { usePartnerDashboard } from '../../hooks/usePartnerDashboard';
 import { relativeTime, relativeTimeWithClock } from '../../lib/relativeTime';
+import type { PartnerDashboardUpdate } from '../../api/partner';
 
 const CARD_COLORS = [
   { bg: '#FBD9F1', pill: '#CF7DAD' },
@@ -94,6 +96,7 @@ export default function PartnerDashboard() {
   const { user } = useAuth();
   const { data } = usePartnerDashboard();
   const firstName = (user?.name || '').split(' ')[0] || 'there';
+  const [selected, setSelected] = useState<{ update: PartnerDashboardUpdate; colors: { bg: string; pill: string } } | null>(null);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -164,7 +167,11 @@ export default function PartnerDashboard() {
               {data.updates.map((u, i) => {
                 const colors = CARD_COLORS[i % CARD_COLORS.length];
                 return (
-                  <View key={u.week} style={[styles.updateCard, { backgroundColor: colors.bg }]}>
+                  <Pressable
+                    key={u.week}
+                    style={[styles.updateCard, { backgroundColor: colors.bg }]}
+                    onPress={() => setSelected({ update: u, colors })}
+                  >
                     <Image source={require('../../assets/images/partner-fetus.png')} style={styles.updateFetus} />
                     <View style={[styles.updatePill, { backgroundColor: colors.pill }]}>
                       <HelixaText style={styles.updatePillText} weight="bold">Week {u.week}</HelixaText>
@@ -173,13 +180,20 @@ export default function PartnerDashboard() {
                     <View style={styles.updateExpand}>
                       <Feather name="arrow-right" size={14} color="#000" style={styles.updateExpandIcon} />
                     </View>
-                  </View>
+                  </Pressable>
                 );
               })}
             </View>
           </View>
         )}
       </ScrollView>
+
+      <UpdateDetailModal
+        visible={!!selected}
+        update={selected?.update ?? null}
+        colors={selected?.colors ?? CARD_COLORS[0]}
+        onClose={() => setSelected(null)}
+      />
     </SafeAreaView>
   );
 }
