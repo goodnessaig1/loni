@@ -89,7 +89,7 @@ export default function PartnerProfile() {
 
         <View style={styles.nameRow}>
           <HelixaText weight="black" style={styles.name}>{user?.name || 'Partner'}</HelixaText>
-          <Pressable style={styles.supportButton}>
+          <Pressable style={styles.supportButton} onPress={() => router.push('/partner/support' as any)}>
             <Feather name="headphones" size={16} color="#FFFFFF" />
             <HelixaText style={styles.supportText} weight="black">Support</HelixaText>
           </Pressable>
