@@ -8,6 +8,7 @@ import Toast from 'react-native-toast-message';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Avatar } from '../../components/Avatar';
+import { SupportIcon } from '../../components/icons/SupportIcon';
 import { useAuth, useUploadProfilePicture } from '../../hooks/useAuth';
 import { usePartnerConnection } from '../../hooks/usePartnerConnection';
 import { relativeTime } from '../../lib/relativeTime';
@@ -90,7 +91,7 @@ export default function PartnerProfile() {
         <View style={styles.nameRow}>
           <HelixaText weight="black" style={styles.name}>{user?.name || 'Partner'}</HelixaText>
           <Pressable style={styles.supportButton} onPress={() => router.push('/partner/support' as any)}>
-            <Feather name="headphones" size={16} color="#FFFFFF" />
+            <SupportIcon size={18} color="#FFFFFF" />
             <HelixaText style={styles.supportText} weight="black">Support</HelixaText>
           </Pressable>
         </View>
