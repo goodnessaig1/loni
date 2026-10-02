@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import lady from '../../assets/hero-lady.webp';
 
 /**
@@ -11,13 +12,20 @@ import lady from '../../assets/hero-lady.webp';
 export function HeroPortrait() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-10 overflow-hidden lg:rounded-b-[28px]">
-      <img
+      <motion.img
         src={lady}
         alt=""
         width={633}
         height={923}
         fetchPriority="high"
         draggable={false}
+        initial={{ opacity: 0, y: 50, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{
+          duration: 1.0,
+          delay: 0.2,
+          ease: [0.16, 1, 0.3, 1],
+        }}
         className="absolute left-[48%] top-[13%] h-[84%] w-auto max-w-none select-none lg:left-auto lg:right-[5%] lg:top-auto lg:bottom-0 lg:h-full"
       />
     </div>

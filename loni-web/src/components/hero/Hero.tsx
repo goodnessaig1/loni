@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { ConnectedCard } from './ConnectedCard';
 import { DownloadLink } from './DownloadLink';
 import { HeroPortrait } from './HeroPortrait';
@@ -12,7 +13,7 @@ export function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
-      className="relative flex flex-col bg-hero-pink min-h-[52rem] md:min-h-[58rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_2.5rem))] lg:rounded-b-[28px] lg:pt-14"
+      className="relative flex flex-col bg-hero-pink min-h-[52rem] md:min-h-[58rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_2.5rem))] lg:rounded-b-[28px] lg:pt-14 overflow-hidden"
     >
       <HeroPortrait />
 
@@ -29,14 +30,31 @@ export function Hero() {
               id="hero-title"
               className="text-[3.1rem] font-semibold sm:text-[4.25rem] md:text-[5rem] lg:text-[clamp(4.25rem,7.3vw,6.6rem)] leading-[1.04] tracking-[-0.035em] text-white"
             >
-              <span className="block">
+              <motion.span
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="block"
+              >
                 Your<br className="sm:hidden" /> <em className="font-light italic">Companion</em>
-              </span>
-              <span className="block">Through Motherhood</span>
+              </motion.span>
+              <motion.span
+                initial={{ opacity: 0, y: 35 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="block"
+              >
+                Through Motherhood
+              </motion.span>
             </h1>
-            <p className="max-w-[20rem] text-[15px] leading-snug text-white sm:max-w-md lg:ml-6 lg:max-w-[32rem] lg:text-[17px]">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              className="max-w-[20rem] text-[15px] leading-snug text-white sm:max-w-md lg:ml-6 lg:max-w-[32rem] lg:text-[17px]"
+            >
               LONI keeps you connected to the information, people, and support that matters most.
-            </p>
+            </motion.p>
           </div>
         </div>
 

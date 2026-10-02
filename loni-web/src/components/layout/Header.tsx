@@ -1,4 +1,5 @@
 import { useCallback, useId, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { DownloadAppButton } from './DownloadAppButton';
@@ -25,7 +26,12 @@ export function Header() {
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
   return (
-    <header className="relative z-30">
+    <motion.header
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className="relative z-30"
+    >
       {/* ── Desktop ─────────────────────────────────────────────── */}
       <div className="hidden h-14 lg:flex">
         <div className="relative flex shrink-0 items-center rounded-br-[20px] bg-white pr-8 before:absolute before:left-0 before:top-full before:size-7 before:bg-[radial-gradient(circle_at_100%_100%,transparent_27.5px,#fff_28px)] after:absolute after:left-full after:top-0 after:size-[26px] after:bg-[radial-gradient(circle_at_100%_100%,transparent_25.5px,#fff_26px)]">
@@ -73,6 +79,6 @@ export function Header() {
       <div className="lg:hidden">
         <MobileMenu id={menuId} open={menuOpen} onClose={closeMenu} />
       </div>
-    </header>
+    </motion.header>
   );
 }
