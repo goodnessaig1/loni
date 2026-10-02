@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Header } from '../components/layout/Header';
 import { Hero } from '../components/hero/Hero';
+import { IntroSection } from '../components/intro/IntroSection';
 
 export default function HomePage() {
   return (
@@ -13,6 +14,7 @@ export default function HomePage() {
       <Header />
       <main>
         <Hero />
+        <IntroSection />
       </main>
     </motion.div>
   );
