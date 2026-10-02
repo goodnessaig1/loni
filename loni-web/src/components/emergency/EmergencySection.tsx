@@ -66,7 +66,7 @@ export function EmergencySection() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 16 }}
             whileInView={{ opacity: 1, scale: 1, y: 0 }}
-            viewport={{ once: false, amount: 1 }}
+            viewport={{ once: false, amount: 0.3 }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
             className="mt-10 flex lg:mt-[55px] lg:justify-end"
           >
