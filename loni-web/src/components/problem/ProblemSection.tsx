@@ -50,7 +50,7 @@ const QUESTION_PILLS = [
 
 export function ProblemSection() {
   return (
-    <section aria-labelledby="problem-title" className="px-5 py-16 sm:px-8 sm:py-24 lg:py-32">
+    <section aria-labelledby="problem-title" className="px-5 pt-4 pb-16 sm:px-8 sm:pt-8 sm:pb-24 lg:pt-8 lg:pb-32">
       <div className="mx-auto flex max-w-7xl flex-col justify-between gap-12 lg:flex-row lg:items-start lg:gap-16">
         {/* Left Side: Title & Badge */}
         <motion.div
@@ -69,13 +69,19 @@ export function ProblemSection() {
 
           <motion.div
             initial={{ opacity: 0, scale: 0.8, rotate: -8 }}
-            whileInView={{ opacity: 1, scale: 1, rotate: -3 }}
+            whileInView={{ opacity: 1, scale: 1, rotate: -3.09 }}
             viewport={{ once: false }}
             transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.2 }}
             whileHover={{ rotate: 0, scale: 1.05 }}
-            className="inline-flex items-center gap-2 rounded-full bg-[#15B300] px-4 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer sm:text-sm"
+            className="inline-flex items-center gap-[14px] rounded-full px-[17px] py-[10px] text-xs font-semibold text-white shadow-sm cursor-pointer sm:text-sm border-t border-r border-l border-b-0 border-dashed border-[#0C6800A3]"
+            style={{
+              backgroundColor: '#15B300',
+              borderWidth: '1px 1px 0px 1px',
+              borderStyle: 'dashed',
+              borderColor: '#0C6800A3',
+            }}
           >
-            <span className="size-2 rounded-full bg-white" />
+            <span className="size-2 rounded-full bg-white shrink-0" />
             <span>Loni exists for you</span>
           </motion.div>
         </motion.div>

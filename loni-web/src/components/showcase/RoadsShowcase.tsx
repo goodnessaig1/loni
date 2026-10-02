@@ -31,7 +31,7 @@ export function RoadsShowcase() {
   return (
     <section
       aria-label="LONI connects mothers with verified nurses, partners, hospitals and drivers"
-      className="relative -mt-6 flex justify-center overflow-hidden pb-16 sm:pb-20 lg:-mt-9 lg:pb-24"
+      className="relative -mt-6 flex justify-center overflow-hidden pb-4 sm:pb-6 lg:-mt-9 lg:pb-8"
     >
       <motion.div
         ref={stageRef}
@@ -41,7 +41,7 @@ export function RoadsShowcase() {
         initial={reduceMotion ? 'show' : 'hide'}
         animate={reduceMotion ? 'show' : undefined}
         whileInView={reduceMotion ? undefined : 'show'}
-        viewport={{ amount: 0.2 }}
+        viewport={{ amount: 0.05, margin: '0px 0px 250px 0px' }}
       >
         {ROADS.map((road, i) => (
           <RoadRoute key={road.id} road={road} index={i} />
