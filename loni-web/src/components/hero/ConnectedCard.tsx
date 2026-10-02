@@ -6,7 +6,8 @@ export function ConnectedCard({ className = '' }: { className?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, x: 40, scale: 0.92 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
+      whileInView={{ opacity: 1, x: 0, scale: 1 }}
+      viewport={{ once: false }}
       transition={{
         duration: 0.8,
         delay: 0.5,

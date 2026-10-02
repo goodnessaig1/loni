@@ -20,7 +20,8 @@ export function HeroPortrait() {
         fetchPriority="high"
         draggable={false}
         initial={{ opacity: 0, y: 50, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
+        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        viewport={{ once: false }}
         transition={{
           duration: 1.0,
           delay: 0.2,

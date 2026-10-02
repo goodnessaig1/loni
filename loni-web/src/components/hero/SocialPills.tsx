@@ -10,7 +10,8 @@ function Pill({ href, icon, children, external, delay = 0 }: { href: string; ico
       href={href}
       {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
       initial={{ opacity: 0, x: -20, scale: 0.95 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
+      whileInView={{ opacity: 1, x: 0, scale: 1 }}
+      viewport={{ once: false }}
       transition={{ duration: 0.5, delay, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ scale: 1.05, y: -2 }}
       whileTap={{ scale: 0.95 }}

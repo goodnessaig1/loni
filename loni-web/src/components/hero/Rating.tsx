@@ -5,7 +5,8 @@ export function Rating({ className = '' }: { className?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: false }}
       transition={{ duration: 0.6, delay: 0.7, ease: [0.22, 1, 0.36, 1] }}
       className={`flex flex-col gap-2.5 text-white lg:items-end ${className}`}
     >
@@ -15,7 +16,8 @@ export function Rating({ className = '' }: { className?: string }) {
           <motion.div
             key={i}
             initial={{ opacity: 0, scale: 0, rotate: -30 }}
-            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+            viewport={{ once: false }}
             transition={{
               delay: 0.75 + i * 0.07,
               type: 'spring',

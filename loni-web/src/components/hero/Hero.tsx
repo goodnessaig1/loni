@@ -32,7 +32,8 @@ export function Hero() {
             >
               <motion.span
                 initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
                 transition={{ duration: 0.7, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
                 className="block"
               >
@@ -40,7 +41,8 @@ export function Hero() {
               </motion.span>
               <motion.span
                 initial={{ opacity: 0, y: 35 }}
-                animate={{ opacity: 1, y: 0 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: false }}
                 transition={{ duration: 0.7, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
                 className="block"
               >
@@ -49,7 +51,8 @@ export function Hero() {
             </h1>
             <motion.p
               initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: false }}
               transition={{ duration: 0.6, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
               className="max-w-[20rem] text-[15px] leading-snug text-white sm:max-w-md lg:ml-6 lg:max-w-[32rem] lg:text-[17px]"
             >
