@@ -7,17 +7,16 @@ import 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../context/AuthContext';
 import { EmergencyContactsProvider } from '../context/EmergencyContactsContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { CallModals } from '../components/CallModals';
+import { queryClient } from '../lib/queryClient';
 
 import '../global.css';
 
 import Toast from 'react-native-toast-message';
-
-const queryClient = new QueryClient();
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -43,6 +42,8 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="(driver)" />
               <Stack.Screen name="driver" />
+              <Stack.Screen name="(partner)" />
+              <Stack.Screen name="partner" />
             </Stack>
             <CallModals />
             <StatusBar style="auto" />

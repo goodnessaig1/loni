@@ -49,6 +49,13 @@ export function getPostAuthRoute(user: User | null): Href {
     return ONBOARDING_ROUTE[ob.current_step] ?? '/(auth)/driver-training';
   }
 
+  // A support partner doesn't pick a role. First login (phone not yet
+  // verified via verify-partner-setup) shows the connection + sharing
+  // confirmation once; after that they land straight on their dashboard.
+  if (user.user_type === 'partner') {
+    return user.isPhoneVerified ? '/(partner)' : '/(auth)/connected';
+  }
+
   // user_type === 'user' (role not chosen yet) or any other role
   return '/(auth)/role-selection';
 }

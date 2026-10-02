@@ -14,10 +14,24 @@ export interface EmergencyContact {
   created_at: string;
 }
 
+export interface PartnerConnection {
+  inviter_name: string;
+  relationship: string;
+  status: 'pending' | 'connected';
+  connected_at: string | null;
+  location: boolean;
+  updates: boolean;
+  emergency: boolean;
+}
+
 export const emergencyContactsApi = {
   getContacts: async () => {
     const response = await apiClient.get('/users/emergency-contacts');
     return response.data;
+  },
+  getPartnerConnection: async (): Promise<PartnerConnection> => {
+    const response = await apiClient.get('/users/partner-connection');
+    return response.data.data;
   },
   invitePartner: async (data: { fullname: string; email: string; message: string }) => {
     const response = await apiClient.post('/users/invite-partner', data);

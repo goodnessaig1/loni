@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.api.deps import get_current_user
@@ -134,6 +135,7 @@ async def verify_partner_setup(data: VerifyPartnerSetupRequest, db: AsyncSession
     if emergency_contact:
         # Update relationship status
         emergency_contact.status = "connected"
+        emergency_contact.connected_at = datetime.now(timezone.utc)
         partner.is_phone_verified = True
         db.add(emergency_contact)
         db.add(partner)
