@@ -4,4 +4,5 @@ export const SITE = {
   instagramUrl: 'https://www.instagram.com/',
   supportHref: '#support',
   downloadHref: '#download',
+  joinDriverHref: '#drivers',
 } as const;
