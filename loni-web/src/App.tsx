@@ -1,10 +1,11 @@
-import { Routes, Route, Navigate } from 'react-router';
+import { Routes, Route } from 'react-router';
+import HomePage from './pages/HomePage';
 import VerifyPage from './pages/VerifyPage';
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/verify" replace />} />
+      <Route path="/" element={<HomePage />} />
       <Route path="/verify" element={<VerifyPage />} />
     </Routes>
   );
