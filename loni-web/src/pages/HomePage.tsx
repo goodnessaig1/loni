@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Header } from '../components/layout/Header';
 import { Hero } from '../components/hero/Hero';
 import { IntroSection } from '../components/intro/IntroSection';
+import { RoadsShowcase } from '../components/showcase/RoadsShowcase';
 
 export default function HomePage() {
   return (
@@ -15,6 +16,7 @@ export default function HomePage() {
       <main>
         <Hero />
         <IntroSection />
+        <RoadsShowcase />
       </main>
     </motion.div>
   );
