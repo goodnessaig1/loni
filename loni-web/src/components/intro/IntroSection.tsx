@@ -5,7 +5,7 @@ import { IntroHeading } from './IntroHeading';
 
 export function IntroSection() {
   return (
-    <section aria-labelledby="intro-title" className="px-5 py-20 sm:px-8 sm:py-24 lg:py-28 overflow-hidden">
+    <section aria-labelledby="intro-title" className="relative z-10 overflow-hidden px-5 pb-0 pt-20 sm:px-8 sm:pt-24 lg:pt-28">
       <div className="mx-auto flex max-w-[48rem] flex-col items-center gap-8">
         <div className="flex flex-col items-center gap-7">
           <div id="intro-title">
