@@ -79,16 +79,16 @@ export function LoniBotSection() {
                 className="h-auto w-full select-none object-cover"
               />
 
-              {/* Bottom-left badge over the transparent notch cut-out */}
+              {/* Bottom-left badge inside the transparent notch cut-out */}
               <motion.div
                 initial={{ opacity: 0, y: 16, scale: 0.95 }}
                 whileInView={{ opacity: 1, y: 0, scale: 1 }}
                 viewport={{ once: false, amount: 0.5 }}
                 transition={{ duration: 0.6, delay: 0.35, ease: EASE }}
-                className="absolute bottom-2.5 left-2.5 sm:bottom-4 sm:left-4 lg:bottom-5 lg:left-6"
+                className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3.5 lg:bottom-3.5 lg:left-4"
               >
-                <div className="inline-flex items-center gap-3 rounded-full bg-white px-4 py-2 text-xs font-semibold text-neutral-900 shadow-md sm:px-5 sm:py-2.5 sm:text-sm border border-neutral-100/80">
-                  <img src={avatars} alt="" className="h-5 sm:h-6 w-auto shrink-0" draggable={false} />
+                <div className="inline-flex items-center gap-2.5 rounded-full bg-white px-3.5 py-1.5 text-[11px] font-semibold text-neutral-900 shadow-md sm:px-4 sm:py-2 sm:text-xs border border-neutral-100/90">
+                  <img src={avatars} alt="" className="h-4.5 sm:h-5.5 w-auto shrink-0" draggable={false} />
                   <span>Used and Tested by 1,000 People</span>
                 </div>
               </motion.div>
