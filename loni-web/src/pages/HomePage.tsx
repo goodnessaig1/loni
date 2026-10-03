@@ -10,6 +10,7 @@ import { NurseSection } from '../components/nurse/NurseSection';
 import { CommunitySection } from '../components/community/CommunitySection';
 import { PartnerSection } from '../components/partner/PartnerSection';
 import { JourneySection } from '../components/journey/JourneySection';
+import { PricingSection } from '../components/pricing/PricingSection';
 
 export default function HomePage() {
   return (
@@ -31,6 +32,7 @@ export default function HomePage() {
         <CommunitySection />
         <PartnerSection />
         <JourneySection />
+        <PricingSection />
       </main>
     </motion.div>
   );
