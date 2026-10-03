@@ -9,6 +9,7 @@ import { LoniBotSection } from '../components/lonibot/LoniBotSection';
 import { NurseSection } from '../components/nurse/NurseSection';
 import { CommunitySection } from '../components/community/CommunitySection';
 import { PartnerSection } from '../components/partner/PartnerSection';
+import { JourneySection } from '../components/journey/JourneySection';
 
 export default function HomePage() {
   return (
@@ -29,6 +30,7 @@ export default function HomePage() {
         <NurseSection />
         <CommunitySection />
         <PartnerSection />
+        <JourneySection />
       </main>
     </motion.div>
   );
