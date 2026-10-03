@@ -5,6 +5,7 @@ import { IntroSection } from '../components/intro/IntroSection';
 import { RoadsShowcase } from '../components/showcase/RoadsShowcase';
 import { ProblemSection } from '../components/problem/ProblemSection';
 import { EmergencySection } from '../components/emergency/EmergencySection';
+import { LoniBotSection } from '../components/lonibot/LoniBotSection';
 
 export default function HomePage() {
   return (
@@ -21,6 +22,7 @@ export default function HomePage() {
         <RoadsShowcase />
         <ProblemSection />
         <EmergencySection />
+        <LoniBotSection />
       </main>
     </motion.div>
   );
