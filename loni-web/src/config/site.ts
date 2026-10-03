@@ -7,4 +7,5 @@ export const SITE = {
   joinDriverHref: '#drivers',
   joinNurseHref: '#nurses',
   talkToNurseHref: '#talk-to-a-nurse',
+  joinCommunityHref: '#community',
 } as const;

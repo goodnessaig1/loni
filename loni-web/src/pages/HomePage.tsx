@@ -7,6 +7,7 @@ import { ProblemSection } from '../components/problem/ProblemSection';
 import { EmergencySection } from '../components/emergency/EmergencySection';
 import { LoniBotSection } from '../components/lonibot/LoniBotSection';
 import { NurseSection } from '../components/nurse/NurseSection';
+import { CommunitySection } from '../components/community/CommunitySection';
 
 export default function HomePage() {
   return (
@@ -25,6 +26,7 @@ export default function HomePage() {
         <EmergencySection />
         <LoniBotSection />
         <NurseSection />
+        <CommunitySection />
       </main>
     </motion.div>
   );

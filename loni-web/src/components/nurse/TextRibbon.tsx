@@ -17,8 +17,8 @@ interface Props {
 
 /**
  * A pink band that follows `d` with a looping "Connecting you to a caring human voice…" marquee
- * running along it. The text is repeated far enough to cover the path and `startOffset` is advanced
- * by exactly one phrase length per cycle, so the loop is seamless. Drawing in/out of view is a
+ * running along it, left to right. The text is repeated far enough to cover the path and `startOffset`
+ * is advanced by exactly one phrase length per cycle, so the loop is seamless. Drawing in/out of view is a
  * stroke reveal; the marquee only ticks while the ribbon is on screen.
  */
 export function TextRibbon({ d, viewBox, strokeWidth, fontSize, speed = 70, color = '#D62D88' }: Props) {
@@ -49,7 +49,8 @@ export function TextRibbon({ d, viewBox, strokeWidth, fontSize, speed = 70, colo
 
   useAnimationFrame((t) => {
     if (!inView || reduceMotion || !layout) return;
-    const offset = -(((t / 1000) * speed) % layout.period);
+    // Starts one phrase behind the path and creeps forward, so the text travels left → right.
+    const offset = -layout.period + (((t / 1000) * speed) % layout.period);
     textPathRef.current?.setAttribute('startOffset', offset.toFixed(2));
   });
 

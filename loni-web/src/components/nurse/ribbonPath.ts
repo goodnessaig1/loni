@@ -1,53 +1,21 @@
-export type Point = readonly [number, number];
-
-/** Smooth cubic path through `pts` (Catmull-Rom → Bézier), so a ribbon is described by a few waypoints. */
-export function smoothPath(pts: readonly Point[]): string {
-  const f = (n: number) => n.toFixed(1);
-  let d = `M${f(pts[0][0])},${f(pts[0][1])}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[Math.max(i - 1, 0)];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[Math.min(i + 2, pts.length - 1)];
-    const c1: Point = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
-    const c2: Point = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
-    d += ` C${f(c1[0])},${f(c1[1])} ${f(c2[0])},${f(c2[1])} ${f(p2[0])},${f(p2[1])}`;
-  }
-  return d;
-}
+/*
+ * Ribbon centre lines as a handful of cubic Béziers whose joins share a tangent, so the band has a
+ * constant, kink-free curvature (a path threaded through many waypoints wobbles).
+ */
 
 /**
- * Centre line of the ribbon in the 1624 × 1122 desktop design space: enters from the left,
- * dips under the nurse card, and comes out on the right rising to the edge.
+ * 1624 × 1122 desktop design space: enters from the left, levels out at a trough just before the
+ * card, rises steeply behind it, and leaves on the right flattening out toward the edge.
  */
-export const DESKTOP_RIBBON = smoothPath([
-  [-400, 503],
-  [-188, 583],
-  [0, 663],
-  [188, 745],
-  [428, 818],
-  [540, 826],
-  [616, 815],
-  [850, 655],
-  [1074, 493],
-  [1173, 440],
-  [1278, 385],
-  [1383, 352],
-  [1500, 338],
-  [1624, 342],
-  [1800, 370],
-  [2000, 410],
-]);
+export const DESKTOP_RIBBON =
+  'M-400,503 C-50,625.5 325,840 540,826 ' + // down to the trough
+  'C790,810 874,603 1074,493 ' + // up behind the card, slope ≈ -0.55 where it re-emerges
+  'C1224,410.5 1325,344 1500,338 ' + // flatten out
+  'C1750,330 1750,360 2000,400'; // gentle fall off the right edge
 
-/** Same idea for the 400 × 620 phone layout. */
-export const MOBILE_RIBBON = smoothPath([
-  [-200, 400],
-  [-60, 440],
-  [60, 490],
-  [180, 500],
-  [260, 460],
-  [330, 380],
-  [420, 300],
-  [520, 270],
-  [700, 300],
-]);
+/** 400 × 560 phone layout, same shape. */
+export const MOBILE_RIBBON =
+  'M-200,420 C-80,462 70,500 170,500 ' +
+  'C250,500 270,420 330,380 ' +
+  'C390,340 430,270 520,270 ' +
+  'C610,270 620,290 700,300';
