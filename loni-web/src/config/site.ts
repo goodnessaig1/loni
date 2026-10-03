@@ -8,4 +8,5 @@ export const SITE = {
   joinNurseHref: '#nurses',
   talkToNurseHref: '#talk-to-a-nurse',
   joinCommunityHref: '#community',
+  partnerSupportHref: '#partners',
 } as const;
