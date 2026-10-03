@@ -6,6 +6,11 @@ import { CommunityCard } from './CommunityCard';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 const HEADING_LINES = ['Pregnancy feels better', 'with people who', 'understand.'];
+const PARAGRAPH_LINES = [
+  'Share, learn, and connect with other mothers going through their',
+  "own journeys. Sometimes it helps to hear from someone who's been",
+  'there too.',
+];
 
 export function CommunitySection() {
   return (
@@ -46,10 +51,13 @@ export function CommunitySection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.6 }}
               transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
-              className="mt-6 max-w-[39rem] text-base leading-[1.95] sm:text-lg lg:mt-[4.2%] lg:max-w-[min(36.2vw,38rem)] lg:text-[min(1.17vw,1.22rem)]"
+              className="mt-6 max-w-[39rem] text-base leading-[1.95] sm:text-lg lg:mt-[4.2%] lg:text-[min(1.17vw,1.22rem)]"
             >
-              Share, learn, and connect with other mothers going through their own journeys. Sometimes it helps to
-              hear from someone who&apos;s been there too.
+              {PARAGRAPH_LINES.map((line) => (
+                <span key={line}>
+                  <span className="lg:block lg:whitespace-nowrap">{line}</span>{' '}
+                </span>
+              ))}
             </motion.p>
 
             <motion.div
