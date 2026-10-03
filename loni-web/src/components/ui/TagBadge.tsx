@@ -26,26 +26,15 @@ export function TagBadge({
         whileHover={{ rotate: 0, scale: 1.05 }}
         className={`relative inline-flex select-none cursor-pointer ${className}`}
       >
-        {/* Offset dashed border background layer */}
+        {/* Dashed outline, nudged down-right of the pill like the Figma sticker. */}
         <span
-          className="absolute inset-0 rounded-[70px] border-2 border-dashed border-[#095100] opacity-[0.81]"
-          style={{
-            transform: 'translate(3.59px, 3.59px)',
-            borderStyle: 'dashed',
-          }}
+          className="absolute -inset-0.5 rounded-full border-[2.5px] border-dashed border-[#2F6B1F]/70"
+          style={{ transform: 'translate(1px, 3px)' }}
           aria-hidden="true"
         />
 
-        {/* Top main pill badge */}
-        <span
-          className="relative inline-flex items-center gap-[14px] rounded-[70px] bg-[#15B300] px-[17px] py-[10px] text-xs font-semibold text-white shadow-sm sm:text-sm"
-          style={{
-            borderWidth: '1px 1px 0px 1px',
-            borderStyle: 'solid',
-            borderColor: '#0C6800A3',
-          }}
-        >
-          <span className="size-2.5 shrink-0 rounded-full bg-white" aria-hidden="true" />
+        <span className="relative inline-flex items-center gap-4 rounded-full bg-[#55AF33] px-5 py-3 text-[15px] font-semibold leading-snug tracking-[0.01em] text-white shadow-[0_3px_0_#47753A]">
+          <span className="size-[7px] shrink-0 rounded-full bg-white" aria-hidden="true" />
           <span>{children}</span>
         </span>
       </motion.div>

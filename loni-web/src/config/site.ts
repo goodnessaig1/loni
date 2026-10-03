@@ -5,4 +5,6 @@ export const SITE = {
   supportHref: '#support',
   downloadHref: '#download',
   joinDriverHref: '#drivers',
+  joinNurseHref: '#nurses',
+  talkToNurseHref: '#talk-to-a-nurse',
 } as const;

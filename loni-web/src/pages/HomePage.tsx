@@ -6,6 +6,7 @@ import { RoadsShowcase } from '../components/showcase/RoadsShowcase';
 import { ProblemSection } from '../components/problem/ProblemSection';
 import { EmergencySection } from '../components/emergency/EmergencySection';
 import { LoniBotSection } from '../components/lonibot/LoniBotSection';
+import { NurseSection } from '../components/nurse/NurseSection';
 
 export default function HomePage() {
   return (
@@ -23,6 +24,7 @@ export default function HomePage() {
         <ProblemSection />
         <EmergencySection />
         <LoniBotSection />
+        <NurseSection />
       </main>
     </motion.div>
   );
