@@ -1,6 +1,31 @@
 @import "tailwindcss";
 
-body {
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  background-color: #FAFAFA;
+@theme {
+  --font-sans: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --color-brand: #d62d88;
+  --color-hero-base: #f7389d;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    font-optical-sizing: auto;
+  }
+
+  body {
+    background-color: #fafafa;
+  }
+}
+
+/* Soft, blurry pink field sampled from the design's hero background. */
+@utility bg-hero-pink {
+  background-color: var(--color-hero-base);
+  background-image:
+    radial-gradient(50% 38% at 0% 0%, #f981c3 0%, rgb(249 129 195 / 0) 100%),
+    radial-gradient(45% 36% at 0% 100%, #fa86c7 0%, rgb(250 134 199 / 0) 100%),
+    radial-gradient(60% 22% at 42% 106%, #f95eb2 0%, rgb(249 94 178 / 0) 100%),
+    radial-gradient(14% 36% at 0% 52%, #f44aa3 0%, rgb(244 74 163 / 0) 100%),
+    radial-gradient(34% 55% at 64% 46%, #fd51ad 0%, rgb(253 81 173 / 0) 100%),
+    radial-gradient(34% 42% at 24% 56%, #f12890 0%, rgb(241 40 144 / 0) 100%);
 }
