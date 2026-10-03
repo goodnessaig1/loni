@@ -141,7 +141,7 @@ export function JourneySection() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <section aria-labelledby="journey-title" className="relative overflow-hidden bg-brand lg:-mx-5">
+      <section id="journey" aria-labelledby="journey-title" className="relative overflow-hidden bg-brand lg:-mx-5">
         {/* Same ribbon on both layouts; on desktop it is anchored in the stage's coordinates instead. */}
         {!isDesktop && <JourneySwirl className="-bottom-6 -left-[8%] w-[92%] sm:w-[70%]" />}
         {isDesktop ? <DesktopLayout /> : <StackedLayout />}

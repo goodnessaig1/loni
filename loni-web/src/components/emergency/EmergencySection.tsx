@@ -16,6 +16,7 @@ export function EmergencySection() {
     <MotionConfig reducedMotion="user">
       <section
         ref={sectionRef}
+        id="drivers"
         aria-labelledby="emergency-title"
         className="relative overflow-hidden bg-brand text-white lg:-mx-5"
       >

@@ -11,6 +11,7 @@ import { CommunitySection } from '../components/community/CommunitySection';
 import { PartnerSection } from '../components/partner/PartnerSection';
 import { JourneySection } from '../components/journey/JourneySection';
 import { PricingSection } from '../components/pricing/PricingSection';
+import { SiteFooter } from '../components/footer/SiteFooter';
 
 export default function HomePage() {
   return (
@@ -34,6 +35,7 @@ export default function HomePage() {
         <JourneySection />
         <PricingSection />
       </main>
+      <SiteFooter />
     </motion.div>
   );
 }

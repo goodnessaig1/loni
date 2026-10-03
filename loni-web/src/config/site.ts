@@ -9,4 +9,8 @@ export const SITE = {
   talkToNurseHref: '#talk-to-a-nurse',
   joinCommunityHref: '#community',
   partnerSupportHref: '#partners',
+  exploreLoniPlusHref: '#pricing',
+  privacyHref: '#privacy',
+  termsHref: '#terms',
+  disclaimerHref: '#disclaimer',
 } as const;
