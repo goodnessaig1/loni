@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router';
 import { SITE } from '../../config/site';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -10,13 +11,23 @@ const DESCRIPTION_LINES = [
   'through postpartum.',
 ];
 
-const GROUPS = [
+const LINK_CLASS = 'inline-block leading-[1.5] text-neutral-400 transition-colors hover:text-black';
+
+interface FooterLink {
+  label: string;
+  /** In-app route (router link). */
+  to?: string;
+  /** In-page anchor / external URL. */
+  href?: string;
+}
+
+const GROUPS: { title: string; links: FooterLink[] }[] = [
   {
     title: 'Join LONI',
     links: [
       { label: 'For Partners & Family', href: SITE.partnerSupportHref },
       { label: 'For Nurses', href: SITE.joinNurseHref },
-      { label: 'For Drivers', href: SITE.joinDriverHref },
+      { label: 'For Drivers', to: '/drivers' },
     ],
   },
   {
@@ -58,12 +69,15 @@ export function FooterInfoCard({ className = '', style }: { className?: string; 
             <ul className="mt-[1.3em] flex flex-col gap-[0.5em] lg:mt-[2.24em] lg:gap-[0.74em]">
               {group.links.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="inline-block leading-[1.5] text-neutral-400 transition-colors hover:text-black"
-                  >
-                    {link.label}
-                  </a>
+                  {link.to ? (
+                    <Link to={link.to} className={LINK_CLASS}>
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a href={link.href} className={LINK_CLASS}>
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

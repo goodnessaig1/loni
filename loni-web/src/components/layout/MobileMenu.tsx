@@ -60,13 +60,12 @@ export function MobileMenu({ id, open, onClose }: Props) {
             <ul hidden={!forYouOpen} className="mb-1 ml-4 flex flex-col border-l border-pink-100 pl-2">
               {FOR_YOU_LINKS.map((item) => (
                 <li key={item.label}>
-                  <a
-                    href={item.href}
+                  <NavItem
+                    item={item}
                     onClick={onClose}
-                    className="block rounded-xl px-3 py-2 text-[15px] font-medium text-neutral-700 transition-colors hover:bg-pink-50 hover:text-brand"
-                  >
-                    {item.label}
-                  </a>
+                    className="block rounded-xl px-3 py-2 text-[15px] font-medium transition-colors hover:bg-pink-50"
+                    inactiveClassName="text-neutral-700 hover:text-brand"
+                  />
                 </li>
               ))}
             </ul>
