@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 
+/** Colourways for the filled, dashed-outline sticker badges. */
+const STICKERS = {
+  green: { body: 'bg-[#55AF33] shadow-[0_3px_0_#47753A]', ring: 'border-[#2F6B1F]/70' },
+  pink: { body: 'bg-brand shadow-[0_3px_0_#9E1F66]', ring: 'border-[#7A1148]/60' },
+} as const;
+
 /**
  * The slightly tilted, dashed-edge label pill ("Emergency transportation").
  * Pops in with a spring and re-plays every time it scrolls into view.
@@ -12,11 +18,11 @@ export function TagBadge({
 }: {
   children: ReactNode;
   className?: string;
-  variant?: 'default' | 'green';
+  variant?: 'default' | 'green' | 'pink';
 }) {
-  const isGreen = variant === 'green';
+  const sticker = variant === 'default' ? null : STICKERS[variant];
 
-  if (isGreen) {
+  if (sticker) {
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.8, rotate: -8 }}
@@ -28,12 +34,12 @@ export function TagBadge({
       >
         {/* Dashed outline, nudged down-right of the pill like the Figma sticker. */}
         <span
-          className="absolute -inset-0.5 rounded-full border-[2.5px] border-dashed border-[#2F6B1F]/70"
+          className={`absolute -inset-0.5 rounded-full border-[2.5px] border-dashed ${sticker.ring}`}
           style={{ transform: 'translate(1px, 3px)' }}
           aria-hidden="true"
         />
 
-        <span className="relative inline-flex items-center gap-4 rounded-full bg-[#55AF33] px-5 py-3 text-[15px] font-semibold leading-snug tracking-[0.01em] text-white shadow-[0_3px_0_#47753A]">
+        <span className={`relative inline-flex items-center gap-4 rounded-full px-5 py-3 text-[15px] font-semibold leading-snug tracking-[0.01em] text-white ${sticker.body}`}>
           <span className="size-[7px] shrink-0 rounded-full bg-white" aria-hidden="true" />
           <span>{children}</span>
         </span>

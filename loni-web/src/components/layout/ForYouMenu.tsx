@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { NavItem } from './NavItem';
 import { FOR_YOU_LINKS } from './navLinks';
 
 /** "For You" desktop dropdown. Click/tap or keyboard to open, Esc / outside click to close. */
@@ -47,14 +48,13 @@ export function ForYouMenu({ className = '' }: { className?: string }) {
         className="absolute left-1/2 top-full z-50 mt-4 w-44 -translate-x-1/2 rounded-2xl bg-white p-2 shadow-xl ring-1 ring-black/5"
       >
         {FOR_YOU_LINKS.map((item) => (
-          <a
+          <NavItem
             key={item.label}
-            href={item.href}
+            item={item}
             onClick={() => setOpen(false)}
-            className="block rounded-xl px-3 py-2 text-[15px] font-medium text-neutral-800 transition-colors hover:bg-pink-50 hover:text-brand"
-          >
-            {item.label}
-          </a>
+            className="block rounded-xl px-3 py-2 text-[15px] font-medium transition-colors hover:bg-pink-50"
+            inactiveClassName="text-neutral-800 hover:text-brand"
+          />
         ))}
       </div>
     </div>

@@ -10,6 +10,8 @@ export const SITE = {
   joinCommunityHref: '#community',
   partnerSupportHref: '#partners',
   exploreLoniPlusHref: '#pricing',
+  driverHowItWorksHref: '#how-it-works',
+  driverSignupHref: '#join-driver',
   privacyHref: '#privacy',
   termsHref: '#terms',
   disclaimerHref: '#disclaimer',
