@@ -12,6 +12,7 @@ export const SITE = {
   exploreLoniPlusHref: '#pricing',
   driverHowItWorksHref: '#how-it-works',
   driverSignupHref: '#join-driver',
+  driverTrainingHref: '#training-guide',
   privacyHref: '#privacy',
   termsHref: '#terms',
   disclaimerHref: '#disclaimer',

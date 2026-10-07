@@ -4,6 +4,7 @@ import { SiteFooter } from '../components/footer/SiteFooter';
 import { Header } from '../components/layout/Header';
 import { DriverEarningsSection } from '../components/drivers/DriverEarningsSection';
 import { RequestVisibilitySection } from '../components/drivers/RequestVisibilitySection';
+import { TrainingSection } from '../components/drivers/TrainingSection';
 import { WhyDriversSection } from '../components/drivers/WhyDriversSection';
 
 export default function DriversPage() {
@@ -20,6 +21,7 @@ export default function DriversPage() {
         <WhyDriversSection />
         <RequestVisibilitySection />
         <DriverEarningsSection />
+        <TrainingSection />
       </main>
       <SiteFooter />
     </motion.div>

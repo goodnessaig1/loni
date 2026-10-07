@@ -71,20 +71,23 @@ function Heading({
       initial="hide"
       whileInView="show"
       viewport={{ once: false, amount: 0.6 }}
+      variants={{ hide: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.9 } } }}
       className={`font-medium tracking-[-0.02em] text-black ${className}`}
       style={style}
     >
       {lines.map((line, i) => (
-        <span key={line} className="block overflow-hidden pb-[0.1em]">
-          <motion.span
-            className="block"
-            variants={{
-              hide: { y: '110%', transition: { duration: 0.4 } },
-              show: { y: 0, transition: { duration: 1.3, delay: 0.1 + i * 0.18, ease: EASE } },
-            }}
-          >
-            {line}
-          </motion.span>
+        <span key={line}>
+          <span className="inline lg:block lg:overflow-hidden lg:pb-[0.1em]">
+            <motion.span
+              className="inline lg:block"
+              variants={{
+                hide: { y: '110%', transition: { duration: 0.4 } },
+                show: { y: 0, transition: { duration: 1.3, delay: 0.1 + i * 0.18, ease: EASE } },
+              }}
+            >
+              {line}
+            </motion.span>
+          </span>{' '}
         </span>
       ))}
     </motion.h2>
