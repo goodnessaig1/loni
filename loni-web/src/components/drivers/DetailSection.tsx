@@ -7,7 +7,8 @@ import { TagBadge } from '../ui/TagBadge';
 
 export interface Detail {
   title: string;
-  text: string;
+  /** Omit for a single-line row (just the arrow and the statement). */
+  text?: string;
 }
 
 export interface CardAsset {
@@ -23,13 +24,18 @@ export interface DetailCanvas {
   h: number;
   badge: Point;
   heading: Point;
-  intro: Point;
+  /** Omit when the section has no intro paragraph. */
+  intro?: Point;
   list: readonly [number, number, number];
   card: readonly [number, number, number];
   headingSize: number;
   headingLh: number;
-  introSize: number;
-  introLh: number;
+  introSize?: number;
+  introLh?: number;
+  /** Base font size of the detail list, in design px (default 16.5). */
+  listFont?: number;
+  /** Row height of the detail list in `em` (default 8.6; single-line rows are shorter). */
+  rowHeight?: number;
 }
 
 export interface DetailSectionProps {
@@ -37,7 +43,7 @@ export interface DetailSectionProps {
   titleId: string;
   badge: string;
   heading: string[];
-  intro: string[];
+  intro?: string[];
   details: Detail[];
   card: CardAsset;
   canvas: DetailCanvas;
@@ -116,15 +122,17 @@ function Intro({ lines, className = '', style }: { lines: string[]; className?: 
 /** "→ Pickup location / See exactly…" rows separated by lines that draw themselves in. Sized in `em`. */
 function DetailList({
   details,
+  rowHeight = 8.6,
   className = '',
   style,
 }: {
   details: Detail[];
+  rowHeight?: number;
   className?: string;
   style?: CSSProperties;
 }) {
   return (
-    <ul className={className} style={style}>
+    <ul className={className} style={{ ...style, ['--row-h' as string]: `${rowHeight}em` }}>
       {details.map((item, i) => (
         <motion.li
           key={item.title}
@@ -135,19 +143,27 @@ function DetailList({
             hide: { opacity: 0, x: -28, transition: { duration: 0.4 } },
             show: { opacity: 1, x: 0, transition: { duration: 1.2, delay: 0.1 + i * 0.12, ease: EASE } },
           }}
-          className="group relative py-6 pl-12 lg:h-[8.6em] lg:py-0 lg:pl-0"
+          className={`group relative pl-12 lg:h-[var(--row-h)] lg:py-0 lg:pl-0 ${item.text ? 'py-6' : 'py-5'}`}
         >
           <ArrowRight
-            className="absolute left-0 top-[1.9rem] size-6 transition-transform duration-500 ease-out group-hover:translate-x-2 lg:left-[0.36em] lg:top-[3.5em] lg:size-[1.6em]"
+            className={`absolute left-0 size-6 transition-transform duration-500 ease-out group-hover:translate-x-2 lg:left-[0.36em] lg:size-[1.6em] ${
+              item.text ? 'top-[1.9rem] lg:top-[3.5em]' : 'top-[1.25rem] lg:top-[calc(50%-0.8em)]'
+            }`}
             strokeWidth={1.75}
             aria-hidden="true"
           />
-          <h3 className="text-[1.1rem] font-medium leading-snug transition-colors duration-500 group-hover:text-brand lg:absolute lg:left-[3.667em] lg:top-[1.75em] lg:text-[1.2em] lg:leading-[1.3]">
+          <h3
+            className={`text-[1.1rem] font-medium leading-snug transition-colors duration-500 group-hover:text-brand lg:absolute lg:left-[3.667em] lg:text-[1.2em] lg:leading-[1.3] ${
+              item.text ? 'lg:top-[1.75em]' : 'lg:top-[calc(50%-0.65em)]'
+            }`}
+          >
             {item.title}
           </h3>
-          <p className="mt-2 text-[0.95rem] leading-snug lg:absolute lg:left-[4.4em] lg:top-[4.95em] lg:mt-0 lg:text-[1em] lg:leading-[1.4]">
-            {item.text}
-          </p>
+          {item.text && (
+            <p className="mt-2 text-[0.95rem] leading-snug lg:absolute lg:left-[4.4em] lg:top-[4.95em] lg:mt-0 lg:text-[1em] lg:leading-[1.4]">
+              {item.text}
+            </p>
+          )}
           {i < details.length - 1 && (
             <motion.span
               aria-hidden="true"
@@ -206,12 +222,14 @@ function DesktopLayout({ props }: { props: DetailSectionProps }) {
         lines={props.heading}
         style={at(c.heading[0], c.heading[1], { fontSize: px(c.headingSize), lineHeight: px(c.headingLh) })}
       />
-      <Intro
-        lines={props.intro}
-        style={at(c.intro[0], c.intro[1], { fontSize: px(c.introSize), lineHeight: px(c.introLh) })}
-      />
+      {props.intro && c.intro && (
+        <Intro
+          lines={props.intro}
+          style={at(c.intro[0], c.intro[1], { fontSize: px(c.introSize ?? 19.5), lineHeight: px(c.introLh ?? 37) })}
+        />
+      )}
 
-      <DetailList details={props.details} style={at(c.list[0], c.list[1], { width: px(c.list[2]), fontSize: px(16.5) })} />
+      <DetailList details={props.details} rowHeight={c.rowHeight} style={at(c.list[0], c.list[1], { width: px(c.list[2]), fontSize: px(c.listFont ?? 16.5) })} />
       <CardImage card={props.card} style={at(c.card[0], c.card[1], { width: px(c.card[2]) })} />
     </div>
   );
@@ -222,7 +240,7 @@ function StackedLayout({ props }: { props: DetailSectionProps }) {
     <div className="mx-auto max-w-[34rem] px-5 pb-16 pt-12 sm:px-8 sm:pb-20 sm:pt-16">
       <TagBadge variant="pink">{props.badge}</TagBadge>
       <Heading id={props.titleId} lines={props.heading} className="mt-7 text-[1.9rem] leading-[1.25] sm:text-4xl" />
-      <Intro lines={props.intro} className="mt-5 text-[0.95rem] leading-[1.7] sm:text-base" />
+      {props.intro && <Intro lines={props.intro} className="mt-5 text-[0.95rem] leading-[1.7] sm:text-base" />}
       <DetailList details={props.details} className="mt-8 border-t border-transparent" />
       <CardImage card={props.card} className="mt-10 w-full" />
     </div>
