@@ -32,19 +32,22 @@ export function EmergencySection() {
                 initial="hide"
                 whileInView="show"
                 viewport={{ once: false, amount: 0.6 }}
+                variants={{ hide: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.5 } } }}
                 className="mt-8 text-[2rem] font-bold leading-[1.25] sm:text-4xl lg:text-[2.75rem] lg:leading-[1.3]"
               >
                 {HEADING_LINES.map((line, i) => (
-                  <span key={line} className="block overflow-hidden">
-                    <motion.span
-                      className="block"
-                      variants={{
-                        hide: { y: '110%', transition: { duration: 0.3 } },
-                        show: { y: 0, transition: { duration: 0.7, delay: i * 0.1, ease: EASE } },
-                      }}
-                    >
-                      {line}
-                    </motion.span>
+                  <span key={line}>
+                    <span className="inline lg:block lg:overflow-hidden">
+                      <motion.span
+                        className="inline lg:block"
+                        variants={{
+                          hide: { y: '110%', transition: { duration: 0.3 } },
+                          show: { y: 0, transition: { duration: 0.7, delay: i * 0.1, ease: EASE } },
+                        }}
+                      >
+                        {line}
+                      </motion.span>
+                    </span>{' '}
                   </span>
                 ))}
               </motion.h2>
@@ -69,7 +72,7 @@ export function EmergencySection() {
             whileInView={{ opacity: 1, scale: 1, y: 0 }}
             viewport={{ once: false, amount: 0.3 }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="mt-10 flex lg:mt-[55px] lg:justify-end"
+            className="mt-8 flex justify-end lg:mt-[55px]"
           >
             <ArrowPillButton href={SITE.joinDriverHref} variant="light">
               Join LONI as a Driver

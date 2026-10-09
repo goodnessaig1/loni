@@ -27,7 +27,7 @@ export function HeroPortrait() {
           delay: 0.2,
           ease: [0.16, 1, 0.3, 1],
         }}
-        className="absolute left-[48%] top-[13%] h-[84%] w-auto max-w-none select-none lg:left-auto lg:right-[5%] lg:top-auto lg:bottom-0 lg:h-full"
+        className="absolute left-[48%] bottom-0 h-[88%] w-auto max-w-none select-none lg:left-auto lg:right-[5%] lg:h-full"
       />
     </div>
   );

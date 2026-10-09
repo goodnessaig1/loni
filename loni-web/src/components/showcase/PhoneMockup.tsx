@@ -1,5 +1,5 @@
 import { motion, type MotionValue } from 'framer-motion';
-import phone from '../../assets/showcase/phone.webp';
+import phone from '../../assets/showcase/phone1.webp';
 import { MotherBadge } from './MotherBadge';
 import { box } from './designUnits';
 import { phoneVariants } from './motionPresets';

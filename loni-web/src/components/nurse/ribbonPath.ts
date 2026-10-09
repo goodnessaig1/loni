@@ -13,9 +13,12 @@ export const DESKTOP_RIBBON =
   'C1224,410.5 1325,344 1500,338 ' + // flatten out
   'C1750,330 1750,360 2000,400'; // gentle fall off the right edge
 
-/** 400 × 560 phone layout, same shape. */
+/**
+ * 400 × 500 phone layout: a gentle dip in from the left that disappears behind the card, then a steep
+ * climb out of its right edge toward the top-right corner (as in the mobile design).
+ */
 export const MOBILE_RIBBON =
-  'M-200,420 C-80,462 70,500 170,500 ' +
-  'C250,500 270,420 330,380 ' +
-  'C390,340 430,270 520,270 ' +
-  'C610,270 620,290 700,300';
+  'M-250,228 C-120,262 40,300 110,304 ' +
+  'C200,309 260,260 336,217 ' +
+  'C381,191 405,163 460,110 ' +
+  'C490,80 540,40 600,0';
