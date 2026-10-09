@@ -163,19 +163,23 @@ function StackedLayout() {
       <Heading className="mt-7 text-[2rem] leading-[1.25] sm:text-4xl" />
       <Pills className="mt-7 gap-3 text-[15px]" />
 
-      <div className="relative mx-auto mt-12 aspect-[400/560] w-full max-w-[26rem]">
-        <TextRibbon d={MOBILE_RIBBON} viewBox="0 0 400 560" strokeWidth={46} fontSize={24} speed={50} />
-        <div className="absolute left-[20%] top-[9%] aspect-[393/727] w-[60%]">
+      <div className="relative mx-auto mt-12 aspect-[400/500] w-full max-w-[26rem]">
+        <TextRibbon d={MOBILE_RIBBON} viewBox="0 0 400 500" strokeWidth={44} fontSize={24} speed={50} />
+        <div className="absolute left-[27%] top-[9%] aspect-[393/727] w-[57%]">
           <NurseCardStack />
         </div>
-        <JoinNurseButton className="absolute right-0 top-[55%] text-[13px]" />
+        <JoinNurseButton className="absolute left-[47%] top-[58%] text-[12px]" />
       </div>
 
-      <motion.p {...paragraphMotion} className="mt-8 text-base leading-8 text-neutral-950 sm:text-lg sm:leading-9">
+      {/* The copy is indented to line up under the card, as in the design. */}
+      <motion.p
+        {...paragraphMotion}
+        className="ml-[33%] mt-8 text-[0.92rem] leading-[1.65] text-neutral-950 sm:text-base"
+      >
         When you need more than an AI answer, LONI connects you with a nurse through a voice call. No typing it out, no
         waiting, just a real person who listens and supports you.
       </motion.p>
-      <Cta className="mt-8" />
+      <Cta className="ml-[33%] mt-6" />
     </div>
   );
 }

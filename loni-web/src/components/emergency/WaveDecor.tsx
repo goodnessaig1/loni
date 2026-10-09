@@ -5,7 +5,8 @@ import wave from '../../assets/emergency/wave.webp';
 /**
  * The translucent ribbon behind the content. One asset serves as both the
  * wave along the bottom and the curl at the right edge (the image covers the
- * middle of it). It drifts slowly with scroll, and fades/scales in and out.
+ * middle of it). It drifts slowly with scroll, and fades/scales in and out. Desktop only: the mobile
+ * design has a plain pink background.
  */
 export function WaveDecor({ sectionRef }: { sectionRef: RefObject<HTMLElement | null> }) {
   const reduceMotion = useReducedMotion();
@@ -16,7 +17,7 @@ export function WaveDecor({ sectionRef }: { sectionRef: RefObject<HTMLElement | 
     <motion.div
       aria-hidden="true"
       style={{ y: reduceMotion ? 0 : y }}
-      className="pointer-events-none absolute left-[22%] top-[44%] w-[135%] select-none lg:left-[52.5%] lg:top-[40.5%] lg:w-[47.5%]"
+      className="pointer-events-none absolute left-[52.5%] top-[40.5%] hidden w-[47.5%] select-none lg:block"
     >
       <motion.img
         src={wave}
