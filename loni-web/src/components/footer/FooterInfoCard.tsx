@@ -1,7 +1,6 @@
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router';
-import { SITE } from '../../config/site';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -25,17 +24,17 @@ const GROUPS: { title: string; links: FooterLink[] }[] = [
   {
     title: 'Join LONI',
     links: [
-      { label: 'For Partners & Family', href: SITE.partnerSupportHref },
-      { label: 'For Nurses', href: SITE.joinNurseHref },
+      { label: 'For Partners & Family', to: '/partners' },
+      { label: 'For Nurses', to: '/nurses' },
       { label: 'For Drivers', to: '/drivers' },
     ],
   },
   {
     title: 'Legal',
     links: [
-      { label: 'Privacy Policy', href: SITE.privacyHref },
-      { label: 'Terms of Service', href: SITE.termsHref },
-      { label: 'Medical Disclaimer', href: SITE.disclaimerHref },
+      { label: 'Privacy Policy', to: '/privacy' },
+      { label: 'Terms of Service', to: '/terms' },
+      { label: 'Medical Disclaimer', to: '/disclaimer' },
     ],
   },
 ];

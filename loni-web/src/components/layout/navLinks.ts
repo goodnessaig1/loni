@@ -15,7 +15,7 @@ export const NAV_LINKS: NavLinkItem[] = [
 
 export const FOR_YOU_LINKS: NavLinkItem[] = [
   { label: 'Mothers', href: '#mothers' },
-  { label: 'Partners', href: '#partners' },
-  { label: 'Nurses', href: '#nurses' },
+  { label: 'Partners', to: '/partners' },
+  { label: 'Nurses', to: '/nurses' },
   { label: 'Drivers', to: '/drivers' },
 ];
