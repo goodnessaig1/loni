@@ -178,22 +178,18 @@ export function RoleHero({
     <MotionConfig reducedMotion="user">
       <section
         aria-labelledby={titleId}
-        className="relative flex min-h-[45.6rem] flex-col overflow-hidden rounded-b-[1.5rem] md:min-h-[52rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_2.5rem))] lg:rounded-b-[28px]"
+        className="relative flex min-h-[45.6rem] flex-col overflow-hidden rounded-b-[1.5rem] bg-black md:min-h-[52rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_2.5rem))] lg:rounded-b-[28px] lg:pt-14"
       >
-        {/* Fills the header's tab (the gap between its two white plates). */}
-        <div aria-hidden="true" className="absolute inset-x-0 top-0 hidden h-14 bg-black lg:block" />
-
         <motion.div
           aria-hidden="true"
           initial={{ scale: 1.06, opacity: 0.5 }}
           whileInView={{ scale: 1, opacity: 1 }}
           viewport={{ once: false, amount: 0.3 }}
           transition={{ duration: 1.6, ease: EASE }}
-          className="absolute inset-x-0 bottom-0 top-[-8.5%] [background-position:0_0,var(--focus-x)_0] [background-repeat:no-repeat] [background-size:100%_100%,cover] [mask-position:var(--focus-x)_0] [mask-repeat:no-repeat] [mask-size:cover] lg:top-[calc(3.5rem-0.0647*(100%-3.5rem))] lg:[background-position:0_0,50%_0] lg:[mask-position:50%_0]"
+          className="absolute inset-0 bg-cover bg-no-repeat"
           style={{
             backgroundImage: `${VIGNETTE}, url(${photo})`,
-            maskImage: `url(${photo})`,
-            WebkitMaskImage: `url(${photo})`,
+            backgroundPosition: `var(--focus-x) center`,
             ['--focus-x' as string]: focusX,
           }}
         />
