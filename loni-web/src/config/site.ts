@@ -2,7 +2,8 @@
 export const SITE = {
   name: 'LONI',
   instagramUrl: 'https://www.instagram.com/',
-  supportHref: '#support',
+  supportEmail: 'support@lonimum.com',
+  supportHref: 'mailto:support@lonimum.com',
   downloadHref: '#download',
   joinDriverHref: '#drivers',
   joinNurseHref: '#nurses',
@@ -15,6 +16,7 @@ export const SITE = {
   driverTrainingHref: '#training-guide',
   nurseHowItWorksHref: '#how-it-works',
   partnerJoinHref: '#join-partner',
+  exploreLoniHref: '/',
   nurseSignupHref: '#join-nurse',
   privacyHref: '#privacy',
   termsHref: '#terms',
