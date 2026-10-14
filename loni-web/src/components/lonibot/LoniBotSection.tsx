@@ -71,7 +71,7 @@ export function LoniBotSection() {
     <MotionConfig reducedMotion="user">
       <section
         aria-labelledby="lonibot-title"
-        className="relative overflow-hidden bg-white text-neutral-900 lg:-mx-5"
+        className="relative overflow-hidden bg-white text-neutral-900 lg:-mx-3"
       >
         <div className="mx-auto max-w-[90rem] px-5 py-16 sm:px-8 sm:py-20 lg:px-14 lg:py-24">
           {/* Header grid */}

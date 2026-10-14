@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { NavItem } from './NavItem';
 import { FOR_YOU_LINKS } from './navLinks';
@@ -42,20 +43,57 @@ export function ForYouMenu({ className = '' }: { className?: string }) {
         />
       </button>
 
-      <div
-        id={panelId}
-        hidden={!open}
-        className="absolute left-1/2 top-full z-50 mt-4 w-44 -translate-x-1/2 rounded-2xl bg-white p-2 shadow-xl ring-1 ring-black/5"
-      >
-        {FOR_YOU_LINKS.map((item) => (
-          <NavItem
-            key={item.label}
-            item={item}
-            onClick={() => setOpen(false)}
-            className="block rounded-xl px-3 py-2 text-[15px] font-medium transition-colors hover:bg-pink-50"
-            inactiveClassName="text-neutral-800 hover:text-brand"
-          />
-        ))}
+      {/* The outer div only positions (framer would overwrite its translate); the inner one animates. */}
+      <div className="absolute left-1/2 top-full z-50 w-[22.5rem] -translate-x-1/2">
+        <AnimatePresence>
+          {open && (
+            <MotionConfig reducedMotion="user">
+              <motion.div
+                id={panelId}
+                initial="hide"
+                animate="show"
+                exit="hide"
+                variants={{
+                  show: { transition: { staggerChildren: 0.09, delayChildren: 0.04 } },
+                  hide: { transition: { staggerChildren: 0.04, staggerDirection: -1 } },
+                }}
+                className="mt-3 flex flex-col gap-2"
+              >
+                {FOR_YOU_LINKS.map((item) => (
+                  <motion.div
+                    key={item.label}
+                    style={{ transformOrigin: '50% 0%' }}
+                    variants={{
+                      hide: { opacity: 0, y: -22, scale: 0.86, filter: 'blur(6px)', transition: { duration: 0.2 } },
+                      show: {
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                        filter: 'blur(0px)',
+                        transition: { type: 'spring', stiffness: 240, damping: 17 },
+                      },
+                    }}
+                  >
+                    <NavItem
+                      item={item}
+                      onClick={() => setOpen(false)}
+                      className="group block rounded-[2.5rem] border border-neutral-200 bg-white px-7 py-4 shadow-[0_10px_30px_-12px_rgb(0_0_0/0.25)] transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_34px_-12px_rgb(214_45_136/0.45)]"
+                      activeClassName="text-black"
+                      inactiveClassName="text-black"
+                    >
+                      <span className="block text-[1.05rem] font-semibold leading-snug transition-colors group-hover:text-brand">
+                        {item.label.startsWith('Partners') ? 'For Partners & Family' : `For ${item.label}`}
+                      </span>
+                      <span className="mt-1 block text-[0.95rem] font-normal leading-snug text-neutral-500">
+                        {item.description}
+                      </span>
+                    </NavItem>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </MotionConfig>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

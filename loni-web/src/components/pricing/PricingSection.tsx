@@ -17,7 +17,7 @@ const H = 1180;
 export function PricingSection() {
   return (
     <MotionConfig reducedMotion="user">
-      <section id="pricing" aria-labelledby="pricing-title" className="relative overflow-hidden bg-black text-white lg:-mx-5">
+      <section id="pricing" aria-labelledby="pricing-title" className="relative overflow-hidden bg-black text-white lg:-mx-3">
         {/* Below lg this is a normal stacked column; from lg it is the absolutely-positioned Figma stage. */}
         <div className="@container relative mx-auto w-full max-w-[1484px] px-5 pb-16 pt-14 sm:px-8 sm:pb-20 sm:pt-20 lg:p-0 lg:[--u:calc(100cqw/1484)]">
           <div className="lg:absolute lg:left-[calc(var(--u)*54)] lg:top-[calc(var(--u)*90)]">

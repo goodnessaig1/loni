@@ -112,7 +112,7 @@ export function SiteFooter() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <footer className="relative overflow-hidden bg-black text-white lg:-mx-5 lg:-mb-5">
+      <footer className="relative overflow-hidden bg-black text-white lg:-mx-3 lg:-mb-3">
         {isDesktop ? <DesktopLayout /> : <StackedLayout />}
       </footer>
     </MotionConfig>

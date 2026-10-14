@@ -13,7 +13,7 @@ export function Hero() {
   return (
     <section
       aria-labelledby="hero-title"
-      className="relative flex flex-col bg-hero-pink min-h-[52rem] md:min-h-[58rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_2.5rem))] lg:rounded-b-[28px] lg:pt-14 overflow-hidden"
+      className="relative flex flex-col bg-hero-pink min-h-[52rem] md:min-h-[58rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_1.5rem))] lg:rounded-b-[28px] lg:pt-14 overflow-hidden"
     >
       <HeroPortrait />
 
@@ -22,7 +22,7 @@ export function Hero() {
 
         <ConnectedCard className="mt-14 self-end lg:absolute lg:right-9 lg:top-16 lg:mt-0" />
 
-        <div className="mt-auto flex flex-col gap-5 pt-10 lg:gap-20">
+        <div className="mt-auto flex flex-col gap-5 pt-10 lg:gap-3">
           <DownloadLink />
 
           <div className="flex flex-col gap-4 lg:gap-3">
@@ -54,7 +54,7 @@ export function Hero() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false }}
               transition={{ duration: 0.6, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
-              className="max-w-[20rem] text-[15px] leading-snug text-white sm:max-w-md lg:ml-6 lg:max-w-[32rem] lg:text-[17px]"
+              className="max-w-[20rem] text-[15px] leading-snug text-white sm:max-w-md lg:ml-6 lg:max-w-[32rem]"
             >
               LONI keeps you connected to the information, people, and support that matters most.
             </motion.p>

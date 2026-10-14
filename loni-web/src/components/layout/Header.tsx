@@ -47,7 +47,7 @@ export function Header() {
         {/* The tab: intentionally empty so the hero's pink shows through. */}
         <div aria-hidden="true" className="min-w-6 flex-1" />
 
-        <div className="relative flex shrink-0 items-center rounded-bl-[20px] bg-white pl-8 before:absolute before:right-full before:top-0 before:size-[26px] before:bg-[radial-gradient(circle_at_0%_100%,transparent_25.5px,#fff_26px)] after:absolute after:right-0 after:top-full after:size-7 after:bg-[radial-gradient(circle_at_0%_100%,transparent_27.5px,#fff_28px)]">
+        <div className="relative flex shrink-0 items-center rounded-bl-[20px] bg-white pl-2.5 before:absolute before:right-full before:top-0 before:size-[26px] before:bg-[radial-gradient(circle_at_0%_100%,transparent_25.5px,#fff_26px)] after:absolute after:right-0 after:top-full after:size-7 after:bg-[radial-gradient(circle_at_0%_100%,transparent_27.5px,#fff_28px)]">
           <DownloadAppButton />
         </div>
       </div>

@@ -178,7 +178,7 @@ export function RoleHero({
     <MotionConfig reducedMotion="user">
       <section
         aria-labelledby={titleId}
-        className="relative flex min-h-[45.6rem] flex-col overflow-hidden rounded-b-[1.5rem] bg-black md:min-h-[52rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_2.5rem))] lg:rounded-b-[28px] lg:pt-14"
+        className="relative flex min-h-[45.6rem] flex-col overflow-hidden rounded-b-[1.5rem] bg-black md:min-h-[52rem] lg:-mt-14 lg:min-h-[max(44rem,calc(100svh_-_1.5rem))] lg:rounded-b-[28px] lg:pt-14"
       >
         <motion.div
           aria-hidden="true"
