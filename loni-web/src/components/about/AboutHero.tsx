@@ -70,9 +70,9 @@ function Intro({ className = '', style }: { className?: string; style?: CSSPrope
       <p className="text-justify text-black">{INTRO}</p>
       <Link
         to={SITE.exploreLoniHref}
-        className="group mt-6 inline-flex items-center lg:mt-[1.5em]"
+        className="group mt-6 inline-flex items-center text-[0.8em] lg:mt-[1.9em]"
       >
-        <span className="inline-flex h-[2.4em] items-center rounded-full bg-black px-[1.6em] text-[0.8em] font-semibold text-white transition-colors group-hover:bg-neutral-800">
+        <span className="inline-flex h-[2.4em] items-center rounded-full bg-black px-[1.5em] font-semibold text-white transition-colors group-hover:bg-neutral-800">
           Explore Loni
         </span>
         <span className="-ml-px inline-flex size-[2.4em] items-center justify-center rounded-full bg-black text-white transition-colors group-hover:bg-neutral-800">
