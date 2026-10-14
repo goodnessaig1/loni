@@ -192,7 +192,7 @@ function DesktopLayout() {
 
 function StackedLayout() {
   return (
-    <div className="mx-auto max-w-[34rem] px-5 pb-16 pt-12 sm:px-8 sm:pb-20 sm:pt-16">
+    <div className="mx-auto max-w-[34rem] px-5 pb-8 pt-10 sm:px-8 sm:pb-12 sm:pt-12">
       <Heading className="text-[2.1rem] leading-[1.15] sm:text-[2.6rem]" />
       <Intro className="mt-6 text-[0.95rem] leading-[1.6] sm:text-base" />
       <Photo className="mt-9 aspect-[722/568] w-full" />
