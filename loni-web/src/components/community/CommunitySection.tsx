@@ -15,7 +15,7 @@ const PARAGRAPH_LINES = [
 export function CommunitySection() {
   return (
     <MotionConfig reducedMotion="user">
-      <section id="community" aria-labelledby="community-title" className="relative overflow-hidden bg-brand text-white lg:-mx-5">
+      <section id="community" aria-labelledby="community-title" className="relative overflow-hidden bg-brand text-white lg:-mx-3">
         <div className="mx-auto grid max-w-[104rem] items-start gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[1.02fr_1fr] lg:gap-0 lg:px-14 lg:py-20">
           <div className="lg:pr-10">
             <TagBadge>The LONI Community</TagBadge>

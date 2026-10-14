@@ -6,6 +6,7 @@ import DriversPage from './pages/DriversPage';
 import NursesPage from './pages/NursesPage';
 import PartnersPage from './pages/PartnersPage';
 import PrivacyPage from './pages/PrivacyPage';
+import AboutPage from './pages/AboutPage';
 import TermsPage from './pages/TermsPage';
 import DisclaimerPage from './pages/DisclaimerPage';
 
@@ -18,6 +19,7 @@ function App() {
         <Route path="/drivers" element={<DriversPage />} />
         <Route path="/nurses" element={<NursesPage />} />
         <Route path="/partners" element={<PartnersPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/disclaimer" element={<DisclaimerPage />} />

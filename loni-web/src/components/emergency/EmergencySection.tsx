@@ -18,7 +18,7 @@ export function EmergencySection() {
         ref={sectionRef}
         id="drivers"
         aria-labelledby="emergency-title"
-        className="relative overflow-hidden bg-brand text-white lg:-mx-5"
+        className="relative overflow-hidden bg-brand text-white lg:-mx-3"
       >
         <WaveDecor sectionRef={sectionRef} />
 

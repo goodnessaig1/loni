@@ -200,7 +200,7 @@ export function PartnerSection() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <section id="partners" aria-labelledby="partner-title" className="relative overflow-hidden bg-white lg:-mx-5">
+      <section id="partners" aria-labelledby="partner-title" className="relative overflow-hidden bg-white lg:-mx-3">
         {isDesktop ? <DesktopLayout /> : <StackedLayout />}
       </section>
     </MotionConfig>

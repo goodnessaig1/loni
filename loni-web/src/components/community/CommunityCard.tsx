@@ -17,9 +17,11 @@ export function CommunityCard({ className = '' }: { className?: string }) {
         hide: { opacity: 0, y: 64, scale: 0.94, transition: { duration: 0.35 } },
         show: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.9, ease: EASE } },
       }}
-      className={`@container relative aspect-[664/733] w-full overflow-hidden bg-white ${className}`}
-      // ≈ 62px at the design's 793px card width.
-      style={{ borderRadius: '7.8cqw' }}
+      className={`relative aspect-[664/733] w-full overflow-hidden bg-white ${className}`}
+      // 7.8% of the width (≈ 62px at the design's 793px card), as a circular radius: the vertical % is of
+      // the height, hence 7.8 × 664/733. (`cqw` would not work here: it resolves against an *ancestor* container.)
+      // style={{ borderRadius: '50px' }}
+      style={{ borderRadius: '7.8% / 7.07%' }}
     >
       <motion.img
         src={community}

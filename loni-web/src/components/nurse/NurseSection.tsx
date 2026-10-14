@@ -189,7 +189,7 @@ export function NurseSection() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <section id="nurses" aria-labelledby="nurse-title" className="relative overflow-hidden bg-white lg:-mx-5">
+      <section id="nurses" aria-labelledby="nurse-title" className="relative overflow-hidden bg-white lg:-mx-3">
         {isDesktop ? <DesktopLayout /> : <StackedLayout />}
       </section>
     </MotionConfig>

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { NavLink } from 'react-router';
 import type { NavLinkItem } from './navLinks';
 
@@ -7,6 +8,8 @@ interface Props {
   activeClassName?: string;
   inactiveClassName?: string;
   onClick?: () => void;
+  /** Custom content; defaults to the item's label. */
+  children?: ReactNode;
 }
 
 /** Renders a router link for in-app routes, a plain anchor for in-page / external ones. */
@@ -16,6 +19,7 @@ export function NavItem({
   activeClassName = 'text-brand',
   inactiveClassName = 'text-neutral-900 hover:text-brand',
   onClick,
+  children,
 }: Props) {
   if (item.to) {
     return (
@@ -25,14 +29,14 @@ export function NavItem({
         onClick={onClick}
         className={({ isActive }) => `${className} ${isActive ? activeClassName : inactiveClassName}`}
       >
-        {item.label}
+        {children ?? item.label}
       </NavLink>
     );
   }
 
   return (
     <a href={item.href} onClick={onClick} className={`${className} ${inactiveClassName}`}>
-      {item.label}
+      {children ?? item.label}
     </a>
   );
 }
