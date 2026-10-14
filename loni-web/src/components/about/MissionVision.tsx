@@ -189,7 +189,7 @@ function DesktopVision() {
 
 function StackedLayout() {
   return (
-    <div className="mx-auto max-w-[34rem] space-y-16 px-5 pb-16 pt-10 sm:px-8 sm:pb-20">
+    <div className="mx-auto max-w-[34rem] space-y-12 px-5 pb-6 pt-6 sm:px-8 sm:pb-8">
       <div>
         <Title id="mission-title" className="text-right text-[2.6rem] sm:text-5xl">
           Our Mission

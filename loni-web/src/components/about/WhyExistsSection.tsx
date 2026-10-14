@@ -171,7 +171,7 @@ function DesktopLayout() {
 
 function StackedLayout() {
   return (
-    <div className="mx-auto max-w-[34rem] px-5 pb-16 pt-14 sm:px-8 sm:pb-20 sm:pt-20">
+    <div className="mx-auto max-w-[34rem] px-5 pb-8 pt-8 sm:px-8 sm:pb-12 sm:pt-12">
       <TagBadge variant="green">Why LONI exists</TagBadge>
       <WordReveal
         as="h2"
