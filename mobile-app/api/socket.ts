@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { API_URL } from './client';
 import { applyServerCallEvent } from '../lib/callEvents';
 import { applyServerRideEvent } from '../lib/rideEvents';
+import { applyServerCommunityEvent } from '../lib/communityEvents';
 
 /**
  * Real-time call signaling socket (Issue 1, 2, 8, 10, 11).
@@ -28,6 +29,10 @@ let pingInterval: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
 let manuallyClosed = false;
+
+// Topics the UI wants live updates for (e.g. "community" while the feed is open). Kept here so they are
+// re-sent automatically after every reconnect.
+const topics = new Set<string>();
 
 function wsBaseUrl(): string {
   return API_URL.replace(/^http/, 'ws');
@@ -56,6 +61,7 @@ export async function connectCallSocket(): Promise<void> {
   socket.onopen = () => {
     reconnectAttempts = 0;
     console.log('[CallSocket] connected');
+    topics.forEach((topic) => sendFrame({ type: 'subscribe', topic }));
     if (pingInterval) clearInterval(pingInterval);
     pingInterval = setInterval(() => {
       try {
@@ -70,6 +76,10 @@ export async function connectCallSocket(): Promise<void> {
     try {
       const msg = JSON.parse(event.data as string);
       if (msg.type === 'pong') return;
+      if (typeof msg.type === 'string' && msg.type.startsWith('community_')) {
+        applyServerCommunityEvent(msg.type, msg.data);
+        return;
+      }
       if (typeof msg.type === 'string' && msg.type.startsWith('ride_')) {
         applyServerRideEvent(msg.type, msg.data);
         return;
@@ -107,6 +117,7 @@ function scheduleReconnect() {
 
 export function disconnectCallSocket(): void {
   manuallyClosed = true;
+  topics.clear();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -117,4 +128,25 @@ export function disconnectCallSocket(): void {
   }
   socket?.close();
   socket = null;
+}
+
+function sendFrame(frame: Record<string, unknown>): void {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    try {
+      socket.send(JSON.stringify(frame));
+    } catch {
+      /* the close handler will reconnect and re-subscribe */
+    }
+  }
+}
+
+/** Start receiving a topic's live events. Safe to call before the socket is open: it is sent on connect. */
+export function subscribeTopic(topic: string): void {
+  topics.add(topic);
+  sendFrame({ type: 'subscribe', topic });
+}
+
+export function unsubscribeTopic(topic: string): void {
+  topics.delete(topic);
+  sendFrame({ type: 'unsubscribe', topic });
 }

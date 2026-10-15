@@ -67,8 +67,13 @@ async def startup_db_client():
         except Exception as e:
             print(f"Error initializing Firebase Admin: {e}")
 
+    from app.modules.community.router import start_view_flusher
+    start_view_flusher()
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    from app.modules.community.router import stop_view_flusher
+    await stop_view_flusher()
     mongo_db.client.close()
     print("Closed MongoDB connection")
 

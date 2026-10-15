@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Pressable,
@@ -18,6 +18,8 @@ import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { emergencyContactsApi } from '../../api/emergencyContacts';
 import Toast from 'react-native-toast-message';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 const ContactSchema = Yup.object().shape({
   contacts: Yup.array().of(
@@ -31,6 +33,8 @@ const ContactSchema = Yup.object().shape({
 });
 
 export default function EmergencyContactsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleContactsSubmit = async (values: any, { setSubmitting }: any) => {
@@ -54,7 +58,7 @@ export default function EmergencyContactsScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={28} color="black" />
+            <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Emergency Contacts</CalText>
@@ -87,7 +91,7 @@ export default function EmergencyContactsScreen() {
                             <TextInput
                               style={[styles.input, contactTouched.name && contactErrors.name ? styles.inputError : null]}
                               placeholder="Enter name"
-                              placeholderTextColor="#9CA3AF"
+                              placeholderTextColor={colors.textMuted}
                               value={contact.name}
                               onChangeText={handleChange(`contacts.${index}.name`)}
                               onBlur={handleBlur(`contacts.${index}.name`)}
@@ -102,7 +106,7 @@ export default function EmergencyContactsScreen() {
                             <TextInput
                               style={[styles.input, contactTouched.email && contactErrors.email ? styles.inputError : null]}
                               placeholder="Enter email address"
-                              placeholderTextColor="#9CA3AF"
+                              placeholderTextColor={colors.textMuted}
                               keyboardType="email-address"
                               autoCapitalize="none"
                               value={contact.email}
@@ -119,7 +123,7 @@ export default function EmergencyContactsScreen() {
                             <TextInput
                               style={[styles.input, contactTouched.phone && contactErrors.phone ? styles.inputError : null]}
                               placeholder="Enter phone number"
-                              placeholderTextColor="#9CA3AF"
+                              placeholderTextColor={colors.textMuted}
                               keyboardType="phone-pad"
                               value={contact.phone}
                               onChangeText={handleChange(`contacts.${index}.phone`)}
@@ -135,7 +139,7 @@ export default function EmergencyContactsScreen() {
                             <TextInput
                               style={[styles.input, contactTouched.relationship && contactErrors.relationship ? styles.inputError : null]}
                               placeholder="e.g., Partner, Mother"
-                              placeholderTextColor="#9CA3AF"
+                              placeholderTextColor={colors.textMuted}
                               value={contact.relationship}
                               onChangeText={handleChange(`contacts.${index}.relationship`)}
                               onBlur={handleBlur(`contacts.${index}.relationship`)}
@@ -180,10 +184,10 @@ export default function EmergencyContactsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -202,19 +206,19 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 26,
     lineHeight: 32,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   subtext: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 22,
     marginBottom: 32,
   },
   formContainer: {
     borderWidth: 1,
     backgroundColor: "#FAFAFA",
-    borderColor: '#E5E5E5',
+    borderColor: c.border,
     borderStyle: 'solid',
     borderRadius: 16,
     padding: 16,
@@ -225,17 +229,17 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#111827',
+    color: c.text,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
   },
   addAnotherButton: {
@@ -267,7 +271,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D62D88',
   },
   continueButtonDisabled: {
-    backgroundColor: '#F9C2D9',
+    backgroundColor: c.primaryDisabled,
   },
   continueButtonText: {
     color: '#FFFFFF',
@@ -278,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   skipButtonText: {
-    color: '#6B7280',
+    color: c.textSecondary,
     fontSize: 15,
   },
   inputError: {

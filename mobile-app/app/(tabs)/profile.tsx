@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, View, StyleSheet, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
@@ -14,11 +14,16 @@ import { ActionModal } from '../../components/ActionModal';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HelixaText } from '../../components/HelixaText';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 const { width } = Dimensions.get('window');
 
 export default function ProfileScreen() {
   const { user, logoutUser } = useAuth();
+  const { colors, isDark, preference } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const themeLabel = preference === 'system' ? 'System' : preference === 'dark' ? 'Dark' : 'Light';
   const uploadMutation = useUploadProfilePicture();
   const router = useRouter();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -89,7 +94,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.bgContainer}>
         <Image
-          source={require('../../assets/images/profile-bg.svg')}
+          source={isDark ? require('../../assets/images/profile-bg-dark.svg') : require('../../assets/images/profile-bg.svg')}
           style={styles.bgImage}
           contentFit="cover"
         />
@@ -104,7 +109,7 @@ export default function ProfileScreen() {
           isUploading={uploadMutation.isPending}
         />
 
-        <View className='bg-white flex flex-col'>
+        <View className='flex flex-col'>
           <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
 
           <ProfileSection>
@@ -113,13 +118,14 @@ export default function ProfileScreen() {
           </ProfileSection>
 
           <ProfileSection>
+            <ProfileMenuItem icon="moon" title={`${themeLabel} Theme`} onPress={() => router.push('/profile/theme')} />
             <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => router.push('/notification-settings')} />
             <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={() => { setCancelStep(1); setIsCancelSubVisible(true); }} />
             <ProfileMenuItem icon="shield" title="Privacy & Permissions" onPress={() => router.push('/profile/privacy-permissions')} isLast />
           </ProfileSection>
 
-          <ProfileSection backgroundColor="#FEE2E2">
-            <ProfileMenuItem icon="log-out" title="Sign Out" color="#EF4444" onPress={handleLogout} isLast />
+          <ProfileSection backgroundColor={colors.dangerSoft}>
+            <ProfileMenuItem icon="log-out" title="Sign Out" color={colors.danger} onPress={handleLogout} isLast />
           </ProfileSection>
         </View>
 
@@ -171,10 +177,10 @@ export default function ProfileScreen() {
               'Enhanced recovery plans'
             ].map((feature, idx) => (
               <View key={idx} className="flex-row items-center mb-4">
-                <View className="w-5 h-5 rounded-full bg-[#E5E7EB] items-center justify-center mr-3">
-                  <Feather name="check" size={12} color="#6B7280" />
+                <View className="w-5 h-5 rounded-full items-center justify-center mr-3" style={{ backgroundColor: colors.divider }}>
+                  <Feather name="check" size={12} color={colors.textSecondary} />
                 </View>
-                <HelixaText className="text-gray-500 text-[15px]">{feature}</HelixaText>
+                <HelixaText className="text-[15px]" style={{ color: colors.textSecondary }}>{feature}</HelixaText>
               </View>
             ))}
           </View>
@@ -184,10 +190,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   bgContainer: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,6 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { PillsIcon, WalkIcon, WaterIcon, RelaxationIcon } from '../../components/RecoveryIcons';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 const INITIAL_TASKS = [
   {
@@ -43,6 +45,8 @@ const INITIAL_TASKS = [
 ];
 
 export default function RecoveryPlanScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const [tasks, setTasks] = useState(INITIAL_TASKS);
 
@@ -58,7 +62,7 @@ export default function RecoveryPlanScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color="#18181B" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -115,10 +119,10 @@ export default function RecoveryPlanScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   header: {
     paddingHorizontal: 20,
@@ -130,7 +134,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -145,11 +149,11 @@ const styles = StyleSheet.create({
   },
   pageSubtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginBottom: 24,
   },
   progressCard: {
-    backgroundColor: '#000000',
+    backgroundColor: c.nav,
     borderRadius: 20,
     padding: 24,
     marginBottom: 32,
@@ -182,7 +186,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    color: '#111827',
+    color: c.text,
     marginBottom: 16,
   },
   tasksContainer: {
@@ -208,7 +212,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
   },
   taskContentBox: {
     flex: 1,
@@ -216,7 +220,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 16,
   },
   iconBox: {
@@ -232,11 +236,11 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     fontSize: 16,
-    color: '#111827',
+    color: c.text,
     marginBottom: 4,
   },
   taskSubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
 });

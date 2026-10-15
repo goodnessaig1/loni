@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   View, 
   Pressable, 
@@ -16,12 +16,16 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 const ResetSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
 });
 
 export default function ResetPasswordScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const handleReset = (values: any, { setSubmitting }: any) => {
     setTimeout(() => {
       setSubmitting(false);
@@ -34,7 +38,7 @@ export default function ResetPasswordScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={28} color="black" />
+            <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Reset Password</CalText>
@@ -54,7 +58,7 @@ export default function ResetPasswordScreen() {
                   <TextInput 
                     style={[styles.input, touched.email && errors.email ? styles.inputError : null]} 
                     placeholder="Sarahchen@example.com"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={values.email}
@@ -82,10 +86,10 @@ export default function ResetPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -104,12 +108,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   subtext: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 22,
     marginBottom: 32,
   },
@@ -118,19 +122,19 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#111827',
+    color: c.text,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   continueButton: {
     borderRadius: 9999,

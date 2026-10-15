@@ -1,5 +1,7 @@
 import React from 'react';
 import { Text, TextProps } from 'react-native';
+import { darkTextOverride, hasExplicitColor } from '../lib/textColor';
+import { useTheme } from '../context/ThemeContext';
 
 interface HelixaTextProps extends TextProps {
   weight?: 'light' | 'regular' | 'bold' | 'black';
@@ -11,6 +13,7 @@ export const HelixaText: React.FC<HelixaTextProps> = ({
   style,
   ...props
 }) => {
+  const { colors, isDark } = useTheme();
   const fontClass =
     weight === 'light'
       ? 'font-helixa-light'
@@ -23,7 +26,13 @@ export const HelixaText: React.FC<HelixaTextProps> = ({
   return (
     <Text
       className={`${fontClass} ${className || ''}`}
-      style={style}
+      style={
+        hasExplicitColor(style, className)
+          ? isDark && darkTextOverride(className, colors)
+            ? [{ color: darkTextOverride(className, colors) }, style]
+            : style
+          : [{ color: colors.text }, style]
+      }
       {...props}
     />
   );

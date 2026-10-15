@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   View, 
   Pressable, 
@@ -16,6 +16,8 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 const PasswordSchema = Yup.object().shape({
   password: Yup.string()
@@ -27,6 +29,8 @@ const PasswordSchema = Yup.object().shape({
 });
 
 export default function CreatePasswordScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -42,7 +46,7 @@ export default function CreatePasswordScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={28} color="black" />
+            <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Create New Password</CalText>
@@ -60,14 +64,14 @@ export default function CreatePasswordScreen() {
                     <TextInput 
                       style={styles.passwordInput} 
                       placeholder="Min. 8 characters"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={colors.textMuted}
                       secureTextEntry={!showPassword}
                       value={values.password}
                       onChangeText={handleChange('password')}
                       onBlur={handleBlur('password')}
                     />
                     <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                      <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#6B7280" />
+                      <Feather name={showPassword ? "eye" : "eye-off"} size={20} color={colors.textSecondary} />
                     </Pressable>
                   </View>
                   {touched.password && errors.password && (
@@ -81,14 +85,14 @@ export default function CreatePasswordScreen() {
                     <TextInput 
                       style={styles.passwordInput} 
                       placeholder="Re-enter password"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={colors.textMuted}
                       secureTextEntry={!showConfirmPassword}
                       value={values.confirmPassword}
                       onChangeText={handleChange('confirmPassword')}
                       onBlur={handleBlur('confirmPassword')}
                     />
                     <Pressable onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                      <Feather name={showConfirmPassword ? "eye" : "eye-off"} size={20} color="#6B7280" />
+                      <Feather name={showConfirmPassword ? "eye" : "eye-off"} size={20} color={colors.textSecondary} />
                     </Pressable>
                   </View>
                   {touched.confirmPassword && errors.confirmPassword && (
@@ -119,10 +123,10 @@ export default function CreatePasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -141,7 +145,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 32,
   },
   inputGroup: {
@@ -149,23 +153,23 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#111827',
+    color: c.text,
     marginBottom: 8,
   },
   passwordInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   passwordInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
   },
   eyeIcon: {
@@ -188,7 +192,7 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   signUpTextBold: {
     fontSize: 14,

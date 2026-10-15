@@ -1,14 +1,16 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTheme } from '../../context/ThemeContext';
 
 type ProfileSectionProps = {
   children: React.ReactNode;
   backgroundColor?: string;
 };
 
-export const ProfileSection = ({ children, backgroundColor = '#F3F3F3' }: ProfileSectionProps) => {
+export const ProfileSection = ({ children, backgroundColor }: ProfileSectionProps) => {
+  const { colors } = useTheme();
   return (
-    <View style={[styles.section, { backgroundColor }]}>
+    <View style={[styles.section, { backgroundColor: backgroundColor ?? colors.surface }]}>
       {children}
     </View>
   );

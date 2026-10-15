@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { HelixaText } from '../../components/HelixaText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +19,7 @@ const REASONS = [
 
 export default function CancelSubscriptionScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [otherReason, setOtherReason] = useState('');
@@ -42,10 +44,11 @@ export default function CancelSubscriptionScreen() {
     <View className="flex-row items-center justify-center py-4 mb-4 relative">
       {showBack && (
         <TouchableOpacity
-          className="absolute left-0 w-12 h-12 rounded-full border border-gray-200 justify-center items-center"
+          className="absolute left-0 w-12 h-12 rounded-full border justify-center items-center"
+          style={{ borderColor: colors.border }}
           onPress={() => step > 1 ? setStep(step - 1 as 1|2) : router.back()}
         >
-          <Feather name="arrow-left" size={24} color="#000" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
       )}
       <HelixaText className="text-[18px]" weight="bold">
@@ -55,7 +58,7 @@ export default function CancelSubscriptionScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       <ScrollView className="flex-1 px-6 mt-4" showsVerticalScrollIndicator={false}>
         
         {step === 1 && (
@@ -77,16 +80,17 @@ export default function CancelSubscriptionScreen() {
               Your feedback helps us make Loni better for every mother.
             </HelixaText>
 
-            <View className="bg-[#F2F2F2] flex flex-col gap-3 rounded-[12px] p-4 mb-8">
+            <View className="flex flex-col gap-3 rounded-[12px] p-4 mb-8" style={{ backgroundColor: colors.surface }}>
               {REASONS.map((reason, index) => (
                 <TouchableOpacity
                   key={reason}
-                  className={`flex-row items-center justify-between p-4 rounded-[14px] ${selectedReason === reason ? 'bg-white border border-[#D62D88]' : 'bg-white border border-transparent'}`}
+                  className="flex-row items-center justify-between p-4 rounded-[14px] border"
+                  style={{ backgroundColor: colors.elevated, borderColor: selectedReason === reason ? '#D62D88' : 'transparent' }}
                   onPress={() => setSelectedReason(reason)}
                 >
                   <HelixaText className="text-[15px]">{reason}</HelixaText>
-                  <View className="w-8 h-8 rounded-full bg-[#E8E8E8] items-center justify-center">
-                    <Feather name="arrow-right" size={16} color="#000" />
+                  <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: colors.surface }}>
+                    <Feather name="arrow-right" size={16} color={colors.text} />
                   </View>
                 </TouchableOpacity>
               ))}
@@ -94,7 +98,9 @@ export default function CancelSubscriptionScreen() {
               {selectedReason === 'Other' && (
                 <View className="mt-2 mb-2 px-2">
                   <TextInput
-                    className="bg-white rounded-[16px] p-4 text-[15px] min-h-[100px] border border-gray-200"
+                    className="rounded-[16px] p-4 text-[15px] min-h-[100px] border"
+                    style={{ backgroundColor: colors.elevated, borderColor: colors.border, color: colors.text }}
+                    placeholderTextColor={colors.textMuted}
                     placeholder="Please tell us more..."
                     multiline
                     textAlignVertical="top"
@@ -110,7 +116,8 @@ export default function CancelSubscriptionScreen() {
             </HelixaText>
 
             <TouchableOpacity 
-              className={`w-full py-4 rounded-full items-center mb-6 ${selectedReason ? 'bg-black' : 'bg-gray-300'}`}
+              className="w-full py-4 rounded-full items-center mb-6"
+              style={{ backgroundColor: selectedReason ? (isDark ? '#D62D88' : '#000') : (isDark ? '#3A3D44' : '#D1D5DB') }}
               onPress={handleNext}
               disabled={!selectedReason || (selectedReason === 'Other' && !otherReason.trim())}
             >
@@ -149,8 +156,8 @@ export default function CancelSubscriptionScreen() {
                 'You can resubscribe anytime with one tap'
               ].map((item, idx) => (
                 <View key={idx} className="flex-row items-center mb-4">
-                  <View className="w-6 h-6 rounded-full bg-gray-100 items-center justify-center mr-3">
-                    <Feather name="check" size={14} color="#6B7280" />
+                  <View className="w-6 h-6 rounded-full items-center justify-center mr-3" style={{ backgroundColor: colors.surface }}>
+                    <Feather name="check" size={14} color={colors.textSecondary} />
                   </View>
                   <HelixaText className="text-gray-500 text-[15px]">{item}</HelixaText>
                 </View>
@@ -180,10 +187,11 @@ export default function CancelSubscriptionScreen() {
           <View className="flex-1">
             <View className="flex-row items-center justify-center py-4 mb-8">
               <TouchableOpacity
-                className="absolute left-0 w-12 h-12 rounded-full border border-gray-200 justify-center items-center"
+                className="absolute left-0 w-12 h-12 rounded-full border justify-center items-center"
+                style={{ borderColor: colors.border }}
                 onPress={() => router.back()}
               >
-                <Feather name="arrow-left" size={24} color="#000" />
+                <Feather name="arrow-left" size={24} color={colors.text} />
               </TouchableOpacity>
               <HelixaText className="text-[18px]" weight="bold">
                 Cancel Subscription
@@ -205,9 +213,9 @@ export default function CancelSubscriptionScreen() {
               Your premium access will continue until June 3, 2026. After that, your account will switch to the free plan.
             </HelixaText>
 
-            <View style={{ height: 96, borderRadius: 24, marginBottom: 48, overflow: 'hidden', position: 'relative', backgroundColor: '#F3F4F6' }}>
+            <View style={{ height: 96, borderRadius: 24, marginBottom: 48, overflow: 'hidden', position: 'relative', backgroundColor: colors.surface }}>
               <Image 
-                source={require('../../assets/images/support.png')} 
+                source={isDark ? require('../../assets/images/support-dark.png') : require('../../assets/images/support.png')} 
                 style={{ position: 'absolute', width: '100%', height: '100%', top: 0, left: 0 }}
                 contentFit="cover"
                 contentPosition="right"

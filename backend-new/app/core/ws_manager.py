@@ -45,6 +45,8 @@ class ConnectionManager:
 
     def __init__(self) -> None:
         self._connections: Dict[str, Set[WebSocket]] = {}
+        # topic -> user_ids that asked to receive its broadcasts (e.g. "community" while the feed is open).
+        self._topics: Dict[str, Set[str]] = {}
 
     async def connect(self, user_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -58,7 +60,27 @@ class ConnectionManager:
         sockets.discard(websocket)
         if not sockets:
             self._connections.pop(user_id, None)
+            # No socket left: they can't be listening to any topic any more.
+            for members in self._topics.values():
+                members.discard(user_id)
         logger.info("WS disconnected user=%s", user_id)
+
+    def subscribe(self, user_id: str, topic: str) -> None:
+        self._topics.setdefault(topic, set()).add(user_id)
+
+    def unsubscribe(self, user_id: str, topic: str) -> None:
+        self._topics.get(topic, set()).discard(user_id)
+
+    async def broadcast_topic(self, topic: str, event_type: str, payload: Dict[str, Any],
+                              exclude: Set[str] | None = None) -> int:
+        """Send an event to every subscriber of `topic` (minus `exclude`). Returns how many users got it."""
+        delivered = 0
+        for user_id in list(self._topics.get(topic, ())):
+            if exclude and user_id in exclude:
+                continue
+            if await self.send_to_user(user_id, event_type, payload):
+                delivered += 1
+        return delivered
 
     def is_online(self, user_id: str) -> bool:
         return bool(self._connections.get(user_id))

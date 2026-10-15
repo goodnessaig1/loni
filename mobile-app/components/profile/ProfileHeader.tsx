@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../HelixaText';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 type ProfileHeaderProps = {
   firstName: string;
@@ -13,6 +15,8 @@ type ProfileHeaderProps = {
 };
 
 export const ProfileHeader = ({ firstName, trimester, profilePicture, onPressAvatar, isUploading }: ProfileHeaderProps) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.container}>
       <HelixaText weight="bold" style={styles.title}>Profile</HelixaText>
@@ -45,7 +49,7 @@ export const ProfileHeader = ({ firstName, trimester, profilePicture, onPressAva
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     alignItems: 'center',
     paddingTop: 20,
@@ -53,7 +57,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    color: '#000',
+    color: c.text,
     marginBottom: 24,
   },
   avatarContainer: {
@@ -61,14 +65,14 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: c.bg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
     marginBottom: 16,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: c.divider,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -101,7 +105,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFF',
+    borderColor: c.bg,
   },
   name: {
     fontSize: 24,
@@ -110,6 +114,6 @@ const styles = StyleSheet.create({
   },
   status: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: c.textMuted,
   },
 });

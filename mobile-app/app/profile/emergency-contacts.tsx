@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Switch, Pressable, Animated, Modal, Dimensions, Image as RNImage, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 const { width } = Dimensions.get('window');
@@ -16,9 +16,12 @@ import { useEmergencyContacts } from '../../context/EmergencyContactsContext';
 import Toast from 'react-native-toast-message';
 
 import { CustomSwitch } from '../../components/CustomSwitch';
+import { ActionModal } from '../../components/ActionModal';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function EmergencyContactsScreen() {
   const router = useRouter();
+  const { colors, isDark } = useTheme();
   const { contacts, isLoading, removeContact, refreshContacts, updateContactPermissions } = useEmergencyContacts();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
@@ -95,14 +98,15 @@ export default function EmergencyContactsScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FAFAFA]" edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       {/* Header */}
       <View className="flex-row items-center px-5 py-4 mt-4">
         <TouchableOpacity
-          className="w-12 h-12 rounded-full border border-gray-200 justify-center items-center"
+          className="w-12 h-12 rounded-full border justify-center items-center"
+          style={{ borderColor: colors.border }}
           onPress={() => router.back()}
         >
-          <Feather name="arrow-left" size={24} color="#000" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
         <CalText className="flex-1 text-center text-[22px] mr-12">
           Emergency Contacts
@@ -125,7 +129,7 @@ export default function EmergencyContactsScreen() {
           <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
         </View>
 
-        <HelixaText className="text-[18px] text-gray-900 mb-4">
+        <HelixaText className="text-[18px] mb-4">
           Support Partners
         </HelixaText>
 
@@ -145,10 +149,10 @@ export default function EmergencyContactsScreen() {
           </View>
         ) : contacts.length === 0 ? (
           <View className="py-16 items-center justify-center mt-4">
-            <View className="w-20 h-20 rounded-full bg-[#FFF0F5] items-center justify-center mb-4">
+            <View className="w-20 h-20 rounded-full items-center justify-center mb-4" style={{ backgroundColor: colors.primarySoft }}>
               <Feather name="users" size={32} color="#D62D88" />
             </View>
-            <CalText className="text-[20px] text-gray-900 mb-2">No Support Partners</CalText>
+            <CalText className="text-[20px] mb-2">No Support Partners</CalText>
             <HelixaText className="text-center text-gray-500 text-[15px] px-8 leading-6">
               You haven't added anyone yet. Add a partner so they can receive updates and help in an emergency.
             </HelixaText>
@@ -161,7 +165,8 @@ export default function EmergencyContactsScreen() {
             return (
               <View
                 key={contact.id}
-                className={`w-full rounded-[24px] p-5 mb-4 overflow-hidden ${isPending ? 'bg-[#F2F2F2]' : ''}`}
+                className="w-full rounded-[24px] p-5 mb-4 overflow-hidden"
+                style={isPending ? { backgroundColor: colors.surface } : undefined}
               >
                 {!isPending && (
                   <View className="absolute top-0 left-0 right-0 bottom-0">
@@ -174,19 +179,19 @@ export default function EmergencyContactsScreen() {
                 )}
 
                 <View className="flex-row items-start relative z-10">
-                  <View className="w-16 h-16 rounded-full bg-[#F2F2F2] overflow-hidden mr-3 border-2 border-white shadow-sm">
+                  <View className="w-16 h-16 rounded-full overflow-hidden mr-3 border-2 shadow-sm" style={{ backgroundColor: colors.surface, borderColor: colors.bg }}>
                     {contact.profile_picture ? (
                       <Image source={{ uri: contact.profile_picture }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                     ) : (
-                      <View className="w-full h-full justify-center items-center bg-[#E5E7EB]">
+                      <View className="w-full h-full justify-center items-center" style={{ backgroundColor: colors.divider }}>
                         <Feather name="user" size={24} color="#9CA3AF" />
                       </View>
                     )}
                   </View>
 
                   <View className="flex-1 pt-1">
-                    <CalText className="text-[18px] text-gray-900">{contact.name}</CalText>
-                    <HelixaText className="text-[14px] text-gray-500">{contact.email}</HelixaText>
+                    <CalText className="text-[18px]" style={isPending ? undefined : { color: '#111827' }}>{contact.name}</CalText>
+                    <HelixaText className="text-[14px]" style={{ color: isPending ? colors.textSecondary : '#4B5563' }}>{contact.email}</HelixaText>
 
                     <View className="flex-row mt-3">
                       <View className={`px-3 py-1 rounded-full flex-row items-center ${isPending ? 'bg-[#FFE8DC]' : 'bg-[#DCFCE7]'}`}>
@@ -208,16 +213,16 @@ export default function EmergencyContactsScreen() {
 
                 {isPending ? (
                   <View className="mt-5 bg-[#FF383C1F] border border-[#FF383C7A] rounded-[12px] p-4 relative z-10">
-                    <HelixaText className="text-[#9A1316] text-[14px]">
+                    <HelixaText className="text-[14px]" style={{ color: isDark ? '#FCA5A5' : '#9A1316' }}>
                       Waiting for them to accept your invite.
                     </HelixaText>
                   </View>
                 ) : (
                   <View className="mt-5 relative z-10">
-                    <View className="bg-white rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50">
+                    <View className="rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50" style={{ backgroundColor: '#FFFFFF' }}>
                       <View className="flex-row items-center gap-3">
                         <Feather name="map-pin" size={20} color="#374151" />
-                        <HelixaText className="text-[16px] text-gray-900">Location</HelixaText>
+                        <HelixaText className="text-[16px]" style={{ color: '#111827' }}>Location</HelixaText>
                       </View>
                       <CustomSwitch 
                         value={contact.location ?? false} 
@@ -226,10 +231,10 @@ export default function EmergencyContactsScreen() {
                       />
                     </View>
 
-                    <View className="bg-white rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50">
+                    <View className="rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50" style={{ backgroundColor: '#FFFFFF' }}>
                       <View className="flex-row items-center gap-3">
                         <Feather name="bell" size={20} color="#374151" />
-                        <HelixaText className="text-[16px] text-gray-900">Updates</HelixaText>
+                        <HelixaText className="text-[16px]" style={{ color: '#111827' }}>Updates</HelixaText>
                       </View>
                       <CustomSwitch 
                         value={contact.updates ?? false} 
@@ -238,10 +243,10 @@ export default function EmergencyContactsScreen() {
                       />
                     </View>
 
-                    <View className="bg-white rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50">
+                    <View className="rounded-[20px] p-4 px-5 flex-row items-center justify-between mb-3 shadow-sm shadow-pink-100/50" style={{ backgroundColor: '#FFFFFF' }}>
                       <View className="flex-row items-center gap-3">
                         <Feather name="clock" size={20} color="#374151" />
-                        <HelixaText className="text-[16px] text-gray-900">Emergency</HelixaText>
+                        <HelixaText className="text-[16px]" style={{ color: '#111827' }}>Emergency</HelixaText>
                       </View>
                       <CustomSwitch 
                         value={contact.emergency ?? false} 
@@ -260,67 +265,18 @@ export default function EmergencyContactsScreen() {
 
       <InvitePartnerModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} />
 
-      <Modal
+      <ActionModal
         visible={removeIndex !== null}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setRemoveIndex(null)}
-      >
-        <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-          <Pressable 
-            style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.4)' }]} 
-            onPress={() => setRemoveIndex(null)} 
-          />
-          <View style={{ width: '100%', backgroundColor: 'white', borderTopLeftRadius: 32, borderTopRightRadius: 32, paddingTop: 0, paddingBottom: 40, alignItems: 'center', overflow: 'hidden' }}>
-            
-            <RNImage 
-              source={require('../../assets/images/confirm.png')} 
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, width: '100%', height: 480 }} 
-              resizeMode="stretch" 
-            />
-
-            <View style={{ width: 56, height: 6, backgroundColor: '#D1D5DB', borderRadius: 3, marginTop: 10, marginBottom: 40 }} />
-
-            <Image 
-              source={require('../../assets/images/iconn.png')} 
-              style={{ width: 120, height: 120, marginBottom: 24 }} 
-              contentFit="contain" 
-            />
-
-            <HelixaText style={{ fontSize: 24, color: '#000', marginBottom: 12, paddingHorizontal: 24, textAlign: 'center' }} weight="bold">
-              Remove Contact?
-            </HelixaText>
-
-            <HelixaText style={{ fontSize: 15, color: '#6B7280', textAlign: 'center', paddingHorizontal: 40, marginBottom: 32, lineHeight: 22 }}>
-              They will no longer be able to see your updates or receive emergency alerts.
-            </HelixaText>
-
-            <View style={{ width: '100%', paddingHorizontal: 24, gap: 12 }}>
-              <TouchableOpacity 
-                style={{ width: '100%', backgroundColor: isDeleting ? '#9CA3AF' : '#000', paddingVertical: 18, borderRadius: 30, alignItems: 'center' }}
-                onPress={handleRemoveContact}
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <HelixaText style={{ color: '#FFF', fontSize: 16 }} weight="bold">
-                    Remove Contact
-                  </HelixaText>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={{ width: '100%', backgroundColor: '#F3F4F6', paddingVertical: 18, borderRadius: 30, alignItems: 'center', opacity: isDeleting ? 0.5 : 1 }}
-                onPress={() => setRemoveIndex(null)}
-                disabled={isDeleting}
-              >
-                <HelixaText style={{ color: '#4B5563', fontSize: 16 }} weight="bold">Keep Contact</HelixaText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => !isDeleting && setRemoveIndex(null)}
+        title="Remove Contact?"
+        description="They will no longer be able to see your updates or receive emergency alerts."
+        icon={<Image source={require('../../assets/images/iconn.png')} style={{ width: 120, height: 120 }} contentFit="contain" />}
+        primaryButtonText="Remove Contact"
+        onPrimaryPress={handleRemoveContact}
+        isPrimaryLoading={isDeleting}
+        secondaryButtonText="Keep Contact"
+        onSecondaryPress={() => setRemoveIndex(null)}
+      />
 
     </SafeAreaView>
   );

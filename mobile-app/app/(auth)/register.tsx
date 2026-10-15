@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   View, 
   Pressable, 
@@ -18,6 +18,8 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Button } from '../../components/Button';
 import { useRegister } from '../../hooks/useAuth';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required('Name is required'),
@@ -62,6 +64,8 @@ const getWeeksForPostpartumStage = (stage: string) => {
 };
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mutateAsync: registerUser } = useRegister();
 
   return (
@@ -103,7 +107,7 @@ export default function RegisterScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent}>
               
               <Pressable onPress={() => router.back()} style={styles.backButton}>
-                <Feather name="chevron-left" size={28} color="black" />
+                <Feather name="chevron-left" size={28} color={colors.text} />
               </Pressable>
 
               <CalText style={styles.heading}>Let's set up your profile</CalText>
@@ -117,7 +121,7 @@ export default function RegisterScreen() {
                   onChangeText={handleChange('name')}
                   onBlur={handleBlur('name')}
                   value={values.name}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
                 {touched.name && errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
               </View>
@@ -132,7 +136,7 @@ export default function RegisterScreen() {
                   onChangeText={handleChange('email')}
                   onBlur={handleBlur('email')}
                   value={values.email}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
                 {touched.email && errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
               </View>
@@ -146,7 +150,7 @@ export default function RegisterScreen() {
                   onChangeText={handleChange('password')}
                   onBlur={handleBlur('password')}
                   value={values.password}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
                 {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
               </View>
@@ -322,10 +326,10 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -344,12 +348,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   subtext: {
     fontSize: 16,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 24,
     marginBottom: 32,
   },
@@ -358,22 +362,22 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   inputLabelSubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginBottom: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
   },
   inputError: {
@@ -403,10 +407,10 @@ const styles = StyleSheet.create({
   statusBox: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   trimesterBox: {
     flex: 1,
@@ -414,10 +418,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   statusBoxSelected: {
     // No border or background color for selected state
@@ -430,18 +434,18 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
   },
   statusSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   radioEmpty: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -470,7 +474,7 @@ const styles = StyleSheet.create({
   },
   switchModeText: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   switchModeHighlight: {
     color: '#D62D88',
@@ -487,8 +491,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: c.border,
+    backgroundColor: c.bgSoft,
   },
   weekBoxSelected: {
     backgroundColor: '#D62D88',
@@ -496,7 +500,7 @@ const styles = StyleSheet.create({
   },
   weekText: {
     fontSize: 14,
-    color: '#374151',
+    color: c.text,
   },
   weekTextSelected: {
     color: '#FFFFFF',

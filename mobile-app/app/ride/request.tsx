@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,8 @@ import { Image } from 'expo-image';
 import { CalText } from 'components/CalText';
 import { ridesApi, Quote } from '../../api/rides';
 import { useRideStore } from '../../store/rideStore';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 function km(m?: number | null) {
   if (m == null) return '—';
@@ -36,6 +38,8 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 export default function EmergencyRideRequestScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const setRide = useRideStore((s) => s.setRide);
 
@@ -162,7 +166,7 @@ export default function EmergencyRideRequestScreen() {
             <View style={styles.cardContainer}>
               <View style={styles.locationCard}>
                 <View style={styles.locationIconWrapper}>
-                  <Feather name="map-pin" size={16} color="#6B7280" />
+                  <Feather name="map-pin" size={16} color={colors.textSecondary} />
                 </View>
                 <View style={styles.locationInfo}>
                   <HelixaText style={styles.locationLabel}>Pickup Location</HelixaText>
@@ -179,7 +183,7 @@ export default function EmergencyRideRequestScreen() {
             <View style={styles.cardContainer}>
               <View style={styles.locationCard}>
                 <View style={styles.locationIconWrapper}>
-                  <Feather name="navigation" size={16} color="#6B7280" />
+                  <Feather name="navigation" size={16} color={colors.textSecondary} />
                 </View>
                 <View style={styles.locationInfo}>
                   <HelixaText style={styles.locationLabel}>Destination</HelixaText>
@@ -234,55 +238,55 @@ export default function EmergencyRideRequestScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.bg },
   scrollContent: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
   iconContainer: { marginBottom: 24, alignItems: 'flex-start' },
-  title: { fontSize: 28, color: '#000', marginBottom: 12 },
-  subtitle: { fontSize: 16, color: '#6B7280', lineHeight: 24, marginBottom: 24 },
+  title: { fontSize: 28, color: c.text, marginBottom: 12 },
+  subtitle: { fontSize: 16, color: c.textSecondary, lineHeight: 24, marginBottom: 24 },
   warningBanner: {
-    flexDirection: 'row', backgroundColor: '#FEE2E2', padding: 16, borderRadius: 12,
-    borderWidth: 1, borderColor: '#FCA5A5', marginBottom: 24,
+    flexDirection: 'row', backgroundColor: c.dangerSoft, padding: 16, borderRadius: 12,
+    borderWidth: 1, borderColor: c.dangerBorder, marginBottom: 24,
   },
   warningIcon: { marginRight: 12, marginTop: 2 },
   warningTextContainer: { flex: 1 },
-  warningTitle: { color: '#B91C1C', fontSize: 16, marginBottom: 4 },
-  warningDesc: { color: '#B91C1C', fontSize: 14, lineHeight: 20, opacity: 0.9 },
+  warningTitle: { color: c.dangerText, fontSize: 16, marginBottom: 4 },
+  warningDesc: { color: c.dangerText, fontSize: 14, lineHeight: 20, opacity: 0.9 },
   loadingBox: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 24 },
-  loadingText: { color: '#6B7280', fontSize: 14 },
+  loadingText: { color: c.textSecondary, fontSize: 14 },
   cardContainer: {
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16,
+    backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 16,
     padding: 16, marginBottom: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
   locationCard: { flexDirection: 'row', alignItems: 'flex-start' },
   locationIconWrapper: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F4F6',
+    width: 32, height: 32, borderRadius: 16, backgroundColor: c.surface,
     justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 2,
   },
   locationInfo: { flex: 1 },
-  locationLabel: { fontSize: 14, color: '#9CA3AF', marginBottom: 4 },
-  locationValue: { fontSize: 16, color: '#111827', marginBottom: 4 },
-  locationSub: { fontSize: 14, color: '#6B7280' },
+  locationLabel: { fontSize: 14, color: c.textMuted, marginBottom: 4 },
+  locationValue: { fontSize: 16, color: c.text, marginBottom: 4 },
+  locationSub: { fontSize: 14, color: c.textSecondary },
   fareRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingVertical: 14, paddingHorizontal: 4, marginBottom: 8,
   },
-  fareLabel: { fontSize: 15, color: '#6B7280' },
+  fareLabel: { fontSize: 15, color: c.textSecondary },
   fareValue: { fontSize: 20, color: '#D62D88' },
   checkboxContainer: { flexDirection: 'row', alignItems: 'flex-start', marginTop: 8, marginBottom: 24 },
   checkbox: {
-    width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#D1D5DB',
+    width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: c.border,
     justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 2,
   },
   checkboxChecked: { backgroundColor: '#EF4444', borderColor: '#EF4444' },
   checkboxTextContainer: { flex: 1 },
-  checkboxTitle: { fontSize: 16, color: '#B91C1C', marginBottom: 4 },
-  checkboxDesc: { fontSize: 14, color: '#B91C1C', lineHeight: 20, opacity: 0.8 },
+  checkboxTitle: { fontSize: 16, color: c.dangerText, marginBottom: 4 },
+  checkboxDesc: { fontSize: 14, color: c.dangerText, lineHeight: 20, opacity: 0.8 },
   error: { color: '#DC2626', fontSize: 14, marginTop: 4 },
   footer: {
     paddingHorizontal: 24, paddingBottom: 32, paddingTop: 16,
-    backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#F3F4F6',
+    backgroundColor: c.bg, borderTopWidth: 1, borderTopColor: c.divider,
   },
   confirmBtn: {
     backgroundColor: '#D62D88', width: '100%', height: 56, borderRadius: 28,
@@ -290,7 +294,7 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
   cancelBtn: {
-    backgroundColor: '#FFF1F2', width: '100%', height: 56, borderRadius: 28,
+    backgroundColor: c.blush, width: '100%', height: 56, borderRadius: 28,
     justifyContent: 'center', alignItems: 'center', marginBottom: 24,
   },
   cancelBtnText: { color: '#D62D88', fontSize: 16, fontWeight: 'bold' },

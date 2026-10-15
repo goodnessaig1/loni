@@ -11,9 +11,15 @@ import RideTrackerModal from '../../components/RideTrackerModal';
 import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
 import { useRideStore } from '../../store/rideStore';
 import { useActiveRideSync } from '../../hooks/useRides';
+import { CommunityBubbleIcon } from '../../components/community/CommunityIcons';
+import { useTheme } from '../../context/ThemeContext';
+import { PregnancyCard } from '../../components/home/PregnancyCard';
+import { TodaysTip } from '../../components/home/TodaysTip';
+import { getPregnancyProgress, tipOfTheDay } from '../../lib/pregnancy';
 
 export default function HomeTab() {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const [isInviteModalVisible, setIsInviteModalVisible] = React.useState(false);
 
@@ -30,10 +36,13 @@ export default function HomeTab() {
   if (hour < 12) greeting = 'Morning';
   else if (hour < 18) greeting = 'Afternoon';
 
+  const progress = React.useMemo(() => getPregnancyProgress(user), [user]);
+  const tip = React.useMemo(() => tipOfTheDay(progress?.kind), [progress?.kind]);
+
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       {rideActive && <RideTrackerModal onClose={() => clearRide('IDLE')} />}
       
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 120 }}>
@@ -41,8 +50,8 @@ export default function HomeTab() {
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 }}>
           {/* Notification Bell */}
-          <TouchableOpacity onPress={() => router.push('/notifications')} style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}>
-            <Feather name="bell" size={24} color="#000" />
+          <TouchableOpacity onPress={() => router.push('/notifications')} style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="bell" size={24} color={colors.text} />
             <View style={{ position: 'absolute', top: 13, right: 14, width: 10, height: 10, backgroundColor: '#D62D88', borderRadius: 5 }} />
           </TouchableOpacity>
 
@@ -68,11 +77,19 @@ export default function HomeTab() {
         {/* Greeting Section */}
         <View style={{ marginBottom: 30 }}>
           <CalText style={{ color: '#D62D88', fontSize: 32, marginBottom: 4 }}>{greeting}</CalText>
-          <HelixaText style={{ fontSize: 32, color: '#000', marginBottom: 8 }}>{firstName} ☀️</HelixaText>
-          <HelixaText style={{ fontSize: 16, color: '#6B7280' }}>How are you feeling today?</HelixaText>
+          <HelixaText style={{ fontSize: 32, color: colors.text, marginBottom: 8 }}>{firstName} ☀️</HelixaText>
+          <HelixaText style={{ fontSize: 16, color: colors.textSecondary }}>How are you feeling today?</HelixaText>
         </View>
 
-        <HelixaText style={{ fontSize: 16, color: '#000', fontWeight: 'bold', marginBottom: 16 }}>What do you need?</HelixaText>
+        {progress && (
+          <View style={{ marginBottom: 28 }}>
+            <PregnancyCard progress={progress} onPress={() => router.push('/pregnancy-status')} />
+          </View>
+        )}
+
+        <TodaysTip tip={tip} />
+
+        <HelixaText style={{ fontSize: 16, color: colors.textSecondary, fontWeight: 'bold', marginBottom: 16 }}>What do you need?</HelixaText>
 
         {/* Grid Section */}
         <View style={{ flexDirection: 'row', gap: 16 }}>
@@ -124,6 +141,17 @@ export default function HomeTab() {
                 style={{ width: 180, height: 280, position: 'absolute', bottom: 0, right: -15 }}
                 contentFit="contain"
               />
+            </TouchableOpacity>
+
+            {/* My Community: sits just above Add Support Partner, right-aligned and shrink-wrapped to its label */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => router.push('/(tabs)/community')}
+              accessibilityRole="button"
+              accessibilityLabel="My Community"
+              style={{ backgroundColor: '#000', borderWidth: 1, borderColor: isDark ? '#2A2D34' : '#000', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 12, position: 'absolute', bottom: 100, right: 0, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
+              <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>My Community</HelixaText>
+              <CommunityBubbleIcon size={20} />
             </TouchableOpacity>
 
             {/* Add Support Partner Button */}

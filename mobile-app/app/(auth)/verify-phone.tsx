@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   View, 
   Pressable, 
@@ -15,8 +15,12 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { useVerifyPhone } from '../../hooks/useAuth';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
 
 export default function VerifyPhoneScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { phone } = useLocalSearchParams<{ phone?: string }>();
   const [code, setCode] = useState(['', '', '', '']);
   const inputs = useRef<Array<TextInput | null>>([]);
@@ -66,7 +70,7 @@ export default function VerifyPhoneScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={28} color="black" />
+            <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Enter Verification Code</CalText>
@@ -111,10 +115,10 @@ export default function VerifyPhoneScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -133,12 +137,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   subtext: {
     fontSize: 16,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 24,
     marginBottom: 32,
   },
@@ -147,7 +151,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     marginBottom: 16,
   },
   codeContainer: {
@@ -159,17 +163,17 @@ const styles = StyleSheet.create({
     width: 65,
     height: 65,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     fontSize: 24,
     textAlign: 'center',
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: c.bgSoft,
   },
   boxInputFilled: {
     borderColor: '#D62D88',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   resendContainer: {
     alignItems: 'flex-start',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -6,9 +6,13 @@ import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../components/HelixaText';
 import { useAuth } from '../hooks/useAuth';
 import { Image } from 'expo-image';
+import { useTheme } from '../context/ThemeContext';
+import type { Palette } from '../lib/theme';
 
 export default function PregnancyStatusScreen() {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles({ ...colors, activeCard: isDark ? '#F78BC6' : '#FCE8F3' }), [colors, isDark]);
 
   // Parse current week from string like "5 weeks" or "18 weeks"
   let currentWeek = 0;
@@ -51,7 +55,7 @@ export default function PregnancyStatusScreen() {
       {/* Background SVG */}
       <View style={StyleSheet.absoluteFill}>
         <Image
-          source={require('../assets/images/pregnancy-bg.svg')}
+          source={isDark ? require('../assets/images/pregnancy-bg-dark.svg') : require('../assets/images/pregnancy-bg.svg')}
           style={styles.bgImage}
           contentFit="cover"
         />
@@ -60,7 +64,7 @@ export default function PregnancyStatusScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#000" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </Pressable>
         <HelixaText style={styles.headerTitle} weight="bold">Pregnancy Status</HelixaText>
         <View style={styles.placeholder} />
@@ -166,6 +170,10 @@ export default function PregnancyStatusScreen() {
 }
 
 function TrimesterCard({ title, weeks, isActive }: { title: string, weeks: string, isActive: boolean }) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles({ ...colors, activeCard: isDark ? '#F78BC6' : '#FCE8F3' }), [colors, isDark]);
+  // The highlighted row is a bright pink in dark mode, so its text must stay dark there.
+  const onActive = isActive && isDark ? { color: '#1B1B1F' } : undefined;
   return (
     <View style={[styles.card, isActive && styles.cardActive]}>
       <View style={styles.cardLeft}>
@@ -173,8 +181,8 @@ function TrimesterCard({ title, weeks, isActive }: { title: string, weeks: strin
           <Feather name="smile" size={20} color="#D62D88" />
         </View>
         <View>
-          <HelixaText style={styles.cardTitle} weight="bold">{title}</HelixaText>
-          <HelixaText style={styles.cardSubtitle}>{weeks}</HelixaText>
+          <HelixaText style={[styles.cardTitle, onActive]} weight="bold">{title}</HelixaText>
+          <HelixaText style={[styles.cardSubtitle, onActive && { color: '#4B4B52' }]}>{weeks}</HelixaText>
         </View>
       </View>
       {isActive && (
@@ -186,10 +194,10 @@ function TrimesterCard({ title, weeks, isActive }: { title: string, weeks: strin
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette & { activeCard: string }) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   bgImage: {
     width: '100%',
@@ -208,14 +216,14 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   headerTitle: {
     fontSize: 18,
-    color: '#000000',
+    color: c.text,
   },
   placeholder: {
     width: 40,
@@ -231,23 +239,23 @@ const styles = StyleSheet.create({
   },
   stageLabel: {
     fontSize: 14,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginBottom: 4,
   },
   stageTitle: {
     fontSize: 28,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   stageSubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginBottom: 24,
   },
   progressContainer: {
     width: '100%',
     height: 48,
-    backgroundColor: '#FCE8F3', // Light pink background
+    backgroundColor: c.primarySoft, // Light pink background
     borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,7 +281,7 @@ const styles = StyleSheet.create({
   dueDateText: {
     marginTop: 16,
     fontSize: 14,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   postpartumCard: {
     marginTop: 24,
@@ -305,7 +313,7 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: c.surface,
     borderRadius: 24,
     padding: 4,
     alignSelf: 'center',
@@ -319,7 +327,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   toggleActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.elevated,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -327,11 +335,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   toggleTextActive: {
-    color: '#000000',
+    color: c.text,
     fontSize: 14,
   },
   toggleTextInactive: {
-    color: '#9CA3AF',
+    color: c.textMuted,
     fontSize: 14,
   },
   trimestersSection: {
@@ -339,20 +347,20 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#000000',
+    color: c.text,
     marginBottom: 16,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F3F3F3',
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
   },
   cardActive: {
-    backgroundColor: '#FCE8F3',
+    backgroundColor: c.activeCard,
   },
   cardLeft: {
     flexDirection: 'row',
@@ -363,18 +371,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.elevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardTitle: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     marginBottom: 2,
   },
   cardSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   checkCircle: {
     width: 24,
@@ -387,7 +395,7 @@ const styles = StyleSheet.create({
   footerText: {
     textAlign: 'center',
     fontSize: 13,
-    color: '#9CA3AF',
+    color: c.textMuted,
     lineHeight: 20,
     paddingHorizontal: 20,
   }

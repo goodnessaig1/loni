@@ -7,6 +7,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { PhoneIcon, RecoveryPlanIcon, RideIcon, SupportPartnerIcon } from '../../components/NotificationIcons';
 
+import { useTheme } from '../../context/ThemeContext';
 type NotificationType = 'nurse_call' | 'recovery_plan' | 'ride' | 'support_partner';
 
 interface NotificationItem {
@@ -71,43 +72,45 @@ const NOTIFICATIONS: NotificationItem[] = [
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'Recent' | 'Earlier'>('Recent');
 
   const getIcon = (type: NotificationType) => {
     switch (type) {
       case 'nurse_call':
-        return <PhoneIcon size={20} color="#18181B" />;
+        return <PhoneIcon size={20} color={colors.text} />;
       case 'recovery_plan':
-        return <RecoveryPlanIcon size={20} color="#18181B" />;
+        return <RecoveryPlanIcon size={20} color={colors.text} />;
       case 'ride':
-        return <RideIcon size={20} color="#18181B" />;
+        return <RideIcon size={20} color={colors.text} />;
       case 'support_partner':
-        return <SupportPartnerIcon size={20} color="#18181B" />;
+        return <SupportPartnerIcon size={20} color={colors.text} />;
       default:
         return null;
     }
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top']}>
       {/* Header */}
       <View className="px-5 pt-2.5 mb-5">
         <TouchableOpacity 
-          className="w-12 h-12 rounded-full border border-gray-200 justify-center items-center" 
+          className="w-12 h-12 rounded-full border justify-center items-center" 
+          style={{ borderColor: colors.border }}
           onPress={() => router.back()}
         >
-          <Feather name="arrow-left" size={24} color="#18181B" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerClassName="px-5 pb-10" showsVerticalScrollIndicator={false}>
         <CalText className="text-[28px] text-[#D62D88] mb-2">Notifications</CalText>
-        <HelixaText className="text-base text-gray-500 leading-6 mb-6">
+        <HelixaText className="text-base leading-6 mb-6" style={{ color: colors.textSecondary }}>
           Stay updated on your support, recovery, and emergency activity.
         </HelixaText>
 
         {/* Custom Tabs */}
-        <View className="flex-row bg-[#F4F7F2] rounded-xl p-1 mb-8 border border-gray-100">
+        <View className="flex-row rounded-xl p-1 mb-8 border" style={{ backgroundColor: colors.surface, borderColor: colors.divider }}>
           <TouchableOpacity 
             className="flex-1" 
             onPress={() => setActiveTab('Recent')}
@@ -115,11 +118,11 @@ export default function NotificationsScreen() {
           >
             <View 
               className="flex-1 flex-row py-3 justify-center items-center rounded-lg"
-              style={activeTab === 'Recent' ? { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
+              style={activeTab === 'Recent' ? { backgroundColor: colors.elevated, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
             >
               <HelixaText 
                 weight={activeTab === 'Recent' ? 'bold' : 'regular'} 
-                style={{ fontSize: 14, color: activeTab === 'Recent' ? '#111827' : '#6B7280' }}
+                style={{ fontSize: 14, color: activeTab === 'Recent' ? colors.text : colors.textSecondary }}
               >
                 Recent
               </HelixaText>
@@ -134,11 +137,11 @@ export default function NotificationsScreen() {
           >
             <View 
               className="flex-1 flex-row py-3 justify-center items-center rounded-lg"
-              style={activeTab === 'Earlier' ? { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
+              style={activeTab === 'Earlier' ? { backgroundColor: colors.elevated, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
             >
               <HelixaText 
                 weight={activeTab === 'Earlier' ? 'bold' : 'regular'} 
-                style={{ fontSize: 14, color: activeTab === 'Earlier' ? '#111827' : '#6B7280' }}
+                style={{ fontSize: 14, color: activeTab === 'Earlier' ? colors.text : colors.textSecondary }}
               >
                 Earlier
               </HelixaText>
@@ -151,11 +154,11 @@ export default function NotificationsScreen() {
           {activeTab === 'Recent' ? (
             NOTIFICATIONS.map((item) => (
               <View key={item.id} className="flex-row items-start mb-6">
-                <View className="w-12 h-12 rounded-full bg-[#F4F7F2] justify-center items-center mr-4">
+                <View className="w-12 h-12 rounded-full justify-center items-center mr-4" style={{ backgroundColor: colors.surface }}>
                   {getIcon(item.type)}
                 </View>
                 <View className="flex-1 pt-1">
-                  <HelixaText weight="bold" className="text-base text-gray-900 mb-1">{item.title}</HelixaText>
+                  <HelixaText weight="bold" className="text-base mb-1">{item.title}</HelixaText>
                   <HelixaText className="text-sm text-gray-500 leading-5 mb-1.5">{item.subtitle}</HelixaText>
                   <HelixaText className="text-xs text-gray-400">{item.time}</HelixaText>
                 </View>
