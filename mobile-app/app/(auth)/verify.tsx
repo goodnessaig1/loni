@@ -17,6 +17,7 @@ import { Button } from '../../components/Button';
 import { useVerifyEmail, useResendOtp } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 export default function VerifyScreen() {
   const { colors } = useTheme();
@@ -83,6 +84,7 @@ export default function VerifyScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
@@ -91,7 +93,9 @@ export default function VerifyScreen() {
           <HelixaText style={styles.subtext}>
             We sent a 4-digit code to {email || 'your email'}
           </HelixaText>
+          </Reveal>
 
+          <Reveal index={1}>
           <View style={styles.inputSection}>
             <HelixaText style={styles.inputLabel} weight="bold">Enter Code</HelixaText>
 
@@ -111,7 +115,9 @@ export default function VerifyScreen() {
               ))}
             </View>
           </View>
+          </Reveal>
 
+          <Reveal index={2}>
           <Pressable onPress={handleResend} style={styles.resendContainer}>
             <HelixaText style={styles.resendText} weight="bold">Resend Code</HelixaText>
           </Pressable>
@@ -122,6 +128,7 @@ export default function VerifyScreen() {
             isLoading={isVerifying}
             disabled={!isComplete}
           />
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>

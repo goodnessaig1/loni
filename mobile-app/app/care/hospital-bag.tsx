@@ -5,6 +5,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { CareScreen, Checkbox, Chip } from '../../components/care/CareParts';
 import { useTheme } from '../../context/ThemeContext';
 import { useHospitalBag, useToggleBagItem } from '../../hooks/useCare';
+import { RevealList } from '../../components/motion';
 
 export default function HospitalBagScreen() {
   const { colors } = useTheme();
@@ -34,9 +35,9 @@ export default function HospitalBagScreen() {
           </ScrollView>
 
           <View style={{ gap: 10 }}>
-            {group.items.map((item) => (
+            {group.items.map((item, i) => (
+              <RevealList key={item.key} index={i}>
               <TouchableOpacity
-                key={item.key}
                 activeOpacity={0.7}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: item.checked }}
@@ -53,6 +54,7 @@ export default function HospitalBagScreen() {
                   {item.title}
                 </HelixaText>
               </TouchableOpacity>
+              </RevealList>
             ))}
           </View>
         </>

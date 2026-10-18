@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useVerifyEmail, useResendOtp, useAuth } from '../../hooks/useAuth';
 import { getPostAuthRoute } from '../../lib/driverOnboarding';
 import { useEffect } from 'react';
@@ -98,41 +99,47 @@ export default function VerifyScreen() {
             <Feather name="chevron-left" size={28} color="black" />
           </Pressable>
 
-          <CalText style={styles.heading}>Enter Verification Code</CalText>
-          <HelixaText style={styles.subtext}>
-            We sent a 4-digit code to {email || 'your email'}
-          </HelixaText>
+          <Reveal index={0}>
+            <CalText style={styles.heading}>Enter Verification Code</CalText>
+            <HelixaText style={styles.subtext}>
+              We sent a 4-digit code to {email || 'your email'}
+            </HelixaText>
+          </Reveal>
 
-          <View style={styles.inputSection}>
-            <HelixaText style={styles.inputLabel} weight="bold">Enter Code</HelixaText>
+          <Reveal index={1}>
+            <View style={styles.inputSection}>
+              <HelixaText style={styles.inputLabel} weight="bold">Enter Code</HelixaText>
 
-            <View style={styles.codeContainer}>
-              {code.map((digit, index) => (
-                <TextInput
-                  key={index}
-                  ref={(ref) => { inputs.current[index] = ref; }}
-                  style={[styles.boxInput, digit ? styles.boxInputFilled : null]}
-                  keyboardType="number-pad"
-                  maxLength={1}
-                  value={digit}
-                  onChangeText={(text) => handleCodeChange(text, index)}
-                  onKeyPress={(e) => handleKeyPress(e, index)}
-                  selectTextOnFocus
-                />
-              ))}
+              <View style={styles.codeContainer}>
+                {code.map((digit, index) => (
+                  <TextInput
+                    key={index}
+                    ref={(ref) => { inputs.current[index] = ref; }}
+                    style={[styles.boxInput, digit ? styles.boxInputFilled : null]}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    value={digit}
+                    onChangeText={(text) => handleCodeChange(text, index)}
+                    onKeyPress={(e) => handleKeyPress(e, index)}
+                    selectTextOnFocus
+                  />
+                ))}
+              </View>
             </View>
-          </View>
+          </Reveal>
 
-          <Pressable onPress={handleResend} style={styles.resendContainer}>
-            <HelixaText style={styles.resendText} weight="bold">Resend Code</HelixaText>
-          </Pressable>
+          <Reveal index={2}>
+            <Pressable onPress={handleResend} style={styles.resendContainer}>
+              <HelixaText style={styles.resendText} weight="bold">Resend Code</HelixaText>
+            </Pressable>
 
-          <Button
-            title="Verify"
-            onPress={handleVerify}
-            isLoading={isVerifying}
-            disabled={!isComplete}
-          />
+            <Button
+              title="Verify"
+              onPress={handleVerify}
+              isLoading={isVerifying}
+              disabled={!isComplete}
+            />
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>

@@ -7,6 +7,7 @@ import { useRouter, Tabs } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
 import { chatTopicsFor } from '../../lib/chatTopics';
+import { PressableScale, Reveal, RevealList } from '../../components/motion';
 
 const { width } = Dimensions.get('window');
 
@@ -93,6 +94,7 @@ export default function ChatScreen() {
         <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: 40, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           
           {/* Header */}
+          <Reveal index={0}>
           <View className="items-center px-6 mb-10">
             <HelixaText 
               className="text-white text-[36px] text-center leading-[42px] mb-3" 
@@ -104,15 +106,16 @@ export default function ChatScreen() {
               Tell Loni how you feel.
             </HelixaText>
           </View>
+          </Reveal>
 
           {/* Grid Options */}
           <View className="flex-row flex-wrap justify-between px-6">
-            {SUPPORT_OPTIONS.map((option) => {
+            {SUPPORT_OPTIONS.map((option, index) => {
               const isSelected = selectedOption === option.id;
               
               return (
-                <TouchableOpacity
-                  key={option.id}
+                <RevealList key={option.id} index={index} delay={70}>
+                <PressableScale
                   activeOpacity={0.8}
                   onPress={() => setSelectedOption(option.id)}
                   style={{
@@ -124,8 +127,8 @@ export default function ChatScreen() {
                     borderWidth: isSelected ? 2 : 0,
                     borderColor: 'white',
                     overflow: 'hidden',
+                    alignItems: 'center',
                   }}
-                  className="items-center"
                 >
                   <View className="flex-1 justify-center items-center w-full mt-4">
                     <Image 
@@ -141,18 +144,22 @@ export default function ChatScreen() {
                       {option.title}
                     </HelixaText>
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
+                </RevealList>
               );
             })}
           </View>
 
           {/* Bottom Section */}
+          <Reveal index={2}>
           <View className="mt-4 items-center h-8 justify-center">
             <Animated.View style={{ transform: [{ translateY: bounceValue }] }}>
               <Feather name="chevrons-down" size={28} color="rgba(255,255,255,0.8)" />
             </Animated.View>
           </View>
+          </Reveal>
 
+          <Reveal index={3}>
           <View className="px-6 mt-8">
             <TouchableOpacity
               activeOpacity={0.8}
@@ -170,7 +177,9 @@ export default function ChatScreen() {
               </HelixaText>
             </TouchableOpacity>
           </View>
+          </Reveal>
 
+          <Reveal index={4}>
           <View className="mt-8 items-center">
             <TouchableOpacity onPress={() => router.push('/')} activeOpacity={0.6}>
               <HelixaText className="text-white text-[16px]" weight="bold">
@@ -178,6 +187,7 @@ export default function ChatScreen() {
               </HelixaText>
             </TouchableOpacity>
           </View>
+          </Reveal>
 
         </ScrollView>
       </SafeAreaView>

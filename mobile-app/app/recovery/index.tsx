@@ -8,6 +8,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { PillsIcon, WalkIcon, WaterIcon, RelaxationIcon } from '../../components/RecoveryIcons';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal, RevealList } from '../../components/motion';
 
 const INITIAL_TASKS = [
   {
@@ -60,17 +61,22 @@ export default function RecoveryPlanScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
+      <Reveal index={0}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
+      </Reveal>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Reveal index={1}>
         <CalText style={styles.pageTitle}>Recovery Plan</CalText>
         <HelixaText style={styles.pageSubtitle}>Your personalized daily guidance</HelixaText>
+        </Reveal>
 
         {/* Progress Card */}
+        <Reveal index={2}>
         <View style={styles.progressCard}>
           <View style={styles.progressHeader}>
             <HelixaText style={styles.progressTitle}>Progress</HelixaText>
@@ -80,14 +86,17 @@ export default function RecoveryPlanScreen() {
             <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
           </View>
         </View>
+        </Reveal>
 
+        <Reveal index={3}>
         <HelixaText weight="bold" style={styles.sectionTitle}>Today's Tasks</HelixaText>
+        </Reveal>
 
         {/* Task List */}
         <View style={styles.tasksContainer}>
-          {tasks.map((task) => (
+          {tasks.map((task, i) => (
+            <RevealList key={task.id} index={4 + i}>
             <TouchableOpacity 
-              key={task.id} 
               style={styles.taskItem}
               activeOpacity={0.7}
               onPress={() => toggleTask(task.id)}
@@ -112,6 +121,7 @@ export default function RecoveryPlanScreen() {
                 </View>
               </View>
             </TouchableOpacity>
+            </RevealList>
           ))}
         </View>
       </ScrollView>

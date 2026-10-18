@@ -13,6 +13,7 @@ import { useAuth, useUploadProfilePicture } from '../../hooks/useAuth';
 import { usePartnerConnection } from '../../hooks/usePartnerConnection';
 import { partnerApi } from '../../api/partner';
 import { relativeTime } from '../../lib/relativeTime';
+import { PressableScale, Reveal } from '../../components/motion';
 
 function ShareRow({ title, description, shared }: { title: string; description: string; shared: boolean }) {
   return (
@@ -99,15 +100,20 @@ export default function PartnerProfile() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Reveal index={0}>
         <CalText style={styles.heading}>Your account</CalText>
+        </Reveal>
 
+        <Reveal index={1}>
         <View style={styles.avatarWrap}>
           <Avatar uri={user?.profilePicture || null} name={user?.name || 'You'} style={styles.avatar} />
           <Pressable style={styles.cameraButton} onPress={handlePickImage}>
             <Feather name="camera" size={14} color="#FFFFFF" />
           </Pressable>
         </View>
+        </Reveal>
 
+        <Reveal index={2}>
         <View style={styles.nameRow}>
           <HelixaText weight="black" style={styles.name}>{user?.name || 'Partner'}</HelixaText>
           <Pressable style={styles.supportButton} onPress={() => router.push('/partner/support' as any)}>
@@ -115,7 +121,9 @@ export default function PartnerProfile() {
             <HelixaText style={styles.supportText} weight="black">Support</HelixaText>
           </Pressable>
         </View>
+        </Reveal>
 
+        <Reveal index={3}>
         <View style={styles.section}>
           <HelixaText style={styles.sectionLabel} weight="bold">Partner account</HelixaText>
           <View style={styles.infoRow}>
@@ -142,8 +150,10 @@ export default function PartnerProfile() {
             </View>
           </View>
         </View>
+        </Reveal>
 
         {connection && (
+          <Reveal index={4}>
           <View style={styles.section}>
             <HelixaText style={styles.sectionLabel} weight="bold">Connection with {inviterName}</HelixaText>
             <View style={styles.infoRow}>
@@ -191,7 +201,7 @@ export default function PartnerProfile() {
               </View>
             </View>
 
-            <Pressable style={styles.leaveCard} onPress={confirmLeave} disabled={leaving}>
+            <PressableScale style={styles.leaveCard} onPress={confirmLeave} disabled={leaving}>
               <Feather name="bell-off" size={18} color="#FA3532" />
               <View style={{ flex: 1 }}>
                 <HelixaText weight="black" style={styles.leaveTitle}>{leaving ? 'Removing…' : 'Stop getting alerts'}</HelixaText>
@@ -199,8 +209,9 @@ export default function PartnerProfile() {
                   You'll stop receiving {inviterName}'s updates and emergency alerts, and this partner account will be closed. She can invite you again.
                 </HelixaText>
               </View>
-            </Pressable>
+            </PressableScale>
           </View>
+          </Reveal>
         )}
       </ScrollView>
     </SafeAreaView>

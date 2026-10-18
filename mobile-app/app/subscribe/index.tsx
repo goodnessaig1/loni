@@ -11,6 +11,7 @@ import { PlanId } from '../../api/subscription';
 import { usePlans, useStartTrial, useSubscription } from '../../hooks/useSubscription';
 import { naira } from '../../lib/format';
 import { BRAND } from '../../lib/theme';
+import { PressableScale, Reveal, RevealList } from '../../components/motion';
 
 const WHITE = '#FFFFFF';
 const GREEN = '#22C55E';
@@ -43,6 +44,7 @@ export default function SubscribeScreen() {
     <LinearGradient colors={['#A3185F', '#7A0F47', '#3A0A27']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+          <Reveal index={0}>
           <TouchableOpacity
             onPress={() => router.back()}
             accessibilityRole="button"
@@ -51,10 +53,13 @@ export default function SubscribeScreen() {
           >
             <Feather name="arrow-left" size={22} color={WHITE} />
           </TouchableOpacity>
+          </Reveal>
 
+          <Reveal index={1}>
           <CalText style={{ color: WHITE, fontSize: 34, lineHeight: 40, marginTop: 64, marginBottom: 20 }}>
             Subscribe to pro{'\n'}version now
           </CalText>
+          </Reveal>
 
           {plansLoading || subLoading ? (
             <ActivityIndicator color={WHITE} style={{ marginVertical: 60 }} />
@@ -64,6 +69,7 @@ export default function SubscribeScreen() {
             </TouchableOpacity>
           ) : (
             <>
+              <Reveal index={2}>
               <View style={{ gap: 14 }}>
                 <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.16)', borderRadius: 999, paddingVertical: 5, paddingRight: 12, paddingLeft: 4 }}>
                   <Check />
@@ -76,13 +82,14 @@ export default function SubscribeScreen() {
                   </View>
                 ))}
               </View>
+              </Reveal>
 
               <View style={{ gap: 14, marginTop: 40 }} accessibilityRole="radiogroup">
-                {plans.plans.map((p) => {
+                {plans.plans.map((p, i) => {
                   const on = p.id === selected;
                   return (
-                    <TouchableOpacity
-                      key={p.id}
+                    <RevealList key={p.id} index={i + 3}>
+                    <PressableScale
                       activeOpacity={0.85}
                       onPress={() => setSelected(p.id)}
                       accessibilityRole="radio"
@@ -113,11 +120,13 @@ export default function SubscribeScreen() {
                           <HelixaText weight="bold" style={{ color: WHITE, fontSize: 11 }}>{p.badge}</HelixaText>
                         </View>
                       ) : null}
-                    </TouchableOpacity>
+                    </PressableScale>
+                    </RevealList>
                   );
                 })}
               </View>
 
+              <Reveal index={5}>
               <TouchableOpacity
                 activeOpacity={0.85}
                 disabled={!canStart || startTrial.isPending}
@@ -134,12 +143,15 @@ export default function SubscribeScreen() {
                   </>
                 )}
               </TouchableOpacity>
+              </Reveal>
 
+              <Reveal index={6}>
               <HelixaText style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, textAlign: 'center', marginTop: 16, lineHeight: 18 }}>
                 {canStart
                   ? `Your first ${days} days are free on either plan. You won't be charged until the trial ends.`
                   : "You've already used your free trial. Paid plans are coming soon."}
               </HelixaText>
+              </Reveal>
             </>
           )}
         </ScrollView>

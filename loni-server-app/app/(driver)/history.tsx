@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useRideHistory } from '../../hooks/useRides';
+import { Reveal, RevealList } from '../../components/motion';
 
 const PINK = '#D62D88';
 
@@ -18,14 +19,17 @@ export default function DriverHistory() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <CalText style={styles.header}>Trip History</CalText>
+      <Reveal index={0}>
+        <CalText style={styles.header}>Trip History</CalText>
+      </Reveal>
       {isLoading ? (
         <ActivityIndicator color={PINK} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {data.length === 0 && <HelixaText style={styles.empty}>No completed trips yet.</HelixaText>}
-          {data.map((h) => (
-            <View key={h.id} style={styles.card}>
+          {data.map((h, i) => (
+            <RevealList key={h.id} index={i}>
+            <View style={styles.card}>
               <View style={styles.iconWrap}>
                 <MaterialCommunityIcons name="car" size={18} color="#FFF" />
               </View>
@@ -45,6 +49,7 @@ export default function DriverHistory() {
                 <HelixaText style={styles.status}>{h.status.toLowerCase()}</HelixaText>
               </View>
             </View>
+            </RevealList>
           ))}
         </ScrollView>
       )}

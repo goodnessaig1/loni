@@ -8,6 +8,7 @@ import { CalText } from '../components/CalText';
 import { HelixaText } from '../components/HelixaText';
 import { Button } from '../components/Button';
 import { Avatar } from '../components/Avatar';
+import { Reveal } from '../components/motion';
 
 function duration(total: number) {
   const m = Math.floor(total / 60);
@@ -25,40 +26,48 @@ export default function CallSummaryScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.badgeOuter}>
-          <View style={styles.badgeInner}>
-            <MaterialCommunityIcons name="check-decagram" size={56} color="#D62D88" />
+        <Reveal index={0}>
+          <View style={styles.badgeOuter}>
+            <View style={styles.badgeInner}>
+              <MaterialCommunityIcons name="check-decagram" size={56} color="#D62D88" />
+            </View>
           </View>
-        </View>
-        <View style={styles.pill}>
-          <Feather name="check" size={12} color="#D62D88" />
-          <HelixaText style={styles.pillText} weight="bold">Completed</HelixaText>
-        </View>
-        <CalText style={styles.title}>Support session ended successfully</CalText>
+        </Reveal>
+        <Reveal index={1} style={{ alignItems: 'center' }}>
+          <View style={styles.pill}>
+            <Feather name="check" size={12} color="#D62D88" />
+            <HelixaText style={styles.pillText} weight="bold">Completed</HelixaText>
+          </View>
+          <CalText style={styles.title}>Support session ended successfully</CalText>
+        </Reveal>
 
-        <View style={styles.card}>
-          <View style={styles.person}>
-            <Avatar uri={picture || undefined} name={name || 'Mother'} style={styles.avatar} />
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <HelixaText weight="bold" style={styles.name}>{name || 'Mother'}</HelixaText>
-              {!!trimester && trimester !== 'Unknown' && <HelixaText style={styles.sub}>{trimester}</HelixaText>}
+        <Reveal index={2} style={{ width: '100%' }}>
+          <View style={styles.card}>
+            <View style={styles.person}>
+              <Avatar uri={picture || undefined} name={name || 'Mother'} style={styles.avatar} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <HelixaText weight="bold" style={styles.name}>{name || 'Mother'}</HelixaText>
+                {!!trimester && trimester !== 'Unknown' && <HelixaText style={styles.sub}>{trimester}</HelixaText>}
+              </View>
+              <View style={styles.tag}>
+                <HelixaText style={styles.tagText} weight="bold">Voice call</HelixaText>
+              </View>
             </View>
-            <View style={styles.tag}>
-              <HelixaText style={styles.tagText} weight="bold">Voice call</HelixaText>
+            <View style={styles.row}>
+              <HelixaText style={styles.label}>Duration</HelixaText>
+              <HelixaText weight="bold" style={styles.value}>{duration(secs)}</HelixaText>
+            </View>
+            <View style={styles.row}>
+              <HelixaText style={styles.label}>Ended</HelixaText>
+              <HelixaText weight="bold" style={styles.value}>{format(new Date(), 'hh:mm a')}</HelixaText>
             </View>
           </View>
-          <View style={styles.row}>
-            <HelixaText style={styles.label}>Duration</HelixaText>
-            <HelixaText weight="bold" style={styles.value}>{duration(secs)}</HelixaText>
-          </View>
-          <View style={styles.row}>
-            <HelixaText style={styles.label}>Ended</HelixaText>
-            <HelixaText weight="bold" style={styles.value}>{format(new Date(), 'hh:mm a')}</HelixaText>
-          </View>
-        </View>
+        </Reveal>
       </View>
 
-      <Button title="Back to Dashboard" onPress={() => router.replace('/(tabs)')} style={styles.button} />
+      <Reveal index={3}>
+        <Button title="Back to Dashboard" onPress={() => router.replace('/(tabs)')} style={styles.button} />
+      </Reveal>
     </SafeAreaView>
   );
 }

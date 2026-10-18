@@ -9,6 +9,7 @@ import { EmergencyAlertCard } from '../../components/partner/EmergencyAlertCard'
 import { useNotifications, useMarkNotificationsRead } from '../../hooks/useNotifications';
 import { relativeTimeWithClock } from '../../lib/relativeTime';
 import type { PartnerNotification } from '../../api/notifications';
+import { PressableScale, Reveal, RevealList } from '../../components/motion';
 
 /** Where a notification leads: her updates, her ride, or what she shares. */
 function targetFor(n: PartnerNotification): string | null {
@@ -22,13 +23,13 @@ function targetFor(n: PartnerNotification): string | null {
 function InfoEventCard({ notification }: { notification: PartnerNotification }) {
   const target = targetFor(notification);
   return (
-    <Pressable style={styles.eventCard} disabled={!target} onPress={() => target && router.push(target as any)}>
+    <PressableScale style={styles.eventCard} disabled={!target} onPress={() => target && router.push(target as any)}>
       <CalText style={styles.eventTitle}>{notification.title}</CalText>
       <HelixaText style={styles.eventBody} weight="bold">{notification.body}</HelixaText>
       <HelixaText style={styles.eventTime} weight="bold">
         {relativeTimeWithClock(notification.created_at)}
       </HelixaText>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -57,6 +58,7 @@ export default function PartnerNotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <Reveal index={0}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Feather name="chevron-left" size={28} color="#000000" />
@@ -64,31 +66,39 @@ export default function PartnerNotificationsScreen() {
         <CalText style={styles.headerTitle}>Notification centre</CalText>
         <View style={styles.backButton} />
       </View>
+      </Reveal>
 
       {notifications.length === 0 ? (
-        <EmptyState />
+        <Reveal index={1} style={{ flex: 1 }}>
+          <EmptyState />
+        </Reveal>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <Reveal index={1}>
           <HelixaText style={styles.sectionLabel} weight="bold">Recent</HelixaText>
+          </Reveal>
           <View style={styles.list}>
-            {notifications.map((n) => (
-              n.type === 'ride_contact_alert' ? (
+            {notifications.map((n, i) => (
+              <RevealList key={n.id} index={i}>
+              {n.type === 'ride_contact_alert' ? (
                 <EmergencyAlertCard
-                  key={n.id}
                   inviterName={(n.data?.rider_name as string) ?? 'She'}
                   rideId={Number(n.data?.ride_id ?? n.data?.id)}
                   requestedAt={(n.data?.requested_at as string) ?? n.created_at}
                 />
               ) : (
-                <InfoEventCard key={n.id} notification={n} />
-              )
+                <InfoEventCard notification={n} />
+              )}
+              </RevealList>
             ))}
           </View>
 
+          <Reveal index={2}>
           <View style={styles.caughtUp}>
             <Feather name="check" size={20} color="#000000" />
             <HelixaText style={styles.caughtUpText} weight="bold">You're all caught up</HelixaText>
           </View>
+          </Reveal>
         </ScrollView>
       )}
     </SafeAreaView>

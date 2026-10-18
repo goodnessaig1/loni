@@ -10,6 +10,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { SelectModal } from '../components/SelectModal';
 import { useAuth } from '../hooks/useAuth';
 import { useContactSupport, useSupportInfo } from '../hooks/useAccount';
+import { Reveal } from '../components/motion';
 
 /** Figma "Support": a message form, plus how to reach the team directly. Shared by every role. */
 export default function SupportScreen() {
@@ -36,55 +37,67 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Support" />
+      <Reveal index={0}>
+        <ScreenHeader title="Support" />
+      </Reveal>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          <HelixaText weight="bold" style={styles.label}>Your Name</HelixaText>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Full name" placeholderTextColor="#9CA3AF" />
+          <Reveal index={1}>
+            <HelixaText weight="bold" style={styles.label}>Your Name</HelixaText>
+            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Full name" placeholderTextColor="#9CA3AF" />
 
-          <HelixaText weight="bold" style={styles.label}>Email Address</HelixaText>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" placeholderTextColor="#9CA3AF" />
+            <HelixaText weight="bold" style={styles.label}>Email Address</HelixaText>
+            <TextInput style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" placeholderTextColor="#9CA3AF" />
+          </Reveal>
 
-          <HelixaText weight="bold" style={styles.label}>Subject</HelixaText>
-          <Pressable style={[styles.input, styles.select]} onPress={() => setPicking(true)}>
-            <HelixaText style={{ color: subject ? '#111827' : '#9CA3AF', fontSize: 15 }}>{subject || 'Select a topic'}</HelixaText>
-            <Feather name="chevron-down" size={18} color="#6B7280" />
-          </Pressable>
+          <Reveal index={2}>
+            <HelixaText weight="bold" style={styles.label}>Subject</HelixaText>
+            <Pressable style={[styles.input, styles.select]} onPress={() => setPicking(true)}>
+              <HelixaText style={{ color: subject ? '#111827' : '#9CA3AF', fontSize: 15 }}>{subject || 'Select a topic'}</HelixaText>
+              <Feather name="chevron-down" size={18} color="#6B7280" />
+            </Pressable>
+          </Reveal>
 
-          <HelixaText weight="bold" style={styles.label}>Message</HelixaText>
-          <TextInput
-            style={[styles.input, styles.textarea]}
-            value={message}
-            onChangeText={setMessage}
-            multiline
-            maxLength={4000}
-            placeholder="How can we help?"
-            placeholderTextColor="#9CA3AF"
-          />
+          <Reveal index={3}>
+            <HelixaText weight="bold" style={styles.label}>Message</HelixaText>
+            <TextInput
+              style={[styles.input, styles.textarea]}
+              value={message}
+              onChangeText={setMessage}
+              multiline
+              maxLength={4000}
+              placeholder="How can we help?"
+              placeholderTextColor="#9CA3AF"
+            />
+          </Reveal>
 
-          <Button title={send.isPending ? 'Sending…' : 'Send Message'} onPress={submit} disabled={!canSend} style={{ marginTop: 8 }} />
+          <Reveal index={4}>
+            <Button title={send.isPending ? 'Sending…' : 'Send Message'} onPress={submit} disabled={!canSend} style={{ marginTop: 8 }} />
+          </Reveal>
 
-          <View style={styles.contactCard}>
-            <HelixaText weight="bold" style={styles.contactTitle}>Other Ways to Reach Us</HelixaText>
-            {!!info?.email && (
-              <Pressable style={styles.contactRow} onPress={() => Linking.openURL(`mailto:${info.email}`)}>
-                <Feather name="mail" size={16} color="#D62D88" />
-                <HelixaText style={styles.contactText}>{info.email}</HelixaText>
-              </Pressable>
-            )}
-            {!!info?.phone && (
-              <Pressable style={styles.contactRow} onPress={() => Linking.openURL(`tel:${info.phone.replace(/\s/g, '')}`)}>
-                <Feather name="phone" size={16} color="#D62D88" />
-                <HelixaText style={styles.contactText}>{info.phone}</HelixaText>
-              </Pressable>
-            )}
-            {!!info?.hours && (
-              <View style={styles.contactRow}>
-                <Feather name="clock" size={16} color="#D62D88" />
-                <HelixaText style={styles.contactText}>{info.hours}</HelixaText>
-              </View>
-            )}
-          </View>
+          <Reveal index={5}>
+            <View style={styles.contactCard}>
+              <HelixaText weight="bold" style={styles.contactTitle}>Other Ways to Reach Us</HelixaText>
+              {!!info?.email && (
+                <Pressable style={styles.contactRow} onPress={() => Linking.openURL(`mailto:${info.email}`)}>
+                  <Feather name="mail" size={16} color="#D62D88" />
+                  <HelixaText style={styles.contactText}>{info.email}</HelixaText>
+                </Pressable>
+              )}
+              {!!info?.phone && (
+                <Pressable style={styles.contactRow} onPress={() => Linking.openURL(`tel:${info.phone.replace(/\s/g, '')}`)}>
+                  <Feather name="phone" size={16} color="#D62D88" />
+                  <HelixaText style={styles.contactText}>{info.phone}</HelixaText>
+                </Pressable>
+              )}
+              {!!info?.hours && (
+                <View style={styles.contactRow}>
+                  <Feather name="clock" size={16} color="#D62D88" />
+                  <HelixaText style={styles.contactText}>{info.hours}</HelixaText>
+                </View>
+              )}
+            </View>
+          </Reveal>
         </ScrollView>
       </KeyboardAvoidingView>
 

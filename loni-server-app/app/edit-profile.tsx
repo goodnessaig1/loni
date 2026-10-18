@@ -20,6 +20,7 @@ import { CalText } from '../components/CalText';
 import { HelixaText } from '../components/HelixaText';
 import { useAuth, useUploadProfilePicture } from '../hooks/useAuth';
 import { apiClient } from '../api/client';
+import { PressableScale, Reveal } from '../components/motion';
 
 const BaseSchema = {
   name: Yup.string().required('Full Name is required'),
@@ -97,13 +98,15 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="chevron-left" size={28} color="#111827" />
-        </TouchableOpacity>
-        <CalText style={styles.headerTitle}>Edit Profile</CalText>
-        <View style={{ width: 28 }} />
-      </View>
+      <Reveal index={0}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Feather name="chevron-left" size={28} color="#111827" />
+          </TouchableOpacity>
+          <CalText style={styles.headerTitle}>Edit Profile</CalText>
+          <View style={{ width: 28 }} />
+        </View>
+      </Reveal>
 
       <Formik
         initialValues={{
@@ -166,181 +169,189 @@ export default function EditProfileScreen() {
           <>
             <ScrollView contentContainerStyle={styles.scrollContent}>
               {/* Avatar Section */}
-              <View style={styles.avatarSection}>
-                <Image
-                  source={{
-                    uri: user?.profilePicture ||
-                      'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=150&q=80',
-                  }}
-                  style={styles.avatar}
-                />
-                <TouchableOpacity
-                  style={styles.editPhotoBtn}
-                  onPress={handlePickImage}
-                  disabled={uploadMutation.isPending}
-                >
-                  {uploadMutation.isPending ? (
-                    <ActivityIndicator size="small" color="#111827" />
-                  ) : (
-                    <HelixaText style={styles.editPhotoText} weight="bold">
-                      Edit Photo
-                    </HelixaText>
-                  )}
-                </TouchableOpacity>
-              </View>
+              <Reveal index={1}>
+                <View style={styles.avatarSection}>
+                  <Image
+                    source={{
+                      uri: user?.profilePicture ||
+                        'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=150&q=80',
+                    }}
+                    style={styles.avatar}
+                  />
+                  <TouchableOpacity
+                    style={styles.editPhotoBtn}
+                    onPress={handlePickImage}
+                    disabled={uploadMutation.isPending}
+                  >
+                    {uploadMutation.isPending ? (
+                      <ActivityIndicator size="small" color="#111827" />
+                    ) : (
+                      <HelixaText style={styles.editPhotoText} weight="bold">
+                        Edit Photo
+                      </HelixaText>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </Reveal>
 
               {/* Form Fields */}
-              <View style={styles.formGroup}>
-                <HelixaText style={styles.label}>Full Name</HelixaText>
-                <TextInput
-                  style={[styles.input, touched.name && errors.name ? styles.inputError : null]}
-                  value={values.name}
-                  onChangeText={handleChange('name')}
-                  onBlur={handleBlur('name')}
-                  placeholder="e.g. Sarah Chen"
-                  placeholderTextColor="#9CA3AF"
-                />
-                {touched.name && errors.name && (
-                  <HelixaText style={styles.errorText}>{errors.name as string}</HelixaText>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <HelixaText style={styles.label}>Email</HelixaText>
-                <TextInput
-                  style={[styles.input, styles.inputDisabled]}
-                  value={user?.email}
-                  editable={false}
-                  placeholder="Email address"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <HelixaText style={styles.label}>Phone Number</HelixaText>
-                <TextInput
-                  style={[styles.input, touched.phone && errors.phone ? styles.inputError : null]}
-                  value={values.phone}
-                  onChangeText={handleChange('phone')}
-                  onBlur={handleBlur('phone')}
-                  placeholder="e.g. +1 (555) 234 - 5678"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                />
-                {touched.phone && errors.phone && (
-                  <HelixaText style={styles.errorText}>{errors.phone as string}</HelixaText>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <HelixaText style={styles.label}>Gender *</HelixaText>
-                <View style={styles.genderRow}>
-                  <TouchableOpacity
-                    style={[styles.genderCard, values.gender === 'Female' && styles.genderCardActive]}
-                    activeOpacity={0.7}
-                    onPress={() => setFieldValue('gender', 'Female')}
-                  >
-                    <HelixaText style={styles.genderText} weight={values.gender === 'Female' ? 'bold' : 'regular'}>
-                      Female
-                    </HelixaText>
-                    {values.gender === 'Female' ? (
-                      <MaterialCommunityIcons name="check-circle" size={20} color="#D62D88" />
-                    ) : (
-                      <View style={styles.radioEmpty} />
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.genderCard, values.gender === 'Male' && styles.genderCardActive]}
-                    activeOpacity={0.7}
-                    onPress={() => setFieldValue('gender', 'Male')}
-                  >
-                    <HelixaText style={styles.genderText} weight={values.gender === 'Male' ? 'bold' : 'regular'}>
-                      Male
-                    </HelixaText>
-                    {values.gender === 'Male' ? (
-                      <MaterialCommunityIcons name="check-circle" size={20} color="#D62D88" />
-                    ) : (
-                      <View style={styles.radioEmpty} />
-                    )}
-                  </TouchableOpacity>
+              <Reveal index={2}>
+                <View style={styles.formGroup}>
+                  <HelixaText style={styles.label}>Full Name</HelixaText>
+                  <TextInput
+                    style={[styles.input, touched.name && errors.name ? styles.inputError : null]}
+                    value={values.name}
+                    onChangeText={handleChange('name')}
+                    onBlur={handleBlur('name')}
+                    placeholder="e.g. Sarah Chen"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  {touched.name && errors.name && (
+                    <HelixaText style={styles.errorText}>{errors.name as string}</HelixaText>
+                  )}
                 </View>
-                {touched.gender && errors.gender && (
-                  <HelixaText style={styles.errorText}>{errors.gender as string}</HelixaText>
-                )}
-              </View>
+
+                <View style={styles.formGroup}>
+                  <HelixaText style={styles.label}>Email</HelixaText>
+                  <TextInput
+                    style={[styles.input, styles.inputDisabled]}
+                    value={user?.email}
+                    editable={false}
+                    placeholder="Email address"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                </View>
+
+                <View style={styles.formGroup}>
+                  <HelixaText style={styles.label}>Phone Number</HelixaText>
+                  <TextInput
+                    style={[styles.input, touched.phone && errors.phone ? styles.inputError : null]}
+                    value={values.phone}
+                    onChangeText={handleChange('phone')}
+                    onBlur={handleBlur('phone')}
+                    placeholder="e.g. +1 (555) 234 - 5678"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="phone-pad"
+                  />
+                  {touched.phone && errors.phone && (
+                    <HelixaText style={styles.errorText}>{errors.phone as string}</HelixaText>
+                  )}
+                </View>
+              </Reveal>
+
+              <Reveal index={3}>
+                <View style={styles.formGroup}>
+                  <HelixaText style={styles.label}>Gender *</HelixaText>
+                  <View style={styles.genderRow}>
+                    <TouchableOpacity
+                      style={[styles.genderCard, values.gender === 'Female' && styles.genderCardActive]}
+                      activeOpacity={0.7}
+                      onPress={() => setFieldValue('gender', 'Female')}
+                    >
+                      <HelixaText style={styles.genderText} weight={values.gender === 'Female' ? 'bold' : 'regular'}>
+                        Female
+                      </HelixaText>
+                      {values.gender === 'Female' ? (
+                        <MaterialCommunityIcons name="check-circle" size={20} color="#D62D88" />
+                      ) : (
+                        <View style={styles.radioEmpty} />
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.genderCard, values.gender === 'Male' && styles.genderCardActive]}
+                      activeOpacity={0.7}
+                      onPress={() => setFieldValue('gender', 'Male')}
+                    >
+                      <HelixaText style={styles.genderText} weight={values.gender === 'Male' ? 'bold' : 'regular'}>
+                        Male
+                      </HelixaText>
+                      {values.gender === 'Male' ? (
+                        <MaterialCommunityIcons name="check-circle" size={20} color="#D62D88" />
+                      ) : (
+                        <View style={styles.radioEmpty} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  {touched.gender && errors.gender && (
+                    <HelixaText style={styles.errorText}>{errors.gender as string}</HelixaText>
+                  )}
+                </View>
+              </Reveal>
 
               {isNurse && (
-              <>
-              <View style={styles.formGroup}>
-                <HelixaText style={styles.label}>Hospital Affiliation</HelixaText>
-                <TextInput
-                  style={[styles.input, touched.hospitalAffiliation && errors.hospitalAffiliation ? styles.inputError : null]}
-                  value={values.hospitalAffiliation}
-                  onChangeText={handleChange('hospitalAffiliation')}
-                  onBlur={handleBlur('hospitalAffiliation')}
-                  placeholder="e.g. General Hospital"
-                  placeholderTextColor="#9CA3AF"
-                />
-                {touched.hospitalAffiliation && errors.hospitalAffiliation && (
-                  <HelixaText style={styles.errorText}>{errors.hospitalAffiliation as string}</HelixaText>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <HelixaText style={styles.label}>Nursing License Number *</HelixaText>
-                <TextInput
-                  style={[styles.input, touched.licenseNumber && errors.licenseNumber ? styles.inputError : null]}
-                  value={values.licenseNumber}
-                  onChangeText={handleChange('licenseNumber')}
-                  onBlur={handleBlur('licenseNumber')}
-                  autoCapitalize="characters"
-                  placeholder="e.g. RN-2024-08742"
-                  placeholderTextColor="#9CA3AF"
-                />
-                {touched.licenseNumber && errors.licenseNumber && (
-                  <HelixaText style={styles.errorText}>{errors.licenseNumber as string}</HelixaText>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <HelixaText style={styles.label}>Years of Experience *</HelixaText>
-                <View style={[styles.inputWithIcon, touched.yearsOfExperience && errors.yearsOfExperience ? styles.inputError : null]}>
+              <Reveal index={4}>
+                <View style={styles.formGroup}>
+                  <HelixaText style={styles.label}>Hospital Affiliation</HelixaText>
                   <TextInput
-                    style={styles.inputInside}
-                    value={values.yearsOfExperience}
-                    onChangeText={handleChange('yearsOfExperience')}
-                    onBlur={handleBlur('yearsOfExperience')}
-                    placeholder="e.g. 6"
+                    style={[styles.input, touched.hospitalAffiliation && errors.hospitalAffiliation ? styles.inputError : null]}
+                    value={values.hospitalAffiliation}
+                    onChangeText={handleChange('hospitalAffiliation')}
+                    onBlur={handleBlur('hospitalAffiliation')}
+                    placeholder="e.g. General Hospital"
                     placeholderTextColor="#9CA3AF"
-                    keyboardType="number-pad"
                   />
-                  <Feather name="chevron-down" size={20} color="#6B7280" style={{ marginRight: 16 }} />
+                  {touched.hospitalAffiliation && errors.hospitalAffiliation && (
+                    <HelixaText style={styles.errorText}>{errors.hospitalAffiliation as string}</HelixaText>
+                  )}
                 </View>
-                {touched.yearsOfExperience && errors.yearsOfExperience && (
-                  <HelixaText style={styles.errorText}>{errors.yearsOfExperience as string}</HelixaText>
-                )}
-              </View>
-              </>
+
+                <View style={styles.formGroup}>
+                  <HelixaText style={styles.label}>Nursing License Number *</HelixaText>
+                  <TextInput
+                    style={[styles.input, touched.licenseNumber && errors.licenseNumber ? styles.inputError : null]}
+                    value={values.licenseNumber}
+                    onChangeText={handleChange('licenseNumber')}
+                    onBlur={handleBlur('licenseNumber')}
+                    autoCapitalize="characters"
+                    placeholder="e.g. RN-2024-08742"
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  {touched.licenseNumber && errors.licenseNumber && (
+                    <HelixaText style={styles.errorText}>{errors.licenseNumber as string}</HelixaText>
+                  )}
+                </View>
+
+                <View style={styles.formGroup}>
+                  <HelixaText style={styles.label}>Years of Experience *</HelixaText>
+                  <View style={[styles.inputWithIcon, touched.yearsOfExperience && errors.yearsOfExperience ? styles.inputError : null]}>
+                    <TextInput
+                      style={styles.inputInside}
+                      value={values.yearsOfExperience}
+                      onChangeText={handleChange('yearsOfExperience')}
+                      onBlur={handleBlur('yearsOfExperience')}
+                      placeholder="e.g. 6"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="number-pad"
+                    />
+                    <Feather name="chevron-down" size={20} color="#6B7280" style={{ marginRight: 16 }} />
+                  </View>
+                  {touched.yearsOfExperience && errors.yearsOfExperience && (
+                    <HelixaText style={styles.errorText}>{errors.yearsOfExperience as string}</HelixaText>
+                  )}
+                </View>
+              </Reveal>
               )}
             </ScrollView>
 
             {/* Footer / Save Button */}
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={() => handleSubmit()}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <HelixaText style={styles.saveBtnText} weight="bold">
-                    Save Changes
-                  </HelixaText>
-                )}
-              </TouchableOpacity>
-            </View>
+            <Reveal index={5}>
+              <View style={styles.footer}>
+                <PressableScale
+                  style={styles.saveBtn}
+                  onPress={() => handleSubmit()}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <HelixaText style={styles.saveBtnText} weight="bold">
+                      Save Changes
+                    </HelixaText>
+                  )}
+                </PressableScale>
+              </View>
+            </Reveal>
           </>
         )}
       </Formik>

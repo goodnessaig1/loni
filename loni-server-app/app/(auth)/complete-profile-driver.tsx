@@ -7,6 +7,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { DatePickerInput } from '../../components/DatePickerInput';
+import { Reveal } from '../../components/motion';
 import { UploadBox } from '../../components/UploadBox';
 import { useAuth, useUploadProfilePicture } from '../../hooks/useAuth';
 import { useSavePersonalInfo } from '../../hooks/useDriverTraining';
@@ -68,50 +69,56 @@ export default function CompleteProfileDriverScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <CalText style={styles.heading}>Complete Your Profile</CalText>
-        <HelixaText style={styles.subtext}>Driver Information</HelixaText>
+        <Reveal index={0}>
+          <CalText style={styles.heading}>Complete Your Profile</CalText>
+          <HelixaText style={styles.subtext}>Driver Information</HelixaText>
+        </Reveal>
 
-        <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Full Name</HelixaText>
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Your full name"
-              placeholderTextColor="#9CA3AF"
+        <Reveal index={1}>
+          <View style={styles.formGroup}>
+            <HelixaText style={styles.label}>Full Name</HelixaText>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Your full name"
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <HelixaText style={styles.label}>Phone Number</HelixaText>
+            <View style={[styles.inputContainer, styles.inputDisabled]}>
+              <TextInput style={[styles.input, { color: '#9CA3AF' }]} value={phone} editable={false} />
+            </View>
+          </View>
+
+          <DatePickerInput label="Date of Birth" value={dob} onChangeText={setDob} />
+
+          <View style={styles.formGroup}>
+            <UploadBox
+              label="Profile Photo *"
+              fileUri={photoUri}
+              fileName={photoName}
+              setUri={handlePickPhoto}
+              setName={setPhotoName}
+              defaultFileName="photo.jpg"
             />
           </View>
-        </View>
+        </Reveal>
 
-        <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Phone Number</HelixaText>
-          <View style={[styles.inputContainer, styles.inputDisabled]}>
-            <TextInput style={[styles.input, { color: '#9CA3AF' }]} value={phone} editable={false} />
+        <Reveal index={2}>
+          <View style={styles.buttonWrapper}>
+            <Button
+              title="Continue"
+              onPress={handleContinue}
+              disabled={!isFormValid || submitting || isPending}
+              isLoading={submitting || isPending}
+            />
           </View>
-        </View>
-
-        <DatePickerInput label="Date of Birth" value={dob} onChangeText={setDob} />
-
-        <View style={styles.formGroup}>
-          <UploadBox
-            label="Profile Photo *"
-            fileUri={photoUri}
-            fileName={photoName}
-            setUri={handlePickPhoto}
-            setName={setPhotoName}
-            defaultFileName="photo.jpg"
-          />
-        </View>
-
-        <View style={styles.buttonWrapper}>
-          <Button
-            title="Continue"
-            onPress={handleContinue}
-            disabled={!isFormValid || submitting || isPending}
-            isLoading={submitting || isPending}
-          />
-        </View>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );

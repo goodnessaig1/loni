@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const slides = [
   {
@@ -123,6 +124,7 @@ export default function OnboardingScreen() {
         bounces={false}
       />
 
+      <Reveal index={2}>
       <View style={styles.footer}>
         {/* Loni logo */}
         <Image source={require('../../assets/logo.svg')} style={styles.logo} contentFit="contain" />
@@ -135,6 +137,7 @@ export default function OnboardingScreen() {
           <Feather name="arrow-right" size={16} color="#D62D88" style={{ marginLeft: 4 }} />
         </Pressable>
       </View>
+      </Reveal>
     </SafeAreaView>
   );
 }

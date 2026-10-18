@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useAptitudeStatus, useOnboarding } from '../../hooks/useDriverTraining';
 import { ONBOARDING_ROUTE } from '../../lib/driverOnboarding';
 
@@ -48,55 +49,61 @@ export default function AptitudeIntroScreen() {
         </View>
       ) : (
         <View style={styles.body}>
-          <CalText style={styles.heading}>
-            {status.passed ? 'Assessment passed' : 'Ready to test your knowledge?'}
-          </CalText>
-          <HelixaText style={styles.subtitle}>
-            {status.passed
-              ? 'Great work — you passed the LONI Driver Assessment. Continue your driver verification.'
-              : 'Complete the assessment to continue your LONI driver verification.'}
-          </HelixaText>
+          <Reveal index={0}>
+            <CalText style={styles.heading}>
+              {status.passed ? 'Assessment passed' : 'Ready to test your knowledge?'}
+            </CalText>
+            <HelixaText style={styles.subtitle}>
+              {status.passed
+                ? 'Great work — you passed the LONI Driver Assessment. Continue your driver verification.'
+                : 'Complete the assessment to continue your LONI driver verification.'}
+            </HelixaText>
+          </Reveal>
 
-          {!status.passed && (
-            <>
-              <View style={styles.statRow}>
-                <View style={styles.statCard}>
-                  <HelixaText style={styles.statLabel}>Questions</HelixaText>
-                  <CalText style={styles.statValue}>{status.question_count}</CalText>
+          <Reveal index={1}>
+            {!status.passed && (
+              <>
+                <View style={styles.statRow}>
+                  <View style={styles.statCard}>
+                    <HelixaText style={styles.statLabel}>Questions</HelixaText>
+                    <CalText style={styles.statValue}>{status.question_count}</CalText>
+                  </View>
+                  <View style={styles.statCard}>
+                    <HelixaText style={styles.statLabel}>Attempts Remaining</HelixaText>
+                    <CalText style={styles.statValue}>{status.attempts_remaining}</CalText>
+                  </View>
                 </View>
-                <View style={styles.statCard}>
-                  <HelixaText style={styles.statLabel}>Attempts Remaining</HelixaText>
-                  <CalText style={styles.statValue}>{status.attempts_remaining}</CalText>
-                </View>
-              </View>
 
-              <View style={styles.infoBox}>
-                <View style={styles.infoBar} />
-                <HelixaText style={styles.infoText}>
-                  You need to answer at least {status.pass_score} of {status.question_count} questions
-                  correctly to pass. Take your time.
+                <View style={styles.infoBox}>
+                  <View style={styles.infoBar} />
+                  <HelixaText style={styles.infoText}>
+                    You need to answer at least {status.pass_score} of {status.question_count} questions
+                    correctly to pass. Take your time.
+                  </HelixaText>
+                </View>
+              </>
+            )}
+
+            {!status.can_attempt && !status.passed && (
+              <View style={styles.blockedBox}>
+                <HelixaText style={styles.blockedText}>
+                  {`You've used all ${status.max_attempts} attempts. Please contact LONI Driver Support for next steps.`}
                 </HelixaText>
               </View>
-            </>
-          )}
-
-          {!status.can_attempt && !status.passed && (
-            <View style={styles.blockedBox}>
-              <HelixaText style={styles.blockedText}>
-                {`You've used all ${status.max_attempts} attempts. Please contact LONI Driver Support for next steps.`}
-              </HelixaText>
-            </View>
-          )}
-
-          <View style={styles.footer}>
-            {status.passed ? (
-              <Button title="Continue" onPress={goNext} />
-            ) : status.can_attempt ? (
-              <Button title="Start Test" onPress={() => router.push('/(auth)/aptitude-test')} />
-            ) : (
-              <Button title="Back to Training" onPress={() => router.replace('/(auth)/driver-training')} />
             )}
-          </View>
+          </Reveal>
+
+          <Reveal index={2} style={{ marginTop: 'auto' }}>
+            <View style={styles.footer}>
+              {status.passed ? (
+                <Button title="Continue" onPress={goNext} />
+              ) : status.can_attempt ? (
+                <Button title="Start Test" onPress={() => router.push('/(auth)/aptitude-test')} />
+              ) : (
+                <Button title="Back to Training" onPress={() => router.replace('/(auth)/driver-training')} />
+              )}
+            </View>
+          </Reveal>
         </View>
       )}
     </SafeAreaView>

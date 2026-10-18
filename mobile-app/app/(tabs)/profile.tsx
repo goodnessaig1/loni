@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { HelixaText } from '../../components/HelixaText';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const { width } = Dimensions.get('window');
 
@@ -109,6 +110,7 @@ export default function ProfileScreen() {
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
+        <Reveal index={0}>
         <ProfileHeader
           firstName={firstName}
           trimester={statusText}
@@ -116,25 +118,34 @@ export default function ProfileScreen() {
           onPressAvatar={handlePickImage}
           isUploading={uploadMutation.isPending}
         />
+        </Reveal>
 
         <View className='flex flex-col'>
+          <Reveal index={1}>
           <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
+          </Reveal>
 
+          <Reveal index={2}>
           <ProfileSection>
             <ProfileMenuItem icon="heart" title={user?.status === 'general' || user?.status === 'ttc' ? 'My Journey' : 'Pregnancy Status'} onPress={() => router.push('/pregnancy-status')} />
             <ProfileMenuItem icon="users" title="Emergency Contacts" onPress={() => router.push('/profile/emergency-contacts')} isLast />
           </ProfileSection>
+          </Reveal>
 
+          <Reveal index={3}>
           <ProfileSection>
             <ProfileMenuItem icon="moon" title={`${themeLabel} Theme`} onPress={() => router.push('/profile/theme')} />
             <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => router.push('/notification-settings')} />
             <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={onCancelSubscription} />
             <ProfileMenuItem icon="shield" title="Privacy & Permissions" onPress={() => router.push('/profile/privacy-permissions')} isLast />
           </ProfileSection>
+          </Reveal>
 
+          <Reveal index={4}>
           <ProfileSection backgroundColor={colors.dangerSoft}>
             <ProfileMenuItem icon="log-out" title="Sign Out" color={colors.danger} onPress={handleLogout} isLast />
           </ProfileSection>
+          </Reveal>
         </View>
 
       </ScrollView>

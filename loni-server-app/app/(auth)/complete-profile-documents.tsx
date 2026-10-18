@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { UploadBox } from '../../components/UploadBox';
 import { useAuth, useUploadDocument } from '../../hooks/useAuth';
 import { useSaveDocuments, useSubmitApplication } from '../../hooks/useDriverTraining';
@@ -81,21 +82,28 @@ export default function CompleteProfileDocumentsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <CalText style={styles.heading}>Complete Your Profile</CalText>
-        <HelixaText style={styles.subtext}>Document Upload</HelixaText>
+        <Reveal index={0}>
+          <CalText style={styles.heading}>Complete Your Profile</CalText>
+          <HelixaText style={styles.subtext}>Document Upload</HelixaText>
+        </Reveal>
 
-        <UploadBox label="Driver's License" fileUri={license.uri} fileName={license.name} setUri={setUploadUri(setLicense)} setName={setUploadName(setLicense)} defaultFileName="license.jpg" />
-        <UploadBox label="Government ID" fileUri={govId.uri} fileName={govId.name} setUri={setUploadUri(setGovId)} setName={setUploadName(setGovId)} defaultFileName="gov_id.jpg" />
-        <UploadBox label="Vehicle Papers" fileUri={papers.uri} fileName={papers.name} setUri={setUploadUri(setPapers)} setName={setUploadName(setPapers)} defaultFileName="vehicle_papers.jpg" />
+        <Reveal index={1}>
 
-        <View style={styles.buttonWrapper}>
-          <Button
-            title="Submit for Review"
-            onPress={handleSubmit}
-            disabled={!isFormValid || busy}
-            isLoading={busy}
-          />
-        </View>
+          <UploadBox label="Driver's License" fileUri={license.uri} fileName={license.name} setUri={setUploadUri(setLicense)} setName={setUploadName(setLicense)} defaultFileName="license.jpg" />
+          <UploadBox label="Government ID" fileUri={govId.uri} fileName={govId.name} setUri={setUploadUri(setGovId)} setName={setUploadName(setGovId)} defaultFileName="gov_id.jpg" />
+          <UploadBox label="Vehicle Papers" fileUri={papers.uri} fileName={papers.name} setUri={setUploadUri(setPapers)} setName={setUploadName(setPapers)} defaultFileName="vehicle_papers.jpg" />
+        </Reveal>
+
+        <Reveal index={2}>
+          <View style={styles.buttonWrapper}>
+            <Button
+              title="Submit for Review"
+              onPress={handleSubmit}
+              disabled={!isFormValid || busy}
+              isLoading={busy}
+            />
+          </View>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );

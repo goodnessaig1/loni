@@ -9,6 +9,7 @@ import { CalText } from '../../../components/CalText';
 import { Avatar } from '../../../components/Avatar';
 import { ridesApi } from '../../../api/rides';
 import { useRideStore, Ride, RouteInfo } from '../../../store/rideStore';
+import { PressableScale, Reveal } from '../../../components/motion';
 
 const PINK = '#D62D88';
 
@@ -84,15 +85,20 @@ export default function TripOverview() {
   const rider = ride.rider;
   return (
     <SafeAreaView style={styles.container}>
+      <Reveal index={0}>
       <View style={styles.header}>
         {/* The trip stays active; the dashboard shows "Resume active trip". */}
         <Pressable hitSlop={10} onPress={() => router.replace('/(driver)' as any)}>
           <Feather name="chevron-left" size={26} color="#000" />
         </Pressable>
       </View>
+      </Reveal>
       <View style={styles.body}>
+        <Reveal index={1}>
         <CalText style={styles.title}>Trip Overview</CalText>
+        </Reveal>
 
+        <Reveal index={2}>
         <View style={styles.card}>
           <View style={styles.riderRow}>
             <Avatar uri={rider?.profile_picture ?? undefined} name={rider?.name || 'Mother'} style={styles.avatar} />
@@ -130,12 +136,15 @@ export default function TripOverview() {
             </View>
           </View>
         </View>
+        </Reveal>
       </View>
 
-      <Pressable style={styles.button} onPress={start}>
+      <Reveal index={3}>
+      <PressableScale style={styles.button} onPress={start}>
         <HelixaText weight="bold" style={styles.buttonText}>Start Navigation</HelixaText>
         <Feather name="navigation" size={16} color="#FFF" />
-      </Pressable>
+      </PressableScale>
+      </Reveal>
     </SafeAreaView>
   );
 }

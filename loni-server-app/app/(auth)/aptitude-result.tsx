@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useOnboarding } from '../../hooks/useDriverTraining';
 import { ONBOARDING_ROUTE } from '../../lib/driverOnboarding';
 
@@ -31,57 +32,65 @@ export default function AptitudeResultScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.body}>
-        <View style={[styles.badge, passed ? styles.badgePass : styles.badgeFail]}>
-          <Feather name={passed ? 'check' : 'x'} size={34} color="#FFFFFF" />
-        </View>
+        <Reveal index={0}>
+          <View style={[styles.badge, passed ? styles.badgePass : styles.badgeFail]}>
+            <Feather name={passed ? 'check' : 'x'} size={34} color="#FFFFFF" />
+          </View>
+        </Reveal>
 
-        <CalText style={styles.title}>
-          {passed ? 'You Passed!' : "You Didn't Pass This Attempt"}
-        </CalText>
-        <HelixaText style={styles.subtitle}>
-          {passed
-            ? 'Great work — you passed the LONI Driver Assessment.'
-            : 'Review your training and try again.'}
-        </HelixaText>
-
-        <View style={styles.scorePill}>
-          <HelixaText style={styles.scoreText}>
-            Score: {score}/{total}
+        <Reveal index={1} style={{ alignItems: 'center' }}>
+          <CalText style={styles.title}>
+            {passed ? 'You Passed!' : "You Didn't Pass This Attempt"}
+          </CalText>
+          <HelixaText style={styles.subtitle}>
+            {passed
+              ? 'Great work — you passed the LONI Driver Assessment.'
+              : 'Review your training and try again.'}
           </HelixaText>
-        </View>
+        </Reveal>
 
-        {!passed && (
-          <HelixaText style={styles.attemptsText}>
-            {attemptsRemaining > 0
-              ? `${attemptsRemaining} ${attemptsRemaining === 1 ? 'attempt' : 'attempts'} remaining. Ready when you are.`
-              : "You've used all your attempts. Contact LONI Driver Support for next steps."}
-          </HelixaText>
-        )}
+        <Reveal index={2} style={{ alignItems: 'center' }}>
+          <View style={styles.scorePill}>
+            <HelixaText style={styles.scoreText}>
+              Score: {score}/{total}
+            </HelixaText>
+          </View>
+
+          {!passed && (
+            <HelixaText style={styles.attemptsText}>
+              {attemptsRemaining > 0
+                ? `${attemptsRemaining} ${attemptsRemaining === 1 ? 'attempt' : 'attempts'} remaining. Ready when you are.`
+                : "You've used all your attempts. Contact LONI Driver Support for next steps."}
+            </HelixaText>
+          )}
+        </Reveal>
       </View>
 
-      <View style={styles.footer}>
-        {passed ? (
-          <Button title="Continue Verification" onPress={continueVerification} />
-        ) : attemptsRemaining > 0 ? (
-          <>
+      <Reveal index={3}>
+        <View style={styles.footer}>
+          {passed ? (
+            <Button title="Continue Verification" onPress={continueVerification} />
+          ) : attemptsRemaining > 0 ? (
+            <>
+              <Button
+                title="Try Again"
+                onPress={() => router.replace('/(auth)/aptitude-test')}
+                style={{ marginBottom: 12 }}
+              />
+              <Button
+                title="Review Training"
+                onPress={() => router.replace('/(auth)/driver-training')}
+                style={styles.ghost}
+              />
+            </>
+          ) : (
             <Button
-              title="Try Again"
-              onPress={() => router.replace('/(auth)/aptitude-test')}
-              style={{ marginBottom: 12 }}
+              title="Back to Dashboard"
+              onPress={() => router.replace('/(auth)/verification-progress')}
             />
-            <Button
-              title="Review Training"
-              onPress={() => router.replace('/(auth)/driver-training')}
-              style={styles.ghost}
-            />
-          </>
-        ) : (
-          <Button
-            title="Back to Dashboard"
-            onPress={() => router.replace('/(auth)/verification-progress')}
-          />
-        )}
-      </View>
+          )}
+        </View>
+      </Reveal>
     </SafeAreaView>
   );
 }

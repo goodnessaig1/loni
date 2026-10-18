@@ -11,6 +11,7 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { useAuth } from '../hooks/useAuth';
 import { useAccountSettings, useUpdateSetting } from '../hooks/useAccount';
 import type { AccountPrefs } from '../api/account';
+import { PressableScale, Reveal } from '../components/motion';
 
 type Key = keyof AccountPrefs;
 
@@ -78,36 +79,46 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title="Settings" />
+      <Reveal index={0}>
+        <ScreenHeader title="Settings" />
+      </Reveal>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <HelixaText style={styles.sectionLabel} weight="bold">Notifications</HelixaText>
-        <View style={styles.group}>
-          {rows.map((r) => (
-            <Toggle key={r.key} title={r.title} subtitle={r.subtitle} disabled={r.disabled || !prefs}
-              value={!!prefs?.[r.key]} onChange={(v) => set(r.key, v)} />
-          ))}
-        </View>
-
-        <HelixaText style={styles.sectionLabel} weight="bold">Account</HelixaText>
-        <View style={styles.group}>
-          <Link title="Change password" onPress={() => router.push('/change-password' as any)} />
-          <Link title="Help & Support" onPress={() => router.push('/support' as any)} />
-        </View>
-
-        <HelixaText style={styles.sectionLabel} weight="bold">About</HelixaText>
-        <View style={styles.group}>
-          <Link title="Privacy Policy" onPress={() => router.push('/legal/privacy' as any)} />
-          <Link title="Terms of Service" onPress={() => router.push('/legal/terms' as any)} />
-          <View style={styles.linkCard}>
-            <HelixaText style={styles.cardTitle} weight="bold">App version</HelixaText>
-            <HelixaText style={styles.versionText}>{Constants.expoConfig?.version ?? '1.0.0'}</HelixaText>
+        <Reveal index={1}>
+          <HelixaText style={styles.sectionLabel} weight="bold">Notifications</HelixaText>
+          <View style={styles.group}>
+            {rows.map((r) => (
+              <Toggle key={r.key} title={r.title} subtitle={r.subtitle} disabled={r.disabled || !prefs}
+                value={!!prefs?.[r.key]} onChange={(v) => set(r.key, v)} />
+            ))}
           </View>
-        </View>
+        </Reveal>
 
-        <Pressable style={styles.signOut} onPress={signOut}>
-          <Feather name="log-out" size={16} color="#D62D88" />
-          <HelixaText weight="bold" style={styles.signOutText}>Sign Out</HelixaText>
-        </Pressable>
+        <Reveal index={2}>
+          <HelixaText style={styles.sectionLabel} weight="bold">Account</HelixaText>
+          <View style={styles.group}>
+            <Link title="Change password" onPress={() => router.push('/change-password' as any)} />
+            <Link title="Help & Support" onPress={() => router.push('/support' as any)} />
+          </View>
+        </Reveal>
+
+        <Reveal index={3}>
+          <HelixaText style={styles.sectionLabel} weight="bold">About</HelixaText>
+          <View style={styles.group}>
+            <Link title="Privacy Policy" onPress={() => router.push('/legal/privacy' as any)} />
+            <Link title="Terms of Service" onPress={() => router.push('/legal/terms' as any)} />
+            <View style={styles.linkCard}>
+              <HelixaText style={styles.cardTitle} weight="bold">App version</HelixaText>
+              <HelixaText style={styles.versionText}>{Constants.expoConfig?.version ?? '1.0.0'}</HelixaText>
+            </View>
+          </View>
+        </Reveal>
+
+        <Reveal index={4}>
+          <PressableScale style={styles.signOut} onPress={signOut}>
+            <Feather name="log-out" size={16} color="#D62D88" />
+            <HelixaText weight="bold" style={styles.signOutText}>Sign Out</HelixaText>
+          </PressableScale>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );

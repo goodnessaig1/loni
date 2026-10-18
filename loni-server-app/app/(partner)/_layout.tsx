@@ -65,7 +65,7 @@ function PartnerTabBar({ state, navigation }: any) {
 
 export default function PartnerTabsLayout() {
   return (
-    <Tabs tabBar={(props) => <PartnerTabBar {...props} />} screenOptions={{ headerShown: false }}>
+    <Tabs tabBar={(props) => <PartnerTabBar {...props} />} screenOptions={{ headerShown: false, animation: 'shift' }}>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>

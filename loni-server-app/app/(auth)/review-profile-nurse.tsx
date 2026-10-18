@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function ReviewProfileNurseScreen() {
@@ -49,43 +50,52 @@ export default function ReviewProfileNurseScreen() {
           <Feather name="chevron-left" size={28} color="black" />
         </Pressable>
 
-        <CalText style={styles.heading}>Review Your Profile</CalText>
+        <Reveal index={0}>
+          <CalText style={styles.heading}>Review Your Profile</CalText>
+        </Reveal>
 
-        <View style={styles.profileHeader}>
-          {profilePhoto ? (
-            <Image source={{ uri: profilePhoto }} style={styles.profileImage} />
-          ) : (
-            <View style={[styles.profileImage, { backgroundColor: '#D62D88', alignItems: 'center', justifyContent: 'center' }]}>
-              <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 22 }}>{(user?.name || '?').charAt(0)}</HelixaText>
+        <Reveal index={1}>
+
+          <View style={styles.profileHeader}>
+            {profilePhoto ? (
+              <Image source={{ uri: profilePhoto }} style={styles.profileImage} />
+            ) : (
+              <View style={[styles.profileImage, { backgroundColor: '#D62D88', alignItems: 'center', justifyContent: 'center' }]}>
+                <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 22 }}>{(user?.name || '?').charAt(0)}</HelixaText>
+              </View>
+            )}
+            <View style={styles.profileInfo}>
+              <HelixaText style={styles.profileName} weight="bold">{user?.name || '—'}</HelixaText>
+              <HelixaText style={styles.profileRole}>Nurse</HelixaText>
             </View>
-          )}
-          <View style={styles.profileInfo}>
-            <HelixaText style={styles.profileName} weight="bold">{user?.name || '—'}</HelixaText>
-            <HelixaText style={styles.profileRole}>Nurse</HelixaText>
+            <Pressable style={styles.editBtn} onPress={() => router.push('/(auth)/complete-profile-nurse')}>
+              <Feather name="edit-2" size={14} color="#D62D88" />
+              <HelixaText weight="bold" style={styles.editText}>Edit Profile</HelixaText>
+            </Pressable>
           </View>
-          <Pressable style={styles.editBtn} onPress={() => router.push('/(auth)/complete-profile-nurse')}>
-            <Feather name="edit-2" size={14} color="#D62D88" />
-            <HelixaText weight="bold" style={styles.editText}>Edit Profile</HelixaText>
-          </Pressable>
-        </View>
+        </Reveal>
 
-        <View style={styles.infoContainer}>
-          <InfoRow value={(user as any)?.gender || '—'} label="Gender" />
-          <InfoRow label="Phone" value={user?.phone || '—'} valueFirst={false} />
-          <InfoRow label="Email" value={user?.email || '—'} valueFirst={false} />
-          <InfoRow label="License No." value={licenseNumber} valueFirst={false} />
-          <InfoRow label="Experience" value={experience} valueFirst={false} />
-        </View>
+        <Reveal index={2}>
+          <View style={styles.infoContainer}>
+            <InfoRow value={(user as any)?.gender || '—'} label="Gender" />
+            <InfoRow label="Phone" value={user?.phone || '—'} valueFirst={false} />
+            <InfoRow label="Email" value={user?.email || '—'} valueFirst={false} />
+            <InfoRow label="License No." value={licenseNumber} valueFirst={false} />
+            <InfoRow label="Experience" value={experience} valueFirst={false} />
+          </View>
+        </Reveal>
 
-        <HelixaText style={styles.footerNote}>
-          Your profile information will be verified by our team. Make sure everything is correct.
-        </HelixaText>
+        <Reveal index={3}>
+          <HelixaText style={styles.footerNote}>
+            Your profile information will be verified by our team. Make sure everything is correct.
+          </HelixaText>
 
-        <Button 
-          title="Submit Profile"
-          onPress={handleSubmit}
-          style={{ marginTop: 32 }}
-        />
+          <Button 
+            title="Submit Profile"
+            onPress={handleSubmit}
+            style={{ marginTop: 32 }}
+          />
+        </Reveal>
 
       </ScrollView>
     </SafeAreaView>

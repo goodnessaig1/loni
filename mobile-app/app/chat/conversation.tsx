@@ -14,6 +14,7 @@ import { useAIChat } from '../../hooks/useAIChat';
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../hooks/useAuth';
+import { RevealList } from '../../components/motion';
 
 // --- Helper Components ---
 
@@ -210,18 +211,21 @@ export default function ConversationScreen() {
   const renderMessage = ({ item: msg, index }: { item: any, index: number }) => {
     if (msg.role === 'user') {
       return (
-        <View key={msg.id || index} className="flex-row justify-end mb-8">
+        <RevealList key={msg.id || index} index={index}>
+        <View className="flex-row justify-end mb-8">
           <View className="bg-[#C82A81] rounded-[24px] rounded-br-none px-5 py-4 shadow-sm max-w-[80%] flex-row items-end">
             <HelixaText className="text-[15px] leading-6 text-white">
               {msg.content}
             </HelixaText>
           </View>
         </View>
+        </RevealList>
       );
     } else {
       // Assistant Message
       return (
-        <View key={msg.id || index} className="flex-row items-end mb-8">
+        <RevealList key={msg.id || index} index={index}>
+        <View className="flex-row items-end mb-8">
           <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full items-center justify-center shadow-sm" style={{ backgroundColor: colors.elevated }}>
             <LumaIcon size={24} />
           </View>
@@ -257,6 +261,7 @@ export default function ConversationScreen() {
             ) : null}
           </View>
         </View>
+        </RevealList>
       );
     }
   };

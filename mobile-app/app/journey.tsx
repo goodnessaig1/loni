@@ -10,6 +10,7 @@ import { useTheme } from '../context/ThemeContext';
 import { BRAND } from '../lib/theme';
 import { getPregnancyProgress } from '../lib/pregnancy';
 import { babyUpdate, changesForYou, MILESTONES, milestoneState } from '../lib/journey';
+import { Reveal } from '../components/motion';
 
 const GREEN = '#16A34A';
 const CORAL = '#FF4D2E';
@@ -29,6 +30,7 @@ export default function JourneyScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48 }} showsVerticalScrollIndicator={false}>
+        <Reveal index={0}>
         <TouchableOpacity
           onPress={() => router.back()}
           accessibilityRole="button"
@@ -40,9 +42,13 @@ export default function JourneyScreen() {
 
         <HelixaText weight="bold" style={{ fontSize: 26, marginTop: 6, marginBottom: 8 }}>Your Journey</HelixaText>
         <HelixaText style={{ fontSize: 14, lineHeight: 21, color: colors.textSecondary, marginBottom: 22 }}>{babyUpdate(week)}</HelixaText>
+        </Reveal>
 
+        <Reveal index={1}>
         <PregnancyCard progress={progress} />
+        </Reveal>
 
+        <Reveal index={2}>
         <View style={{ marginTop: 16, padding: 16, borderRadius: 18, borderWidth: 1, borderColor: colors.divider, backgroundColor: colors.card }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 }}>
             <IconTile name="heart" />
@@ -57,12 +63,16 @@ export default function JourneyScreen() {
             ))}
           </View>
         </View>
+        </Reveal>
 
+        <Reveal index={3}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20, marginBottom: 12 }}>
           <IconTile name="flag" />
           <HelixaText style={{ fontSize: 15 }}>Milestones</HelixaText>
         </View>
+        </Reveal>
 
+        <Reveal index={4}>
         <View style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 18, borderWidth: 1, borderColor: colors.divider, backgroundColor: colors.card }}>
           {MILESTONES.map((m, i) => {
             const state = milestoneState(m.week, week);
@@ -99,6 +109,7 @@ export default function JourneyScreen() {
             );
           })}
         </View>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );

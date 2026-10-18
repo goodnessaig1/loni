@@ -7,6 +7,7 @@ import { HelixaText } from '../components/HelixaText';
 import Svg, { Path, G, Defs, Rect, ClipPath } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
 import { useCheckinPreferences } from '../hooks/useCheckins';
+import { Reveal } from '../components/motion';
 
 const CustomSwitch = ({ value, onValueChange, disabled }: { value: boolean, onValueChange: (v: boolean) => void, disabled?: boolean }) => {
   const { isDark } = useTheme();
@@ -53,6 +54,7 @@ export default function NotificationSettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }}>
+      <Reveal index={0}>
       <View className="flex-row items-center px-6 py-4">
         <Pressable
           onPress={() => router.back()}
@@ -65,9 +67,11 @@ export default function NotificationSettingsScreen() {
           Notification Settings
         </HelixaText>
       </View>
+      </Reveal>
 
       <ScrollView className="flex-1 px-6 pt-4" showsVerticalScrollIndicator={false}>
         {/* Emergency Alerts Card */}
+        <Reveal index={1}>
         <View style={{ backgroundColor: colors.surface, padding: 16, borderRadius: 12, marginBottom: 17 }}>
           <View style={{ backgroundColor: colors.elevated, paddingTop: 13, paddingBottom: 13, paddingLeft: 18, paddingRight: 18, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View className="flex-row items-center flex-1">
@@ -88,8 +92,10 @@ export default function NotificationSettingsScreen() {
             />
           </View>
         </View>
+        </Reveal>
 
         {/* Recovery Reminders Card */}
+        <Reveal index={2}>
         <View style={{ backgroundColor: colors.surface, padding: 16, borderRadius: 12, marginBottom: 17 }}>
           <View style={{ backgroundColor: colors.elevated, paddingTop: 13, paddingBottom: 13, paddingLeft: 18, paddingRight: 18, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View className="flex-row items-center flex-1">
@@ -107,8 +113,10 @@ export default function NotificationSettingsScreen() {
             />
           </View>
         </View>
+        </Reveal>
 
         {/* Wellness Check-ins Card */}
+        <Reveal index={3}>
         <View style={{ backgroundColor: colors.surface, padding: 16, borderRadius: 12, marginBottom: 17 }}>
           <View style={{ backgroundColor: colors.elevated, paddingTop: 13, paddingBottom: 13, paddingLeft: 18, paddingRight: 18, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View className="flex-row items-center flex-1">
@@ -135,10 +143,13 @@ export default function NotificationSettingsScreen() {
             />
           </View>
         </View>
+        </Reveal>
 
+        <Reveal index={4}>
         <HelixaText className="text-center text-[13px] px-4 leading-5 mt-4" style={{ color: colors.textSecondary }}>
           Emergency alerts are always enabled for your safety.
         </HelixaText>
+        </Reveal>
 
       </ScrollView>
     </SafeAreaView>

@@ -18,6 +18,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { UploadBox } from '../../components/UploadBox';
+import { Reveal, PressableScale } from '../../components/motion';
 
 import { useUploadDocument, useCompleteNurseProfile } from '../../hooks/useAuth';
 
@@ -93,81 +94,90 @@ export default function CompleteProfileNurseScreen() {
             <Feather name="chevron-left" size={28} color="black" />
           </Pressable>
 
-          <CalText style={styles.heading}>Complete Your Profile</CalText>
+          <Reveal index={0}>
+            <CalText style={styles.heading}>Complete Your Profile</CalText>
+          </Reveal>
 
-          {/* Gender */}
-          <View style={styles.inputContainer}>
-            <HelixaText style={styles.inputLabel} weight="bold">Gender *</HelixaText>
-            <View style={styles.genderRow}>
-              <Pressable 
-                style={[styles.genderBox, gender === 'Female' && styles.genderBoxSelected]}
-                onPress={() => setGender('Female')}
-              >
-                <HelixaText style={styles.genderText}>Female</HelixaText>
-                <View style={[styles.radioEmpty, gender === 'Female' && styles.radioSelected]}>
-                  {gender === 'Female' && <View style={styles.radioInner} />}
-                </View>
-              </Pressable>
+          <Reveal index={1}>
 
-              <Pressable 
-                style={[styles.genderBox, gender === 'Male' && styles.genderBoxSelected]}
-                onPress={() => setGender('Male')}
-              >
-                <HelixaText style={styles.genderText}>Male</HelixaText>
-                <View style={[styles.radioEmpty, gender === 'Male' && styles.radioSelected]}>
-                  {gender === 'Male' && <View style={styles.radioInner} />}
-                </View>
-              </Pressable>
-            </View>
-          </View>
+            {/* Gender */}
+            <View style={styles.inputContainer}>
+              <HelixaText style={styles.inputLabel} weight="bold">Gender *</HelixaText>
+              <View style={styles.genderRow}>
+                <PressableScale
+                  style={[styles.genderBox, gender === 'Female' && styles.genderBoxSelected]}
+                  onPress={() => setGender('Female')}
+                >
+                  <HelixaText style={styles.genderText}>Female</HelixaText>
+                  <View style={[styles.radioEmpty, gender === 'Female' && styles.radioSelected]}>
+                    {gender === 'Female' && <View style={styles.radioInner} />}
+                  </View>
+                </PressableScale>
 
-          {/* Nursing License Number */}
-          <View style={styles.inputContainer}>
-            <HelixaText style={styles.inputLabel} weight="bold">Nursing License Number *</HelixaText>
-            <TextInput 
-              placeholder="RN-2024-08742" 
-              style={styles.input} 
-              onChangeText={setLicenseNumber}
-              value={licenseNumber}
-              placeholderTextColor="#9CA3AF"
-            />
-          </View>
-
-          {/* Years of Experience */}
-          <View style={styles.inputContainer}>
-            <HelixaText style={styles.inputLabel} weight="bold">Years of Experience *</HelixaText>
-            <View style={styles.numberInputContainer}>
-              <TextInput 
-                placeholder="6" 
-                style={styles.numberInput} 
-                keyboardType="numeric"
-                onChangeText={(text) => setYearsExperience(text.replace(/[^0-9]/g, ''))}
-                value={yearsExperience}
-                placeholderTextColor="#9CA3AF"
-              />
-              <View style={styles.upDownArrows}>
-                <Feather name="chevron-up" size={16} color="#6B7280" />
-                <Feather name="chevron-down" size={16} color="#6B7280" />
+                <PressableScale
+                  style={[styles.genderBox, gender === 'Male' && styles.genderBoxSelected]}
+                  onPress={() => setGender('Male')}
+                >
+                  <HelixaText style={styles.genderText}>Male</HelixaText>
+                  <View style={[styles.radioEmpty, gender === 'Male' && styles.radioSelected]}>
+                    {gender === 'Male' && <View style={styles.radioInner} />}
+                  </View>
+                </PressableScale>
               </View>
             </View>
-          </View>
 
-          {/* Uploads */}
-          <UploadBox label="Profile Photo *" fileUri={photoUri} fileName={photoName} setUri={setPhotoUri} setName={setPhotoName} />
-          <UploadBox label="Nursing License *" fileUri={licenseUri} fileName={licenseName} setUri={setLicenseUri} setName={setLicenseName} />
-          <UploadBox label="Government ID *" fileUri={idUri} fileName={idName} setUri={setIdUri} setName={setIdName} />
+            {/* Nursing License Number */}
+            <View style={styles.inputContainer}>
+              <HelixaText style={styles.inputLabel} weight="bold">Nursing License Number *</HelixaText>
+              <TextInput 
+                placeholder="RN-2024-08742" 
+                style={styles.input} 
+                onChangeText={setLicenseNumber}
+                value={licenseNumber}
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
-          <HelixaText style={styles.footerNote}>
-            Documents must be clear, unexpired, and show your full name matching your profile. Verification typically takes 24-48 hours.
-          </HelixaText>
+            {/* Years of Experience */}
+            <View style={styles.inputContainer}>
+              <HelixaText style={styles.inputLabel} weight="bold">Years of Experience *</HelixaText>
+              <View style={styles.numberInputContainer}>
+                <TextInput 
+                  placeholder="6" 
+                  style={styles.numberInput} 
+                  keyboardType="numeric"
+                  onChangeText={(text) => setYearsExperience(text.replace(/[^0-9]/g, ''))}
+                  value={yearsExperience}
+                  placeholderTextColor="#9CA3AF"
+                />
+                <View style={styles.upDownArrows}>
+                  <Feather name="chevron-up" size={16} color="#6B7280" />
+                  <Feather name="chevron-down" size={16} color="#6B7280" />
+                </View>
+              </View>
+            </View>
+          </Reveal>
 
-          <Button 
-            title="Continue"
-            onPress={handleContinue}
-            disabled={!isFormValid || isSubmitting || isPending}
-            isLoading={isSubmitting || isPending}
-            style={{ marginTop: 24 }}
-          />
+          <Reveal index={2}>
+            {/* Uploads */}
+            <UploadBox label="Profile Photo *" fileUri={photoUri} fileName={photoName} setUri={setPhotoUri} setName={setPhotoName} />
+            <UploadBox label="Nursing License *" fileUri={licenseUri} fileName={licenseName} setUri={setLicenseUri} setName={setLicenseName} />
+            <UploadBox label="Government ID *" fileUri={idUri} fileName={idName} setUri={setIdUri} setName={setIdName} />
+
+            <HelixaText style={styles.footerNote}>
+              Documents must be clear, unexpired, and show your full name matching your profile. Verification typically takes 24-48 hours.
+            </HelixaText>
+          </Reveal>
+
+          <Reveal index={3}>
+            <Button 
+              title="Continue"
+              onPress={handleContinue}
+              disabled={!isFormValid || isSubmitting || isPending}
+              isLoading={isSubmitting || isPending}
+              style={{ marginTop: 24 }}
+            />
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>

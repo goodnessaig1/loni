@@ -20,6 +20,7 @@ import { Button } from '../../components/Button';
 import { useRegister } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required('Name is required'),
@@ -106,13 +107,16 @@ export default function RegisterScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
               
+              <Reveal index={0}>
               <Pressable onPress={() => router.back()} style={styles.backButton}>
                 <Feather name="chevron-left" size={28} color={colors.text} />
               </Pressable>
 
               <CalText style={styles.heading}>Let's set up your profile</CalText>
               <HelixaText style={styles.subtext}>This helps us provide the right support for your journey.</HelixaText>
+              </Reveal>
 
+              <Reveal index={1}>
               <View style={styles.inputContainer}>
                 <HelixaText style={styles.inputLabel} weight="bold">Your name</HelixaText>
                 <TextInput 
@@ -154,7 +158,9 @@ export default function RegisterScreen() {
                 />
                 {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
               </View>
+              </Reveal>
 
+              <Reveal index={2}>
               <View style={styles.statusSection}>
                 <HelixaText style={styles.inputLabel} weight="bold">I am currently</HelixaText>
                 
@@ -236,9 +242,11 @@ export default function RegisterScreen() {
                 </View>
                 {touched.status && errors.status && <Text style={styles.errorText}>{errors.status}</Text>}
               </View>
+              </Reveal>
 
               {/* Conditional Field: Trimester */}
               {values.status === 'pregnant' && (
+                <Reveal>
                 <View style={styles.conditionalSection}>
                   <HelixaText style={styles.inputLabelSubtitle}>Which trimester are you in?</HelixaText>
                   <View style={styles.trimesterRow}>
@@ -286,10 +294,12 @@ export default function RegisterScreen() {
                     </View>
                   ) : null}
                 </View>
+                </Reveal>
               )}
 
               {/* Conditional Field: Baby Age (Postpartum) */}
               {values.status === 'newMom' && (
+                <Reveal>
                 <View style={styles.conditionalSection}>
                   <HelixaText style={styles.inputLabelSubtitle}>Which postpartum stage are you in?</HelixaText>
                   
@@ -343,8 +353,10 @@ export default function RegisterScreen() {
                     </View>
                   ) : null}
                 </View>
+                </Reveal>
               )}
 
+              <Reveal index={3}>
               <Button 
                 title="Continue"
                 onPress={handleSubmit as any}
@@ -357,6 +369,7 @@ export default function RegisterScreen() {
                   Already have an account? <HelixaText style={styles.switchModeHighlight} weight="bold">Sign in</HelixaText>
                 </HelixaText>
               </Pressable>
+              </Reveal>
 
             </ScrollView>
           </KeyboardAvoidingView>

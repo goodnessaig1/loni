@@ -19,6 +19,7 @@ import { Button } from '../../components/Button';
 import { useAddPhone } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const PhoneSchema = Yup.object().shape({
   phone: Yup.string()
@@ -51,6 +52,7 @@ export default function PhoneScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
@@ -59,6 +61,7 @@ export default function PhoneScreen() {
           <HelixaText style={styles.subtext}>
             We'll send you a verification code to confirm your number
           </HelixaText>
+          </Reveal>
 
           <Formik
             initialValues={{ phone: '' }}
@@ -67,6 +70,7 @@ export default function PhoneScreen() {
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isValid, dirty, isSubmitting }) => (
               <>
+                <Reveal index={1}>
                 <View style={styles.inputContainer}>
                   <HelixaText style={styles.inputLabel} weight="bold">Your phone number</HelixaText>
 
@@ -96,13 +100,16 @@ export default function PhoneScreen() {
                     <HelixaText style={styles.errorText}>{errors.phone}</HelixaText>
                   )}
                 </View>
+                </Reveal>
 
+                <Reveal index={2}>
                 <Button
                   title="Send Verification Code"
                   onPress={handleSubmit as any}
                   isLoading={isSubmitting}
                   disabled={!(isValid && dirty)}
                 />
+                </Reveal>
               </>
             )}
           </Formik>

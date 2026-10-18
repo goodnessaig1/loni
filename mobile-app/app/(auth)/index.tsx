@@ -16,6 +16,7 @@ import Animated, {
   Easing
 } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
+import { PressableScale } from '../../components/motion';
 
 const AnimatedExpoImage = Animated.createAnimatedComponent(Image);
 
@@ -130,7 +131,7 @@ export default function OnboardingScreen() {
 
             {/* Top Button */}
             <View style={styles.topButtonContainer}>
-              <TouchableOpacity
+              <PressableScale
                 activeOpacity={0.8}
                 style={styles.topButton}
                 onPress={() => router.push('/(auth)/register')}
@@ -139,7 +140,7 @@ export default function OnboardingScreen() {
                   This Is{'\n'}Prepared{'\n'}For You
                 </HelixaText>
                 <Feather name="arrow-right" size={20} color="white" />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
 
             {/* Main Text Content */}
@@ -172,7 +173,7 @@ export default function OnboardingScreen() {
 
             {/* Bottom Button */}
             <View style={styles.bottomButtonContainer}>
-              <TouchableOpacity
+              <PressableScale
                 activeOpacity={0.8}
                 style={styles.bottomButton}
                 onPress={() => router.push('/(auth)/register')}
@@ -181,7 +182,7 @@ export default function OnboardingScreen() {
                   I was invited
                 </HelixaText>
                 <Feather name="arrow-right" size={20} color="#D62D88" />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
 
           </SafeAreaView>

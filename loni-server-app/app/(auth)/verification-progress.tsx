@@ -12,6 +12,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { VerificationIcon } from '../../components/VerificationIcon';
+import { Reveal } from '../../components/motion';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function VerificationProgressScreen() {
@@ -67,25 +68,31 @@ export default function VerificationProgressScreen() {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.illustrationContainer}>
-          <VerificationIcon />
-        </View>
+        <Reveal index={0}>
+          <View style={styles.illustrationContainer}>
+            <VerificationIcon />
+          </View>
+        </Reveal>
 
-        <CalText style={styles.heading}>Verification in Progress</CalText>
+        <Reveal index={1} style={{ alignItems: 'center' }}>
+          <CalText style={styles.heading}>Verification in Progress</CalText>
         
-        <HelixaText style={styles.subtitle}>
-          We're reviewing your information.
-        </HelixaText>
+          <HelixaText style={styles.subtitle}>
+            We're reviewing your information.
+          </HelixaText>
+        </Reveal>
 
-        <Button 
-          title="Check Back Later"
-          onPress={handleCheckBack}
-          style={styles.button}
-        />
+        <Reveal index={2} style={{ width: '100%', alignItems: 'center' }}>
+          <Button 
+            title="Check Back Later"
+            onPress={handleCheckBack}
+            style={styles.button}
+          />
 
-        <HelixaText style={styles.footerNote}>
-          This usually takes 24-48 hours. We'll notify you once your verification is complete.
-        </HelixaText>
+          <HelixaText style={styles.footerNote}>
+            This usually takes 24-48 hours. We'll notify you once your verification is complete.
+          </HelixaText>
+        </Reveal>
       </View>
     </SafeAreaView>
   );

@@ -15,6 +15,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
 import { useCallStats } from '../../hooks/useCallHistory';
+import { PressableScale, Reveal } from '../../components/motion';
 
 export default function ProfileScreen() {
   const { user, logoutUser } = useAuth();
@@ -49,106 +50,116 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <CalText style={styles.heading}>Profile</CalText>
+        <Reveal index={0}>
+          <CalText style={styles.heading}>Profile</CalText>
+        </Reveal>
 
         {/* Profile card */}
-        <View style={styles.profileCard}>
-          {/* Top row: avatar + name / info */}
-          <View style={styles.profileTop}>
-            <Image
-              source={{
-                uri: user?.profilePicture ||
-                  'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=150&q=80',
-              }}
-              style={styles.avatar}
-            />
-            <View style={styles.profileInfo}>
-              <HelixaText style={styles.profileName} weight="bold">{user?.name || firstName}</HelixaText>
-              <View style={styles.profileSubRow}>
-                <HelixaText style={styles.profileRole}>Nurse</HelixaText>
-                <HelixaText style={styles.dot}> • </HelixaText>
-                <HelixaText style={styles.licenseNumber}>
-                  {licenseNumber !== '—' ? `RN-${licenseNumber}` : '—'}
-                </HelixaText>
+        <Reveal index={1}>
+          <View style={styles.profileCard}>
+            {/* Top row: avatar + name / info */}
+            <View style={styles.profileTop}>
+              <Image
+                source={{
+                  uri: user?.profilePicture ||
+                    'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&w=150&q=80',
+                }}
+                style={styles.avatar}
+              />
+              <View style={styles.profileInfo}>
+                <HelixaText style={styles.profileName} weight="bold">{user?.name || firstName}</HelixaText>
+                <View style={styles.profileSubRow}>
+                  <HelixaText style={styles.profileRole}>Nurse</HelixaText>
+                  <HelixaText style={styles.dot}> • </HelixaText>
+                  <HelixaText style={styles.licenseNumber}>
+                    {licenseNumber !== '—' ? `RN-${licenseNumber}` : '—'}
+                  </HelixaText>
+                </View>
+              </View>
+            </View>
+
+            {/* Divider */}
+            <View style={styles.statsDivider} />
+
+            {/* Stats row */}
+            <View style={styles.statsRow}>
+              <View style={styles.statItem}>
+                <View style={styles.ratingRow}>
+                  <MaterialCommunityIcons name="star" size={16} color="#F59E0B" />
+                  <HelixaText style={styles.statValue} weight="bold">{stats?.rating_avg != null ? stats.rating_avg.toFixed(1) : '—'}</HelixaText>
+                </View>
+                <HelixaText style={styles.statLabel}>Rating</HelixaText>
+              </View>
+
+              <View style={styles.statSeparator} />
+
+              <View style={styles.statItem}>
+                <HelixaText style={styles.statValue} weight="bold">{stats?.total_calls ?? 0}</HelixaText>
+                <HelixaText style={styles.statLabel}>Calls</HelixaText>
+              </View>
+
+              <View style={styles.statSeparator} />
+
+              <View style={styles.statItem}>
+                <HelixaText style={styles.statValue} weight="bold">{yearsExp}</HelixaText>
+                <HelixaText style={styles.statLabel}>Years Exp</HelixaText>
               </View>
             </View>
           </View>
-
-          {/* Divider */}
-          <View style={styles.statsDivider} />
-
-          {/* Stats row */}
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <View style={styles.ratingRow}>
-                <MaterialCommunityIcons name="star" size={16} color="#F59E0B" />
-                <HelixaText style={styles.statValue} weight="bold">{stats?.rating_avg != null ? stats.rating_avg.toFixed(1) : '—'}</HelixaText>
-              </View>
-              <HelixaText style={styles.statLabel}>Rating</HelixaText>
-            </View>
-
-            <View style={styles.statSeparator} />
-
-            <View style={styles.statItem}>
-              <HelixaText style={styles.statValue} weight="bold">{stats?.total_calls ?? 0}</HelixaText>
-              <HelixaText style={styles.statLabel}>Calls</HelixaText>
-            </View>
-
-            <View style={styles.statSeparator} />
-
-            <View style={styles.statItem}>
-              <HelixaText style={styles.statValue} weight="bold">{yearsExp}</HelixaText>
-              <HelixaText style={styles.statLabel}>Years Exp</HelixaText>
-            </View>
-          </View>
-        </View>
+        </Reveal>
 
         {/* Edit Profile */}
-        <TouchableOpacity 
-          style={styles.menuCard} 
-          activeOpacity={0.7}
-          onPress={() => router.push('/edit-profile')}
-        >
-          <View style={styles.menuRow}>
-            <Feather name="edit-2" size={20} color="#111827" style={styles.menuIcon} />
-            <HelixaText style={styles.menuLabel} weight="bold">Edit Profile</HelixaText>
-          </View>
-          <View style={styles.chevronBox}>
-            <Feather name="arrow-right" size={18} color="#111827" />
-          </View>
-        </TouchableOpacity>
+        <Reveal index={2}>
+          <PressableScale
+            style={styles.menuCard}
+            activeOpacity={0.7}
+            onPress={() => router.push('/edit-profile')}
+          >
+            <View style={styles.menuRow}>
+              <Feather name="edit-2" size={20} color="#111827" style={styles.menuIcon} />
+              <HelixaText style={styles.menuLabel} weight="bold">Edit Profile</HelixaText>
+            </View>
+            <View style={styles.chevronBox}>
+              <Feather name="arrow-right" size={18} color="#111827" />
+            </View>
+          </PressableScale>
+        </Reveal>
 
         {/* Settings + Support */}
-        <View style={styles.groupCard}>
-          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7} onPress={() => router.push('/settings' as any)}>
-            <Feather name="settings" size={20} color="#111827" style={styles.menuIcon} />
-            <HelixaText style={styles.menuLabel} weight="bold">Settings</HelixaText>
-            <View style={[styles.chevronBox, styles.chevronRight]}>
-              <Feather name="arrow-right" size={18} color="#111827" />
-            </View>
-          </TouchableOpacity>
+        <Reveal index={3}>
+          <View style={styles.groupCard}>
+            <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7} onPress={() => router.push('/settings' as any)}>
+              <Feather name="settings" size={20} color="#111827" style={styles.menuIcon} />
+              <HelixaText style={styles.menuLabel} weight="bold">Settings</HelixaText>
+              <View style={[styles.chevronBox, styles.chevronRight]}>
+                <Feather name="arrow-right" size={18} color="#111827" />
+              </View>
+            </TouchableOpacity>
 
-          <View style={styles.groupDivider} />
+            <View style={styles.groupDivider} />
 
-          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7} onPress={() => router.push('/support' as any)}>
-            <Feather name="help-circle" size={20} color="#111827" style={styles.menuIcon} />
-            <HelixaText style={styles.menuLabel} weight="bold">Support</HelixaText>
-            <View style={[styles.chevronBox, styles.chevronRight]}>
-              <Feather name="arrow-right" size={18} color="#111827" />
-            </View>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7} onPress={() => router.push('/support' as any)}>
+              <Feather name="help-circle" size={20} color="#111827" style={styles.menuIcon} />
+              <HelixaText style={styles.menuLabel} weight="bold">Support</HelixaText>
+              <View style={[styles.chevronBox, styles.chevronRight]}>
+                <Feather name="arrow-right" size={18} color="#111827" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Reveal>
 
         {/* Sign Out */}
-        <TouchableOpacity style={styles.signOutCard} onPress={handleSignOut} activeOpacity={0.8}>
-          <View style={styles.menuRow}>
-            <Feather name="log-out" size={20} color="#FA3532" style={styles.menuIcon} />
-            <HelixaText style={styles.signOutLabel} weight="bold">Sign Out</HelixaText>
-          </View>
-          <View style={styles.signOutChevron}>
-            <Feather name="arrow-right" size={18} color="#FFFFFF" />
-          </View>
-        </TouchableOpacity>
+        <Reveal index={4}>
+          <PressableScale style={styles.signOutCard} onPress={handleSignOut} activeOpacity={0.8}>
+            <View style={styles.menuRow}>
+              <Feather name="log-out" size={20} color="#FA3532" style={styles.menuIcon} />
+              <HelixaText style={styles.signOutLabel} weight="bold">Sign Out</HelixaText>
+            </View>
+            <View style={styles.signOutChevron}>
+              <Feather name="arrow-right" size={18} color="#FFFFFF" />
+            </View>
+          </PressableScale>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );

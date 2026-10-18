@@ -11,6 +11,7 @@ import { MapView, Marker, Polyline, MAPS_AVAILABLE, PROVIDER_GOOGLE } from '../.
 import { ridesApi } from '../../../api/rides';
 import type { Ride, RideStatus, LatLng } from '../../../store/rideStore';
 import { decodePolyline } from '../../../lib/navigation/polyline';
+import { Reveal, RevealList } from '../../../components/motion';
 
 const TERMINAL: RideStatus[] = ['COMPLETED', 'CANCELLED', 'NO_DRIVERS', 'FAILED'];
 
@@ -124,23 +125,30 @@ export default function PartnerRideTrackingScreen() {
 
       <SafeAreaView edges={['bottom']} style={styles.sheet}>
         <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
+          <Reveal index={0}>
           <View style={styles.statusPill}>
             <View style={styles.statusDot} />
             <HelixaText style={styles.statusText} weight="bold">
               {ride ? STATUS_LABEL[ride.status] : 'Loading…'}
             </HelixaText>
           </View>
+          </Reveal>
 
+          <Reveal index={1}>
           <CalText style={styles.heading}>
             {ride && TERMINAL.includes(ride.status) ? `${herName}'s emergency ride` : `${herName} may need your help`}
           </CalText>
+          </Reveal>
+          <Reveal index={1}>
           <HelixaText style={styles.subtext}>
             {ride?.location_shared === false
               ? "She isn't sharing her location with you, but you'll see each step of her ride here."
               : 'She started an emergency ride. Follow her journey live below.'}
           </HelixaText>
+          </Reveal>
 
           {ride?.driver && (
+            <Reveal index={2}>
             <View style={styles.driverCard}>
               <Avatar uri={ride.driver.profile_picture || null} name={ride.driver.name} style={styles.driverAvatar} />
               <View style={styles.driverInfo}>
@@ -155,27 +163,37 @@ export default function PartnerRideTrackingScreen() {
                 </Pressable>
               )}
             </View>
+            </Reveal>
           )}
 
           {ride?.driver && (
+            <Reveal index={3}>
             <View style={styles.infoBox}>
               <InfoRow label="Vehicle" value={[ride.driver.vehicle_color, ride.driver.vehicle_brand, ride.driver.vehicle_model].filter(Boolean).join(' ') || '—'} />
               <InfoRow label="Plate number" value={ride.driver.plate_number || '—'} />
               {!TERMINAL.includes(ride.status) && <InfoRow label="ETA" value={formatEta(eta) ?? '—'} />}
               <InfoRow label="Trip distance" value={km(ride.distance_meters)} />
             </View>
+            </Reveal>
           )}
 
+          <Reveal index={4}>
           <HelixaText weight="bold" style={styles.sectionLabel}>Hospital destination</HelixaText>
+          </Reveal>
+          <Reveal index={4}>
           <View style={styles.infoBox}>
             <HelixaText weight="bold" style={styles.driverName}>{ride?.dropoff_name || 'Hospital'}</HelixaText>
             {!!ride?.dropoff_address && <HelixaText style={styles.driverVehicle}>{ride.dropoff_address}</HelixaText>}
           </View>
+          </Reveal>
 
+          <Reveal index={5}>
           <HelixaText weight="bold" style={styles.sectionLabel}>Status</HelixaText>
+          </Reveal>
           <View>
             {steps.map((st, i) => (
-              <View key={st.label} style={styles.stepRow}>
+              <RevealList key={st.label} index={i}>
+              <View style={styles.stepRow}>
                 <View style={styles.stepRail}>
                   <View style={[styles.stepDot, st.done ? styles.stepDotDone : null]}>
                     {st.done && <Feather name="check" size={11} color="#FFF" />}
@@ -187,6 +205,7 @@ export default function PartnerRideTrackingScreen() {
                   {!!clock(st.at) && <HelixaText style={styles.stepTime}>{clock(st.at)}</HelixaText>}
                 </View>
               </View>
+              </RevealList>
             ))}
             {ride?.status === 'CANCELLED' && <HelixaText style={[styles.stepLabel, { color: '#EF4444' }]}>The ride was cancelled.</HelixaText>}
           </View>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { Avatar } from '../../components/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 import { useDriverStats } from '../../hooks/useRides';
+import { PressableScale, Reveal } from '../../components/motion';
 
 const PINK = '#D62D88';
 
@@ -36,8 +37,11 @@ export default function DriverProfile() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Reveal index={0}>
         <CalText style={styles.heading}>Profile</CalText>
+        </Reveal>
 
+        <Reveal index={1}>
         <View style={styles.card}>
           <View style={styles.avatarRing}>
             <Avatar uri={user?.profilePicture || null} name={user?.name || 'Driver'} style={styles.avatar} />
@@ -66,31 +70,38 @@ export default function DriverProfile() {
             </View>
           </View>
         </View>
+        </Reveal>
 
+        <Reveal index={2}>
         <View style={styles.section}>
           <Row icon="phone" label="Phone" value={user?.phone || '—'} />
           <Row icon="mail" label="Email" value={user?.email || '—'} />
           <Row icon="truck" label="Vehicle" value={vehicle} />
           <Row icon="hash" label="Plate" value={dp.plate_number || '—'} />
         </View>
+        </Reveal>
 
-        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/edit-profile' as any)}>
+        <Reveal index={3}>
+        <PressableScale style={styles.editBtn} onPress={() => router.push('/edit-profile' as any)}>
           <Feather name="edit-2" size={16} color="#111" />
           <HelixaText weight="bold" style={styles.editText}>Edit profile</HelixaText>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/settings' as any)}>
+        </PressableScale>
+        <PressableScale style={styles.editBtn} onPress={() => router.push('/settings' as any)}>
           <Feather name="settings" size={16} color="#111" />
           <HelixaText weight="bold" style={styles.editText}>Settings</HelixaText>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/support' as any)}>
+        </PressableScale>
+        <PressableScale style={styles.editBtn} onPress={() => router.push('/support' as any)}>
           <Feather name="help-circle" size={16} color="#111" />
           <HelixaText weight="bold" style={styles.editText}>Help & Support</HelixaText>
-        </TouchableOpacity>
+        </PressableScale>
+        </Reveal>
 
-        <TouchableOpacity style={styles.signOut} onPress={signOut}>
+        <Reveal index={4}>
+        <PressableScale style={styles.signOut} onPress={signOut}>
           <Feather name="log-out" size={16} color={PINK} />
           <HelixaText weight="bold" style={styles.signOutText}>Sign Out</HelixaText>
-        </TouchableOpacity>
+        </PressableScale>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );

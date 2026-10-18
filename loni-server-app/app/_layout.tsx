@@ -36,7 +36,7 @@ export default function RootLayout() {
       <AuthProvider>
         <NotificationProvider>
           <EmergencyContactsProvider>
-            <Stack screenOptions={{ headerShown: false }}>
+            <Stack screenOptions={{ headerShown: false, animation: 'ios_from_right', gestureEnabled: true }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />

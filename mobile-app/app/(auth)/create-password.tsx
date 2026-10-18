@@ -18,6 +18,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const PasswordSchema = Yup.object().shape({
   password: Yup.string()
@@ -45,11 +46,13 @@ export default function CreatePasswordScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Create New Password</CalText>
+          </Reveal>
 
           <Formik
             initialValues={{ password: '', confirmPassword: '' }}
@@ -58,6 +61,7 @@ export default function CreatePasswordScreen() {
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isValid, dirty, isSubmitting }) => (
               <>
+                <Reveal index={1}>
                 <View style={styles.inputGroup}>
                   <HelixaText style={styles.inputLabel} weight="bold">Password</HelixaText>
                   <View style={[styles.passwordInputContainer, touched.password && errors.password ? styles.inputError : null]}>
@@ -99,7 +103,9 @@ export default function CreatePasswordScreen() {
                     <HelixaText style={styles.errorText}>{errors.confirmPassword}</HelixaText>
                   )}
                 </View>
+                </Reveal>
 
+                <Reveal index={2}>
                 <Button 
                   title="Continue"
                   onPress={handleSubmit as any}
@@ -107,15 +113,18 @@ export default function CreatePasswordScreen() {
                   disabled={!(isValid && dirty)}
                   style={styles.continueButtonSpacing}
                 />
+                </Reveal>
               </>
             )}
           </Formik>
 
+          <Reveal index={3}>
           <View style={styles.signUpContainer}>
             <HelixaText style={styles.signUpText}>
               Don't have an account? <HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
             </HelixaText>
           </View>
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>

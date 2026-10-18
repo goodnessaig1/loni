@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Reveal, RevealList, PressableScale } from '../../components/motion';
 import { usePartnerConnection } from '../../hooks/usePartnerConnection';
 
 const SHARE_ITEMS = [
@@ -38,45 +39,53 @@ export default function WhatsSharedScreen() {
           <Feather name="chevron-left" size={28} color="black" />
         </Pressable>
 
-        <HelixaText style={styles.eyebrow} weight="bold">She chooses what you can see</HelixaText>
-        <CalText style={styles.heading}>Here's what she's chosen to share</CalText>
-        <HelixaText style={styles.subtext}>
-          These permissions help us provide the best care and support
-        </HelixaText>
+        <Reveal index={0}>
+          <HelixaText style={styles.eyebrow} weight="bold">She chooses what you can see</HelixaText>
+          <CalText style={styles.heading}>Here's what she's chosen to share</CalText>
+          <HelixaText style={styles.subtext}>
+            These permissions help us provide the best care and support
+          </HelixaText>
+        </Reveal>
 
-        <View style={styles.cardsContainer}>
-          {SHARE_ITEMS.map((item) => {
-            const shared = connection ? connection[item.key] : true;
-            return (
-              <View key={item.key} style={styles.cardWrapper}>
-                <View style={styles.card}>
-                  <View style={styles.cardIcon}>
-                    <Feather name={item.icon} size={18} color="#4B5563" />
-                  </View>
-                  <View style={styles.cardTextContent}>
-                    <View style={styles.cardTitleRow}>
-                      <HelixaText style={styles.cardTitle} weight="bold">{item.title}</HelixaText>
-                      <View style={[styles.badge, !shared && styles.badgeMuted]}>
-                        <HelixaText style={[styles.badgeText, !shared && styles.badgeTextMuted]} weight="bold">
-                          {shared ? 'Shared' : 'Not shared'}
-                        </HelixaText>
+        <Reveal index={1}>
+          <View style={styles.cardsContainer}>
+            {SHARE_ITEMS.map((item, i) => {
+              const shared = connection ? connection[item.key] : true;
+              return (
+                <RevealList key={item.key} index={i}>
+                  <View style={styles.cardWrapper}>
+                    <View style={styles.card}>
+                      <View style={styles.cardIcon}>
+                        <Feather name={item.icon} size={18} color="#4B5563" />
+                      </View>
+                      <View style={styles.cardTextContent}>
+                        <View style={styles.cardTitleRow}>
+                          <HelixaText style={styles.cardTitle} weight="bold">{item.title}</HelixaText>
+                          <View style={[styles.badge, !shared && styles.badgeMuted]}>
+                            <HelixaText style={[styles.badgeText, !shared && styles.badgeTextMuted]} weight="bold">
+                              {shared ? 'Shared' : 'Not shared'}
+                            </HelixaText>
+                          </View>
+                        </View>
+                        <HelixaText style={styles.cardDescription}>{item.description}</HelixaText>
                       </View>
                     </View>
-                    <HelixaText style={styles.cardDescription}>{item.description}</HelixaText>
                   </View>
-                </View>
-              </View>
-            );
-          })}
-        </View>
+                </RevealList>
+              );
+            })}
+          </View>
+        </Reveal>
 
-        <HelixaText style={styles.footnote}>
-          You can view this information, but you can't change what's shared.
-        </HelixaText>
+        <Reveal index={2}>
+          <HelixaText style={styles.footnote}>
+            You can view this information, but you can't change what's shared.
+          </HelixaText>
 
-        <Pressable style={styles.okayButton} onPress={() => router.replace('/(partner)' as any)}>
-          <HelixaText style={styles.okayButtonText} weight="bold">Okay</HelixaText>
-        </Pressable>
+          <PressableScale style={styles.okayButton} onPress={() => router.replace('/(partner)' as any)}>
+            <HelixaText style={styles.okayButtonText} weight="bold">Okay</HelixaText>
+          </PressableScale>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );

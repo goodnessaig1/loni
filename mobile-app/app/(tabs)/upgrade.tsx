@@ -12,6 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useResumeSubscription, useSubscription } from '../../hooks/useSubscription';
 import { naira, shortDate } from '../../lib/format';
 import { BRAND } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 interface RowProps {
   title: string;
@@ -74,11 +75,14 @@ export default function UpgradeScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
       <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+        <Reveal index={0}>
         <CalText style={{ color: BRAND.pink, fontSize: 30, marginBottom: 6 }}>LoniPlus</CalText>
         <HelixaText style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 22, marginBottom: 24 }}>
           Extra support when you need it most. Because you deserve peace of mind.
         </HelixaText>
+        </Reveal>
 
+        <Reveal index={1}>
         <View style={{ borderRadius: 26, padding: 6, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.divider, marginBottom: 32 }}>
           <LinearGradient colors={['#FBD3E6', '#FDE6EE', '#FDEBD3']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 22, padding: 18 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -101,7 +105,9 @@ export default function UpgradeScreen() {
             </View>
           </LinearGradient>
         </View>
+        </Reveal>
 
+        <Reveal index={2}>
         <HelixaText style={{ fontSize: 14, marginBottom: 12 }}>Manage</HelixaText>
         <View style={{ gap: 10, padding: 12, borderRadius: 14, backgroundColor: colors.surface }}>
           <Row title="Change Payment Method" subtitle="Update your card or wallet" onPress={() => soon('Payment methods')} />
@@ -112,6 +118,7 @@ export default function UpgradeScreen() {
           )}
           <Row title="Download Invoices" subtitle="Get PDF copies of your bills" onPress={() => soon('Invoices')} />
         </View>
+        </Reveal>
       </ScrollView>
 
       <CancelPrompt

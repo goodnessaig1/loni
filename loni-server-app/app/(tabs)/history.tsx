@@ -14,6 +14,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Avatar } from '../../components/Avatar';
 import { useCallHistory, CallRecord } from '../../hooks/useCallHistory';
+import { Reveal, RevealList } from '../../components/motion';
 
 // Trimester icon from user request
 const TrimesterIcon = () => (
@@ -50,80 +51,86 @@ export default function HistoryScreen() {
         /* ---- Call Details View ---- */
         <ScrollView contentContainerStyle={styles.scrollContent}>
           {/* Back button */}
-          <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedCall(null)}>
-            <Feather name="chevron-left" size={26} color="#000" />
-          </TouchableOpacity>
+          <Reveal index={0}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => setSelectedCall(null)}>
+              <Feather name="chevron-left" size={26} color="#000" />
+            </TouchableOpacity>
 
-          <CalText style={styles.detailHeading}>Call Details</CalText>
+            <CalText style={styles.detailHeading}>Call Details</CalText>
+          </Reveal>
 
           {/* Status banner */}
-          {selectedCall.status === 'completed' ? (
-            <View style={styles.completedBanner}>
-              <View style={styles.completedIconBox}>
-                <Feather name="check" size={18} color="#FFFFFF" />
-              </View>
-              <View>
-                <HelixaText style={styles.completedTitle} weight="bold">
-                  Call Completed
-                </HelixaText>
-                <HelixaText style={styles.completedSubtitle}>Support session ended</HelixaText>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.missedBanner}>
-              <View style={styles.missedIconBox}>
-                <Feather name="phone-missed" size={18} color="#FFFFFF" />
-              </View>
-              <View>
-                <HelixaText style={styles.missedBannerTitle} weight="bold">
-                  Missed Call
-                </HelixaText>
-                <HelixaText style={styles.missedBannerSubtitle}>You missed this support request</HelixaText>
-              </View>
-            </View>
-          )}
-
-          {/* Caller info + call meta card */}
-          <View style={styles.detailCard}>
-            <HelixaText style={styles.detailLabel}>Caller</HelixaText>
-            <View style={styles.callerRow}>
-              <Avatar 
-                uri={selectedCall?.img}
-                name={selectedCall?.name}
-                style={styles.detailAvatar} 
-              />
-              <View>
-                <HelixaText style={styles.detailCallerName} weight="bold">
-                  {selectedCall.name}
-                </HelixaText>
-                <View style={styles.trimesterRow}>
-                  <TrimesterIcon />
-                  <HelixaText style={styles.trimesterText}>{selectedCall.trimester}</HelixaText>
+          <Reveal index={1}>
+            {selectedCall.status === 'completed' ? (
+              <View style={styles.completedBanner}>
+                <View style={styles.completedIconBox}>
+                  <Feather name="check" size={18} color="#FFFFFF" />
+                </View>
+                <View>
+                  <HelixaText style={styles.completedTitle} weight="bold">
+                    Call Completed
+                  </HelixaText>
+                  <HelixaText style={styles.completedSubtitle}>Support session ended</HelixaText>
                 </View>
               </View>
+            ) : (
+              <View style={styles.missedBanner}>
+                <View style={styles.missedIconBox}>
+                  <Feather name="phone-missed" size={18} color="#FFFFFF" />
+                </View>
+                <View>
+                  <HelixaText style={styles.missedBannerTitle} weight="bold">
+                    Missed Call
+                  </HelixaText>
+                  <HelixaText style={styles.missedBannerSubtitle}>You missed this support request</HelixaText>
+                </View>
+              </View>
+            )}
+          </Reveal>
+
+          {/* Caller info + call meta card */}
+          <Reveal index={2}>
+            <View style={styles.detailCard}>
+              <HelixaText style={styles.detailLabel}>Caller</HelixaText>
+              <View style={styles.callerRow}>
+                <Avatar 
+                  uri={selectedCall?.img}
+                  name={selectedCall?.name}
+                  style={styles.detailAvatar} 
+                />
+                <View>
+                  <HelixaText style={styles.detailCallerName} weight="bold">
+                    {selectedCall.name}
+                  </HelixaText>
+                  <View style={styles.trimesterRow}>
+                    <TrimesterIcon />
+                    <HelixaText style={styles.trimesterText}>{selectedCall.trimester}</HelixaText>
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.detailDivider} />
+
+              <View style={styles.detailRow}>
+                <HelixaText style={styles.detailRowLabel}>Date</HelixaText>
+                <HelixaText style={styles.detailRowValue} weight="bold">{selectedCall.date}</HelixaText>
+              </View>
+
+              <View style={styles.detailDivider} />
+
+              <View style={styles.detailRow}>
+                <HelixaText style={styles.detailRowLabel}>Time</HelixaText>
+                <HelixaText style={styles.detailRowValue} weight="bold">{selectedCall.time}</HelixaText>
+              </View>
+
+              <View style={styles.detailDivider} />
+
+              <View style={styles.detailRow}>
+                <HelixaText style={styles.detailRowLabel}>Duration</HelixaText>
+                <HelixaText style={styles.detailRowValue} weight="bold">{selectedCall.duration}</HelixaText>
+              </View>
             </View>
-
-            <View style={styles.detailDivider} />
-
-            <View style={styles.detailRow}>
-              <HelixaText style={styles.detailRowLabel}>Date</HelixaText>
-              <HelixaText style={styles.detailRowValue} weight="bold">{selectedCall.date}</HelixaText>
-            </View>
-
-            <View style={styles.detailDivider} />
-
-            <View style={styles.detailRow}>
-              <HelixaText style={styles.detailRowLabel}>Time</HelixaText>
-              <HelixaText style={styles.detailRowValue} weight="bold">{selectedCall.time}</HelixaText>
-            </View>
-
-            <View style={styles.detailDivider} />
-
-            <View style={styles.detailRow}>
-              <HelixaText style={styles.detailRowLabel}>Duration</HelixaText>
-              <HelixaText style={styles.detailRowValue} weight="bold">{selectedCall.duration}</HelixaText>
-            </View>
-          </View>
+          </Reveal>
         </ScrollView>
       ) : isLoading ? (
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -131,55 +138,59 @@ export default function HistoryScreen() {
         </View>
       ) : (
           <ScrollView contentContainerStyle={styles.scrollContent}>
-          <CalText style={styles.heading}>Call History</CalText>
-          <HelixaText style={styles.callCount}>{calls.length} calls</HelixaText>
+          <Reveal index={0}>
+            <CalText style={styles.heading}>Call History</CalText>
+            <HelixaText style={styles.callCount}>{calls.length} calls</HelixaText>
+          </Reveal>
 
-        <View style={styles.listCard}>
-          {calls.map((call, index) => (
-            <View key={call.id}>
-              <TouchableOpacity
-                style={styles.callRow}
-                activeOpacity={0.7}
-                onPress={() => setSelectedCall(call)}
-              >
-                <Avatar 
-                  uri={call.img}
-                  name={call.name}
-                  style={styles.avatar} 
-                />
+        <Reveal index={1}>
+          <View style={styles.listCard}>
+            {calls.map((call, index) => (
+              <RevealList key={call.id} index={index}>
+                  <TouchableOpacity
+                    style={styles.callRow}
+                    activeOpacity={0.7}
+                    onPress={() => setSelectedCall(call)}
+                  >
+                    <Avatar 
+                      uri={call.img}
+                      name={call.name}
+                      style={styles.avatar} 
+                    />
 
-                <View style={styles.callInfo}>
-                  <View style={styles.nameRow}>
-                    <HelixaText style={styles.callerName} weight="bold">
-                      {call.name}
-                    </HelixaText>
-                    {call.status === 'missed' && (
-                      <View style={styles.missedBadge}>
-                        <HelixaText style={styles.missedText}>Missed</HelixaText>
+                    <View style={styles.callInfo}>
+                      <View style={styles.nameRow}>
+                        <HelixaText style={styles.callerName} weight="bold">
+                          {call.name}
+                        </HelixaText>
+                        {call.status === 'missed' && (
+                          <View style={styles.missedBadge}>
+                            <HelixaText style={styles.missedText}>Missed</HelixaText>
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                  <View style={styles.trimesterRow}>
-                    <TrimesterIcon />
-                    <HelixaText style={styles.trimesterText}>{call.trimester}</HelixaText>
-                  </View>
-                </View>
+                      <View style={styles.trimesterRow}>
+                        <TrimesterIcon />
+                        <HelixaText style={styles.trimesterText}>{call.trimester}</HelixaText>
+                      </View>
+                    </View>
 
-                <View style={styles.callMeta}>
-                  <HelixaText style={styles.metaDuration}>{call.durationFormatted}</HelixaText>
-                  <HelixaText style={styles.metaTime}>{call.timeLabel}</HelixaText>
-                </View>
+                    <View style={styles.callMeta}>
+                      <HelixaText style={styles.metaDuration}>{call.durationFormatted}</HelixaText>
+                      <HelixaText style={styles.metaTime}>{call.timeLabel}</HelixaText>
+                    </View>
 
-                <View style={styles.chevronBox}>
-                  <Feather name="chevron-right" size={18} color="#6B7280" />
-                </View>
-              </TouchableOpacity>
+                    <View style={styles.chevronBox}>
+                      <Feather name="chevron-right" size={18} color="#6B7280" />
+                    </View>
+                  </TouchableOpacity>
 
-              {/* Divider between rows, not after last */}
-              {index < calls.length - 1 && <View style={styles.divider} />}
-            </View>
-          ))}
-        </View>
+                  {/* Divider between rows, not after last */}
+                  {index < calls.length - 1 && <View style={styles.divider} />}
+              </RevealList>
+            ))}
+          </View>
+        </Reveal>
         </ScrollView>
       )}
     </SafeAreaView>

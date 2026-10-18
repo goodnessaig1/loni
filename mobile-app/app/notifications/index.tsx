@@ -9,6 +9,7 @@ import { PhoneIcon, RecoveryPlanIcon, RideIcon, SupportPartnerIcon } from '../..
 import { useMarkNotificationsRead, useNotificationFeed, AppNotification } from '../../hooks/useNotificationFeed';
 import { openFromPush } from '../../lib/checkinLinks';
 import { relativeTime } from '../../lib/relativeTime';
+import { Reveal, RevealList } from '../../components/motion';
 
 import { useTheme } from '../../context/ThemeContext';
 type IconKind = 'checkin' | 'ride' | 'comment' | 'partner' | 'recovery' | 'call' | 'default';
@@ -77,6 +78,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top']}>
       {/* Header */}
+      <Reveal index={0}>
       <View className="px-5 pt-2.5 mb-5">
         <TouchableOpacity 
           className="w-12 h-12 rounded-full border justify-center items-center" 
@@ -86,14 +88,18 @@ export default function NotificationsScreen() {
           <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
+      </Reveal>
 
       <ScrollView contentContainerClassName="px-5 pb-10" showsVerticalScrollIndicator={false}>
+        <Reveal index={1}>
         <CalText className="text-[28px] text-[#D62D88] mb-2">Notifications</CalText>
         <HelixaText className="text-base leading-6 mb-6" style={{ color: colors.textSecondary }}>
           Stay updated on your support, recovery, and emergency activity.
         </HelixaText>
+        </Reveal>
 
         {/* Custom Tabs */}
+        <Reveal index={2}>
         <View className="flex-row rounded-xl p-1 mb-8 border" style={{ backgroundColor: colors.surface, borderColor: colors.divider }}>
           <TouchableOpacity 
             className="flex-1" 
@@ -132,6 +138,7 @@ export default function NotificationsScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        </Reveal>
 
         {/* Notifications List */}
         <View className="flex-1">
@@ -148,8 +155,9 @@ export default function NotificationsScreen() {
               </HelixaText>
             </View>
           ) : (
-            items.map((item) => (
-              <TouchableOpacity key={item.id} activeOpacity={0.7} onPress={() => onPressItem(item)} className="flex-row items-start mb-6">
+            items.map((item, i) => (
+              <RevealList key={item.id} index={i}>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => onPressItem(item)} className="flex-row items-start mb-6">
                 <View className="w-12 h-12 rounded-full justify-center items-center mr-4" style={{ backgroundColor: colors.surface }}>
                   {getIcon(item.type)}
                 </View>
@@ -159,6 +167,7 @@ export default function NotificationsScreen() {
                   <HelixaText className="text-xs" style={{ color: colors.textMuted }}>{relativeTime(item.created_at)}</HelixaText>
                 </View>
               </TouchableOpacity>
+              </RevealList>
             ))
           )}
         </View>

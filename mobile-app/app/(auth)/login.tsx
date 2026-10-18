@@ -19,6 +19,7 @@ import { Button } from '../../components/Button';
 import { useLogin } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const LoginSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -50,6 +51,7 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
@@ -58,6 +60,7 @@ export default function LoginScreen() {
           <HelixaText style={styles.subtext}>
             Log in to your LONI Server account.
           </HelixaText>
+          </Reveal>
 
           <Formik
             initialValues={{ email: 'goodness6337@gmail.com', password: 'goodness' }}
@@ -66,6 +69,7 @@ export default function LoginScreen() {
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isSubmitting }) => (
               <>
+                <Reveal index={1}>
                 <View style={styles.inputGroup}>
                   <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
                   <TextInput
@@ -107,22 +111,27 @@ export default function LoginScreen() {
                 <Pressable onPress={() => router.push('/(auth)/reset-password')} style={styles.forgotPasswordContainer}>
                   <HelixaText style={styles.forgotPasswordText} weight="bold">Forgot Password?</HelixaText>
                 </Pressable>
+                </Reveal>
 
+                <Reveal index={2}>
                 <Button
                   title="Continue"
                   onPress={handleSubmit as any}
                   isLoading={isSubmitting}
                   style={styles.continueButtonSpacing}
                 />
+                </Reveal>
               </>
             )}
           </Formik>
 
+          <Reveal index={3}>
           <View style={styles.signUpContainer}>
             <HelixaText style={styles.signUpText}>
               Don't have an account? <HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
             </HelixaText>
           </View>
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>

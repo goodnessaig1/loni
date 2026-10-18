@@ -11,6 +11,7 @@ import { ridesApi, Quote } from '../../api/rides';
 import { useRideStore } from '../../store/rideStore';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { PressableScale, Reveal } from '../../components/motion';
 
 function km(m?: number | null) {
   if (m == null) return '—';
@@ -137,15 +138,20 @@ export default function EmergencyRideRequestScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.iconContainer}>
-          <Image source={require('../../assets/images/ride1.svg')} style={{ width: 111, height: 78.95 }} contentFit="fill" />
-        </View>
+        <Reveal index={0}>
+          <View style={styles.iconContainer}>
+            <Image source={require('../../assets/images/ride1.svg')} style={{ width: 111, height: 78.95 }} contentFit="fill" />
+          </View>
+        </Reveal>
 
-        <CalText style={styles.title}>Request Emergency Ride</CalText>
-        <HelixaText style={styles.subtitle}>
-          We'll immediately dispatch a trained driver to take you to the nearest hospital
-        </HelixaText>
+        <Reveal index={1}>
+          <CalText style={styles.title}>Request Emergency Ride</CalText>
+          <HelixaText style={styles.subtitle}>
+            We'll immediately dispatch a trained driver to take you to the nearest hospital
+          </HelixaText>
+        </Reveal>
 
+        <Reveal index={2}>
         <View style={styles.warningBanner}>
           <Feather name="alert-circle" size={20} color="#DC2626" style={styles.warningIcon} />
           <View style={styles.warningTextContainer}>
@@ -155,14 +161,18 @@ export default function EmergencyRideRequestScreen() {
             </HelixaText>
           </View>
         </View>
+        </Reveal>
 
         {loading ? (
+          <Reveal index={3}>
           <View style={styles.loadingBox}>
             <ActivityIndicator color="#D62D88" />
             <HelixaText style={styles.loadingText}>Finding your location…</HelixaText>
           </View>
+          </Reveal>
         ) : (
           <>
+            <Reveal index={3}>
             <View style={styles.cardContainer}>
               <View style={styles.locationCard}>
                 <View style={styles.locationIconWrapper}>
@@ -179,7 +189,9 @@ export default function EmergencyRideRequestScreen() {
                 </View>
               </View>
             </View>
+            </Reveal>
 
+            <Reveal index={4}>
             <View style={styles.cardContainer}>
               <View style={styles.locationCard}>
                 <View style={styles.locationIconWrapper}>
@@ -192,14 +204,18 @@ export default function EmergencyRideRequestScreen() {
                 </View>
               </View>
             </View>
+            </Reveal>
 
+            <Reveal index={5}>
             <View style={styles.fareRow}>
               <HelixaText style={styles.fareLabel}>Estimated fare</HelixaText>
               <HelixaText weight="bold" style={styles.fareValue}>{naira(quote?.fare_estimate)}</HelixaText>
             </View>
+            </Reveal>
           </>
         )}
 
+        <Reveal index={6}>
         <TouchableOpacity style={styles.checkboxContainer} onPress={() => setNotifyContacts(!notifyContacts)} activeOpacity={0.7}>
           <View style={[styles.checkbox, notifyContacts && styles.checkboxChecked]}>
             {notifyContacts && <Feather name="check" size={14} color="#FFF" />}
@@ -211,10 +227,12 @@ export default function EmergencyRideRequestScreen() {
             </HelixaText>
           </View>
         </TouchableOpacity>
+        </Reveal>
 
         {!!error && <HelixaText style={styles.error}>{error}</HelixaText>}
       </ScrollView>
 
+      <Reveal index={7}>
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.confirmBtn, (loading || submitting || !pickup) && { opacity: 0.6 }]}
@@ -225,15 +243,16 @@ export default function EmergencyRideRequestScreen() {
             : <HelixaText style={styles.confirmBtnText}>Confirm Emergency Request</HelixaText>}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => router.back()}>
+        <PressableScale style={styles.cancelBtn} onPress={() => router.back()}>
           <HelixaText style={styles.cancelBtnText}>Cancel</HelixaText>
-        </TouchableOpacity>
+        </PressableScale>
 
         <View style={styles.footerDisclaimer}>
           <HelixaText style={styles.disclaimerText}>Life-threatening emergency?</HelixaText>
           <HelixaText style={styles.disclaimerTextBold}>Call 911 immediately</HelixaText>
         </View>
       </View>
+      </Reveal>
     </SafeAreaView>
   );
 }

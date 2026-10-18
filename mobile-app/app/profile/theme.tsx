@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { HelixaText } from '../../components/HelixaText';
 import { useTheme } from '../../context/ThemeContext';
 import { LIGHT, DARK, BRAND, type ThemePreference, type Palette } from '../../lib/theme';
+import { PressableScale, Reveal, RevealList } from '../../components/motion';
 
 interface Option {
   value: ThemePreference;
@@ -54,6 +55,7 @@ export default function ThemeScreen() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
+      <Reveal index={0}>
       <View className="px-6 py-4">
         <TouchableOpacity
           className="w-12 h-12 rounded-full border justify-center items-center"
@@ -65,28 +67,30 @@ export default function ThemeScreen() {
           <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
+      </Reveal>
 
       <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
+        <Reveal index={1}>
         <HelixaText className="text-[26px] mb-2" weight="bold">
           Theme
         </HelixaText>
         <HelixaText className="text-[14px] leading-6 mb-6" style={{ color: colors.textSecondary }}>
           Choose your preferred look and make the app feel like you.
         </HelixaText>
+        </Reveal>
 
         <View className="gap-3" accessibilityRole="radiogroup">
-          {OPTIONS.map((o) => {
+          {OPTIONS.map((o, i) => {
             const selected = preference === o.value;
             return (
-              <TouchableOpacity
-                key={o.value}
+              <RevealList key={o.value} index={i + 2}>
+              <PressableScale
                 activeOpacity={0.85}
                 onPress={() => setPreference(o.value)}
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
                 accessibilityLabel={`${o.title} theme`}
-                className="flex-row items-center rounded-[16px] p-4"
-                style={{ backgroundColor: o.card, borderWidth: 1, borderColor: o.border }}
+                style={{ flexDirection: 'row', alignItems: 'center', borderRadius: 16, padding: 16, backgroundColor: o.card, borderWidth: 1, borderColor: o.border }}
               >
                 {o.value === 'system' ? <SplitThumbnail /> : <Thumbnail p={o.value === 'dark' ? DARK : LIGHT} />}
                 <View className="flex-1 mx-4">
@@ -104,7 +108,8 @@ export default function ThemeScreen() {
                 ) : (
                   <View className="w-6 h-6 rounded-full" style={{ borderWidth: 1.5, borderColor: o.subText }} />
                 )}
-              </TouchableOpacity>
+              </PressableScale>
+              </RevealList>
             );
           })}
         </View>

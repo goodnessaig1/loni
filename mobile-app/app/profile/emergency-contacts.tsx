@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { Reveal, RevealList } from '../../components/motion';
 
 const { width } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
@@ -100,6 +101,7 @@ export default function EmergencyContactsScreen() {
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
       {/* Header */}
+      <Reveal index={0}>
       <View className="flex-row items-center px-5 py-4 mt-4">
         <TouchableOpacity
           className="w-12 h-12 rounded-full border justify-center items-center"
@@ -112,6 +114,7 @@ export default function EmergencyContactsScreen() {
           Emergency Contacts
         </CalText>
       </View>
+      </Reveal>
 
       <ScrollView 
         className="flex-1 px-5 mt-5" 
@@ -125,13 +128,17 @@ export default function EmergencyContactsScreen() {
           />
         }
       >
-        <View className="mb-4">
-          <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
-        </View>
+        <Reveal index={1}>
+          <View className="mb-4">
+            <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
+          </View>
+        </Reveal>
 
-        <HelixaText className="text-[18px] mb-4">
-          Support Partners
-        </HelixaText>
+        <Reveal index={2}>
+          <HelixaText className="text-[18px] mb-4">
+            Support Partners
+          </HelixaText>
+        </Reveal>
 
         {isLoading ? (
           <View className="py-10 mt-20 items-center">
@@ -148,6 +155,7 @@ export default function EmergencyContactsScreen() {
             </View>
           </View>
         ) : contacts.length === 0 ? (
+          <Reveal index={3}>
           <View className="py-16 items-center justify-center mt-4">
             <View className="w-20 h-20 rounded-full items-center justify-center mb-4" style={{ backgroundColor: colors.primarySoft }}>
               <Feather name="users" size={32} color="#D62D88" />
@@ -157,14 +165,15 @@ export default function EmergencyContactsScreen() {
               You haven't added anyone yet. Add a partner so they can receive updates and help in an emergency.
             </HelixaText>
           </View>
+          </Reveal>
         ) : (
-          contacts.map((contact) => {
+          contacts.map((contact, i) => {
             const toggles = getToggles(contact.id, contact);
             const isPending = contact.status === 'pending';
 
             return (
+              <RevealList key={contact.id} index={i + 3}>
               <View
-                key={contact.id}
                 className="w-full rounded-[24px] p-5 mb-4 overflow-hidden"
                 style={isPending ? { backgroundColor: colors.surface } : undefined}
               >
@@ -257,6 +266,7 @@ export default function EmergencyContactsScreen() {
                   </View>
                 )}
               </View>
+              </RevealList>
             );
           })
         )}

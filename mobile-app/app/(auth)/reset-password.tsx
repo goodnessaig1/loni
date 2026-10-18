@@ -18,6 +18,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const ResetSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -37,6 +38,7 @@ export default function ResetPasswordScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
@@ -45,6 +47,7 @@ export default function ResetPasswordScreen() {
           <HelixaText style={styles.subtext}>
             Enter your email address and we'll send you a verification code.
           </HelixaText>
+          </Reveal>
 
           <Formik
             initialValues={{ email: '' }}
@@ -53,6 +56,7 @@ export default function ResetPasswordScreen() {
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isSubmitting, isValid, dirty }) => (
               <>
+                <Reveal index={1}>
                 <View style={styles.inputGroup}>
                   <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
                   <TextInput 
@@ -69,13 +73,16 @@ export default function ResetPasswordScreen() {
                     <HelixaText style={styles.errorText}>{errors.email}</HelixaText>
                   )}
                 </View>
+                </Reveal>
 
+                <Reveal index={2}>
                 <Button 
                   title="Send Reset Code"
                   onPress={handleSubmit as any}
                   isLoading={isSubmitting}
                   disabled={!(isValid && dirty)}
                 />
+                </Reveal>
               </>
             )}
           </Formik>

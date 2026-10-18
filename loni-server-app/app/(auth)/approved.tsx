@@ -6,6 +6,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useAuth } from '../../hooks/useAuth';
 import { getPostAuthRoute } from '../../lib/driverOnboarding';
 
@@ -38,46 +39,54 @@ export default function ApprovedScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.badge}>
-          <MaterialCommunityIcons name="heart-circle" size={64} color={BRAND} />
-          <View style={styles.check}>
-            <Feather name="check" size={16} color="#FFF" />
-          </View>
-        </View>
-
-        <CalText style={styles.heading}>{isDriver ? "You're Ready to Drive" : "You're Ready to Support Mothers"}</CalText>
-        <HelixaText style={styles.subtitle}>
-          {isDriver
-            ? "Your account has been verified. Go online whenever you're available and we'll send nearby emergency requests your way."
-            : "Your account has been verified. Go online whenever you're available and mothers who need a nurse can reach you."}
-        </HelixaText>
-
-        <View style={styles.card}>
-          <View style={styles.cardTop}>
-            {user?.profilePicture ? (
-              <Image source={{ uri: user.profilePicture }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <HelixaText weight="bold" style={{ color: '#FFF' }}>{(user?.name || '?').charAt(0)}</HelixaText>
-              </View>
-            )}
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <HelixaText weight="bold" style={styles.name}>{user?.name}</HelixaText>
-              <View style={styles.verifiedRow}>
-                <View style={styles.dot} />
-                <HelixaText style={styles.verified}>Verified</HelixaText>
-              </View>
+        <Reveal index={0}>
+          <View style={styles.badge}>
+            <MaterialCommunityIcons name="heart-circle" size={64} color={BRAND} />
+            <View style={styles.check}>
+              <Feather name="check" size={16} color="#FFF" />
             </View>
           </View>
-          {rows.map(([label, value]) => (
-            <View key={label} style={styles.row}>
-              <HelixaText style={styles.rowLabel}>{label}</HelixaText>
-              <HelixaText weight="bold" style={styles.rowValue}>{value}</HelixaText>
-            </View>
-          ))}
-        </View>
+        </Reveal>
 
-        <Button title="Go to Dashboard" onPress={() => router.replace(getPostAuthRoute(user))} style={styles.button} />
+        <Reveal index={1} style={{ alignItems: 'center' }}>
+          <CalText style={styles.heading}>{isDriver ? "You're Ready to Drive" : "You're Ready to Support Mothers"}</CalText>
+          <HelixaText style={styles.subtitle}>
+            {isDriver
+              ? "Your account has been verified. Go online whenever you're available and we'll send nearby emergency requests your way."
+              : "Your account has been verified. Go online whenever you're available and mothers who need a nurse can reach you."}
+          </HelixaText>
+        </Reveal>
+
+        <Reveal index={2} style={{ width: '100%' }}>
+          <View style={styles.card}>
+            <View style={styles.cardTop}>
+              {user?.profilePicture ? (
+                <Image source={{ uri: user.profilePicture }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <HelixaText weight="bold" style={{ color: '#FFF' }}>{(user?.name || '?').charAt(0)}</HelixaText>
+                </View>
+              )}
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <HelixaText weight="bold" style={styles.name}>{user?.name}</HelixaText>
+                <View style={styles.verifiedRow}>
+                  <View style={styles.dot} />
+                  <HelixaText style={styles.verified}>Verified</HelixaText>
+                </View>
+              </View>
+            </View>
+            {rows.map(([label, value]) => (
+              <View key={label} style={styles.row}>
+                <HelixaText style={styles.rowLabel}>{label}</HelixaText>
+                <HelixaText weight="bold" style={styles.rowValue}>{value}</HelixaText>
+              </View>
+            ))}
+          </View>
+        </Reveal>
+
+        <Reveal index={3} style={{ width: '100%' }}>
+          <Button title="Go to Dashboard" onPress={() => router.replace(getPostAuthRoute(user))} style={styles.button} />
+        </Reveal>
       </View>
     </SafeAreaView>
   );

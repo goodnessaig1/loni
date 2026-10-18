@@ -25,6 +25,7 @@ import {
   useDeletePost,
   useViewTracker,
 } from '../../hooks/useCommunity';
+import { PressableScale, Reveal, RevealList } from '../../components/motion';
 
 const PINK = '#C93A86';
 
@@ -60,19 +61,24 @@ export default function CommunityScreen() {
   }, [feed]);
 
   const renderItem = useCallback(
-    ({ item }: { item: CommunityPost }) => (
-      <PostCard post={item} onDelete={(p) => del.mutate(p.id)} />
+    ({ item, index }: { item: CommunityPost; index: number }) => (
+      <RevealList index={index}>
+        <PostCard post={item} onDelete={(p) => del.mutate(p.id)} />
+      </RevealList>
     ),
     [del]
   );
 
   const header = (
     <View>
+      <Reveal index={0}>
       <CalText style={{ fontSize: 30, color: PINK, marginTop: 14 }}>Community</CalText>
       <HelixaText style={{ fontSize: 17, lineHeight: 26, color: colors.textSecondary, marginTop: 10 }}>
         A warm space to share, ask, and encourage one another.
       </HelixaText>
+      </Reveal>
 
+      <Reveal index={1}>
       <View
         style={{
           flexDirection: 'row',
@@ -112,8 +118,10 @@ export default function CommunityScreen() {
           </TouchableOpacity>
         )}
       </View>
+      </Reveal>
 
-      <TouchableOpacity
+      <Reveal index={2}>
+      <PressableScale
         activeOpacity={0.85}
         onPress={() => setShareOpen(true)}
         accessibilityRole="button"
@@ -148,7 +156,8 @@ export default function CommunityScreen() {
             What&apos;s on your mind?
           </HelixaText>
         </View>
-      </TouchableOpacity>
+      </PressableScale>
+      </Reveal>
     </View>
   );
 

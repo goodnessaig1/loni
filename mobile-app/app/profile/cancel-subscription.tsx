@@ -10,6 +10,7 @@ import Toast from 'react-native-toast-message';
 import { CancelReason } from '../../api/subscription';
 import { useCancelSubscription, useResumeSubscription, useSubscription } from '../../hooks/useSubscription';
 import { longDate, planName } from '../../lib/format';
+import { PressableScale, Reveal } from '../../components/motion';
 
 const { width } = Dimensions.get('window');
 
@@ -85,8 +86,9 @@ export default function CancelSubscriptionScreen() {
         
         {step === 1 && (
           <View className="flex-1">
-            {renderHeader('Cancel Subscription')}
+            <Reveal index={0}>{renderHeader('Cancel Subscription')}</Reveal>
 
+            <Reveal index={1}>
             <View className="items-center mt-6 mb-8">
               <Image 
                 source={require('../../assets/images/cancel-sad.png')} 
@@ -94,14 +96,18 @@ export default function CancelSubscriptionScreen() {
                 contentFit="contain" 
               />
             </View>
+            </Reveal>
 
+            <Reveal index={2}>
             <HelixaText className="text-[24px] text-center mb-2" weight="bold">
               Why are you leaving?
             </HelixaText>
             <HelixaText className="text-[15px] text-gray-500 text-center mb-8 px-4">
               Your feedback helps us make Loni better for every mother.
             </HelixaText>
+            </Reveal>
 
+            <Reveal index={3}>
             <View className="flex flex-col gap-3 rounded-[12px] p-4 mb-8" style={{ backgroundColor: colors.surface }}>
               {REASONS.map((reason) => (
                 <TouchableOpacity
@@ -132,26 +138,31 @@ export default function CancelSubscriptionScreen() {
                 </View>
               )}
             </View>
+            </Reveal>
 
+            <Reveal index={4}>
             <HelixaText className="text-center text-gray-500 text-[13px] leading-5 px-6 mb-8">
               Your premium access will continue until the end of your current billing period. You can resubscribe anytime.
             </HelixaText>
+            </Reveal>
 
-            <TouchableOpacity 
-              className="w-full py-4 rounded-full items-center mb-6"
-              style={{ backgroundColor: selectedReason ? (isDark ? '#D62D88' : '#000') : (isDark ? '#3A3D44' : '#D1D5DB') }}
+            <Reveal index={5}>
+            <PressableScale
+              style={{ width: '100%', paddingVertical: 16, borderRadius: 9999, alignItems: 'center', marginBottom: 24, backgroundColor: selectedReason ? (isDark ? '#D62D88' : '#000') : (isDark ? '#3A3D44' : '#D1D5DB') }}
               onPress={handleNext}
               disabled={!selectedReason || (selectedReason === 'other' && !otherReason.trim())}
             >
               <HelixaText className="text-white text-[16px]" weight="bold">Next</HelixaText>
-            </TouchableOpacity>
+            </PressableScale>
+            </Reveal>
           </View>
         )}
 
         {step === 2 && (
           <View className="flex-1">
-            {renderHeader('Cancel Subscription')}
+            <Reveal index={0}>{renderHeader('Cancel Subscription')}</Reveal>
 
+            <Reveal index={1}>
             <View className="items-center mb-8">
               <Image 
                 source={require('../../assets/images/cry.png')} 
@@ -159,14 +170,18 @@ export default function CancelSubscriptionScreen() {
                 contentFit="contain" 
               />
             </View>
+            </Reveal>
 
+            <Reveal index={2}>
             <HelixaText className="text-[24px] text-center mb-2" weight="bold">
               We are sorry to see you go.
             </HelixaText>
             <HelixaText className="text-[15px] text-gray-500 text-center mb-10">
               We are constantly improving.
             </HelixaText>
+            </Reveal>
 
+            <Reveal index={3}>
             <HelixaText className="text-[16px] mb-4" weight="bold">
               What happens next:
             </HelixaText>
@@ -185,16 +200,18 @@ export default function CancelSubscriptionScreen() {
                 </View>
               ))}
             </View>
+            </Reveal>
 
-            <TouchableOpacity 
-              className="w-full bg-[#D62D88] py-4 rounded-full items-center mb-4"
+            <Reveal index={4}>
+            <PressableScale
+              style={{ width: '100%', backgroundColor: '#D62D88', paddingVertical: 16, borderRadius: 9999, alignItems: 'center', marginBottom: 16 }}
               onPress={handleNext}
               disabled={isCanceling}
             >
               <HelixaText className="text-white text-[16px]" weight="bold">
                 {isCanceling ? 'Canceling...' : 'Confirm Cancellation'}
               </HelixaText>
-            </TouchableOpacity>
+            </PressableScale>
 
             <TouchableOpacity 
               className="w-full py-4 items-center mb-6"
@@ -202,11 +219,13 @@ export default function CancelSubscriptionScreen() {
             >
               <HelixaText className="text-gray-500 text-[16px]" weight="bold">Keep Subscription</HelixaText>
             </TouchableOpacity>
+            </Reveal>
           </View>
         )}
 
         {step === 3 && (
           <View className="flex-1">
+            <Reveal index={0}>
             <View className="flex-row items-center justify-center py-4 mb-8">
               <TouchableOpacity
                 className="absolute left-0 w-12 h-12 rounded-full border justify-center items-center"
@@ -219,7 +238,9 @@ export default function CancelSubscriptionScreen() {
                 Cancel Subscription
               </HelixaText>
             </View>
+            </Reveal>
 
+            <Reveal index={1}>
             <View className="items-center mt-4 mb-8">
               <Image 
                 source={require('../../assets/images/cry-star.png')} 
@@ -227,14 +248,18 @@ export default function CancelSubscriptionScreen() {
                 contentFit="contain" 
               />
             </View>
+            </Reveal>
 
+            <Reveal index={2}>
             <HelixaText className="text-[24px] text-center mb-4" weight="bold">
               Subscription Cancelled
             </HelixaText>
             <HelixaText className="text-[15px] text-gray-500 text-center mb-10 leading-6 px-4">
               Your premium access will continue until {endDate}. After that, your account will switch to the free plan.
             </HelixaText>
+            </Reveal>
 
+            <Reveal index={3}>
             <View style={{ height: 96, borderRadius: 24, marginBottom: 48, overflow: 'hidden', position: 'relative', backgroundColor: colors.surface }}>
               <Image 
                 source={isDark ? require('../../assets/images/support-dark.png') : require('../../assets/images/support.png')} 
@@ -247,14 +272,16 @@ export default function CancelSubscriptionScreen() {
                 <HelixaText className="text-[13px] text-gray-500">Ends {endDate}</HelixaText>
               </View>
             </View>
+            </Reveal>
 
-            <TouchableOpacity 
-              className="w-full bg-[#D62D88] py-4 rounded-full items-center mb-4"
+            <Reveal index={4}>
+            <PressableScale
+              style={{ width: '100%', backgroundColor: '#D62D88', paddingVertical: 16, borderRadius: 9999, alignItems: 'center', marginBottom: 16 }}
               onPress={onReschedule}
               disabled={resume.isPending}
             >
               <HelixaText className="text-white text-[16px]" weight="bold">{resume.isPending ? 'Resuming...' : 'Reschedule Now'}</HelixaText>
-            </TouchableOpacity>
+            </PressableScale>
 
             <TouchableOpacity 
               className="w-full py-4 items-center mb-6"
@@ -262,6 +289,7 @@ export default function CancelSubscriptionScreen() {
             >
               <HelixaText className="text-gray-500 text-[16px]" weight="bold">Back to home</HelixaText>
             </TouchableOpacity>
+            </Reveal>
           </View>
         )}
 

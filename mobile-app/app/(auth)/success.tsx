@@ -1,7 +1,6 @@
 import React, { useMemo } from 'react';
 import {
   View,
-  Pressable,
   StyleSheet,
   ScrollView,
 } from 'react-native';
@@ -13,6 +12,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { PressableScale, Reveal } from '../../components/motion';
 
 export default function SuccessScreen() {
   const { colors, isDark } = useTheme();
@@ -21,6 +21,7 @@ export default function SuccessScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
+        <Reveal index={0}>
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <LottieView
@@ -35,7 +36,9 @@ export default function SuccessScreen() {
             You now have free access to LONI's maternal support services
           </HelixaText>
         </View>
+        </Reveal>
 
+        <Reveal index={1}>
         <View style={styles.cardsContainer}>
           {/* Talk to a Nurse */}
           <View style={styles.card}>
@@ -76,19 +79,22 @@ export default function SuccessScreen() {
             </View>
           </View>
         </View>
+        </Reveal>
 
+        <Reveal index={2} style={{ marginTop: 'auto' }}>
         <View style={styles.footer}>
-          <Pressable
+          <PressableScale
             style={styles.startButton}
             onPress={() => router.replace('/(auth)/onboarding')}
           >
             <HelixaText style={styles.startButtonText} weight="bold">Get Started</HelixaText>
-          </Pressable>
+          </PressableScale>
 
           <HelixaText style={styles.footerText}>
             You can upgrade to <HelixaText style={styles.upgradeHighlight} weight="bold">LoniPlus</HelixaText> anytime for unlimited access
           </HelixaText>
         </View>
+        </Reveal>
 
       </ScrollView>
     </SafeAreaView>

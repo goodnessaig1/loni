@@ -20,6 +20,7 @@ import { apiClient } from '../../api/client';
 import { useCallStore } from '../../store/callStore';
 import { useCall } from '../../hooks/useCall';
 import { useCallHistory } from '../../hooks/useCallHistory';
+import { Reveal, RevealList } from '../../components/motion';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -104,221 +105,235 @@ export default function NurseDashboardScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Top Header */}
-        <View style={styles.headerRow}>
-          <View style={styles.verifiedBadge}>
-            <MaterialCommunityIcons name="check-decagram" size={16} color="#00C300" />
-            <HelixaText style={styles.verifiedText} weight="bold">
-              Verified Nurse
-            </HelixaText>
+        <Reveal index={0}>
+          <View style={styles.headerRow}>
+            <View style={styles.verifiedBadge}>
+              <MaterialCommunityIcons name="check-decagram" size={16} color="#00C300" />
+              <HelixaText style={styles.verifiedText} weight="bold">
+                Verified Nurse
+              </HelixaText>
+            </View>
+            <Avatar
+              uri={user?.profilePicture || null}
+              name={user?.name || 'Nurse'}
+              style={styles.avatar}
+            />
           </View>
-          <Avatar
-            uri={user?.profilePicture || null}
-            name={user?.name || 'Nurse'}
-            style={styles.avatar}
-          />
-        </View>
+        </Reveal>
 
         {/* Greeting */}
-        <View style={styles.greetingContainer}>
-          <CalText style={styles.greetingTime}>Good {greeting},</CalText>
-          <View style={styles.greetingNameRow}>
-            <HelixaText style={styles.greetingName}>{firstName}</HelixaText>
-            <HelixaText style={{ fontSize: 24, marginLeft: 8 }}>
-              {hour < 12 ? '🌤️' : hour < 18 ? '☀️' : '🌙'}
-            </HelixaText>
-          </View>
-        </View>
-
-        {/* Online Toggle */}
-        <View style={styles.onlineCard}>
-          <View style={styles.onlineTextContent}>
-            <HelixaText style={styles.onlineTitle} weight="bold">
-              You're {isOnline ? 'Online' : 'Offline'}
-            </HelixaText>
-            <HelixaText style={styles.onlineSubtitle}>
-              {isOnline
-                ? "You will receive support requests while you're online."
-                : "You won't receive new requests."}
-            </HelixaText>
-          </View>
-          <CustomSwitch
-            value={isOnline}
-            onValueChange={handleToggleOnline}
-            activeColor="#D62D88"
-          />
-        </View>
-
-        {/* Incoming Requests */}
-        <View style={styles.sectionHeader}>
-          <HelixaText style={styles.sectionTitle}>Incoming Requests</HelixaText>
-          {hasIncomingRequests && (
-            <TouchableOpacity onPress={() => setShowAllRequests(true)}>
-              <HelixaText style={styles.viewAllText}>View all ❯</HelixaText>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {hasIncomingRequests ? (
-          <View style={{ gap: 12 }}>
-            {topRequests.map((req) => (
-              <View key={req.callId} style={styles.incomingCard}>
-                <View style={styles.incomingTop}>
-                  <Avatar
-                    uri={req.remote?.profile_picture || null}
-                    name={req.remote?.name || 'A Mother'}
-                    style={styles.incomingAvatar}
-                  />
-                  <View style={styles.incomingInfo}>
-                    <View style={styles.incomingNameRow}>
-                      <HelixaText style={styles.incomingName} weight="bold">
-                        {req.remote?.name || 'A Mother'}
-                      </HelixaText>
-                      <HelixaText style={styles.incomingTime}>Just now</HelixaText>
-                    </View>
-                    {!!req.remote?.trimester && (
-                      <View style={styles.trimesterRow}>
-                        <TrimesterIcon />
-                        <HelixaText style={styles.trimesterText}>
-                          {req.remote.trimester}{req.remote.pregnancy_week ? ` · Week ${req.remote.pregnancy_week}` : ''}
-                        </HelixaText>
-                      </View>
-                    )}
-                    <View style={styles.plusMemberBadge}>
-                      <View style={styles.plusDot} />
-                      <HelixaText style={styles.plusMemberText}>Plus Member</HelixaText>
-                    </View>
-                  </View>
-                  <TouchableOpacity style={styles.callIconBtn} onPress={() => handleView(req.callId)}>
-                    <Feather name="phone-call" size={18} color="#000" />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.incomingActions}>
-                  <TouchableOpacity
-                    style={styles.declineBtn}
-                    onPress={() => handleDecline(req.callId)}>
-                    <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.viewBtn} onPress={() => handleView(req.callId)}>
-                    <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
-                    <HelixaText style={styles.viewBtnText}>View</HelixaText>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.emptyCard}>
-            <HelixaText style={styles.emptyText}>No incoming requests right now.</HelixaText>
-          </View>
-        )}
-
-        {/* Today at a glance */}
-        <HelixaText style={[styles.sectionTitle, { marginTop: 32 }]}>Today at a glance</HelixaText>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.glanceScroll}>
-          <View style={styles.glanceCardLight}>
-            <View style={styles.glanceIconBox}>
-              <Feather name="phone-call" size={20} color="#000" />
-            </View>
-            <HelixaText style={styles.glanceValue} weight="bold">
-              {stats.total_calls}
-            </HelixaText>
-            <HelixaText style={styles.glanceLabel}>Total Calls</HelixaText>
-            <HelixaText style={styles.glanceSub}>All time</HelixaText>
-          </View>
-          <View style={styles.glanceCardLight}>
-            <View style={styles.glanceIconBox}>
-              <Feather name="clock" size={20} color="#000" />
-            </View>
-            <HelixaText style={styles.glanceValue} weight="bold">
-              {stats.total_duration_formatted}
-            </HelixaText>
-            <HelixaText style={styles.glanceLabel}>Total Call Time</HelixaText>
-            <HelixaText style={styles.glanceSub}>All time</HelixaText>
-          </View>
-          <View style={styles.glanceCardDark}>
-            <View style={[styles.glanceIconBox, { backgroundColor: '#FFF' }]}>
-              <Feather name="star" size={16} color="#F59E0B" fill="#F59E0B" />
-            </View>
-            <HelixaText style={[styles.glanceValue, { color: '#FFF' }]} weight="bold">
-              {stats.rating_avg != null ? stats.rating_avg.toFixed(1) : '—'}
-            </HelixaText>
-            <HelixaText style={[styles.glanceLabel, { color: '#D1D5DB' }]}>Rating</HelixaText>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
-              <Feather name="star" size={12} color="#F59E0B" fill="#F59E0B" />
-              <HelixaText style={{ color: '#FFF', fontSize: 12, marginLeft: 4 }}>
-                {stats.rating_count ? `${stats.rating_count} rating${stats.rating_count === 1 ? '' : 's'}` : 'No ratings yet'}
+        <Reveal index={1}>
+          <View style={styles.greetingContainer}>
+            <CalText style={styles.greetingTime}>Good {greeting},</CalText>
+            <View style={styles.greetingNameRow}>
+              <HelixaText style={styles.greetingName}>{firstName}</HelixaText>
+              <HelixaText style={{ fontSize: 24, marginLeft: 8 }}>
+                {hour < 12 ? '🌤️' : hour < 18 ? '☀️' : '🌙'}
               </HelixaText>
             </View>
           </View>
-          <View style={styles.glanceCardLight}>
-            <View style={styles.glanceIconBox}>
-              <Feather name="check-circle" size={16} color="#000" />
+        </Reveal>
+
+        {/* Online Toggle */}
+        <Reveal index={2}>
+          <View style={styles.onlineCard}>
+            <View style={styles.onlineTextContent}>
+              <HelixaText style={styles.onlineTitle} weight="bold">
+                You're {isOnline ? 'Online' : 'Offline'}
+              </HelixaText>
+              <HelixaText style={styles.onlineSubtitle}>
+                {isOnline
+                  ? "You will receive support requests while you're online."
+                  : "You won't receive new requests."}
+              </HelixaText>
             </View>
-            <HelixaText style={styles.glanceValue} weight="bold">
-              {stats.today_calls ?? 0}
-            </HelixaText>
-            <HelixaText style={styles.glanceLabel}>Calls Today</HelixaText>
-            <HelixaText style={styles.glanceSub}>Since midnight</HelixaText>
+            <CustomSwitch
+              value={isOnline}
+              onValueChange={handleToggleOnline}
+              activeColor="#D62D88"
+            />
           </View>
-        </ScrollView>
+        </Reveal>
+
+        {/* Incoming Requests */}
+        <Reveal index={3}>
+          <View style={styles.sectionHeader}>
+            <HelixaText style={styles.sectionTitle}>Incoming Requests</HelixaText>
+            {hasIncomingRequests && (
+              <TouchableOpacity onPress={() => setShowAllRequests(true)}>
+                <HelixaText style={styles.viewAllText}>View all ❯</HelixaText>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {hasIncomingRequests ? (
+            <View style={{ gap: 12 }}>
+              {topRequests.map((req, i) => (
+                <RevealList key={req.callId} index={i}>
+                  <View style={styles.incomingCard}>
+                    <View style={styles.incomingTop}>
+                      <Avatar
+                        uri={req.remote?.profile_picture || null}
+                        name={req.remote?.name || 'A Mother'}
+                        style={styles.incomingAvatar}
+                      />
+                      <View style={styles.incomingInfo}>
+                        <View style={styles.incomingNameRow}>
+                          <HelixaText style={styles.incomingName} weight="bold">
+                            {req.remote?.name || 'A Mother'}
+                          </HelixaText>
+                          <HelixaText style={styles.incomingTime}>Just now</HelixaText>
+                        </View>
+                        {!!req.remote?.trimester && (
+                          <View style={styles.trimesterRow}>
+                            <TrimesterIcon />
+                            <HelixaText style={styles.trimesterText}>
+                              {req.remote.trimester}{req.remote.pregnancy_week ? ` · Week ${req.remote.pregnancy_week}` : ''}
+                            </HelixaText>
+                          </View>
+                        )}
+                        <View style={styles.plusMemberBadge}>
+                          <View style={styles.plusDot} />
+                          <HelixaText style={styles.plusMemberText}>Plus Member</HelixaText>
+                        </View>
+                      </View>
+                      <TouchableOpacity style={styles.callIconBtn} onPress={() => handleView(req.callId)}>
+                        <Feather name="phone-call" size={18} color="#000" />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.incomingActions}>
+                      <TouchableOpacity
+                        style={styles.declineBtn}
+                        onPress={() => handleDecline(req.callId)}>
+                        <HelixaText style={styles.declineBtnText}>Decline</HelixaText>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.viewBtn} onPress={() => handleView(req.callId)}>
+                        <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 6 }} />
+                        <HelixaText style={styles.viewBtnText}>View</HelixaText>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </RevealList>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyCard}>
+              <HelixaText style={styles.emptyText}>No incoming requests right now.</HelixaText>
+            </View>
+          )}
+        </Reveal>
+
+        {/* Today at a glance */}
+        <Reveal index={4}>
+          <HelixaText style={[styles.sectionTitle, { marginTop: 32 }]}>Today at a glance</HelixaText>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.glanceScroll}>
+            <View style={styles.glanceCardLight}>
+              <View style={styles.glanceIconBox}>
+                <Feather name="phone-call" size={20} color="#000" />
+              </View>
+              <HelixaText style={styles.glanceValue} weight="bold">
+                {stats.total_calls}
+              </HelixaText>
+              <HelixaText style={styles.glanceLabel}>Total Calls</HelixaText>
+              <HelixaText style={styles.glanceSub}>All time</HelixaText>
+            </View>
+            <View style={styles.glanceCardLight}>
+              <View style={styles.glanceIconBox}>
+                <Feather name="clock" size={20} color="#000" />
+              </View>
+              <HelixaText style={styles.glanceValue} weight="bold">
+                {stats.total_duration_formatted}
+              </HelixaText>
+              <HelixaText style={styles.glanceLabel}>Total Call Time</HelixaText>
+              <HelixaText style={styles.glanceSub}>All time</HelixaText>
+            </View>
+            <View style={styles.glanceCardDark}>
+              <View style={[styles.glanceIconBox, { backgroundColor: '#FFF' }]}>
+                <Feather name="star" size={16} color="#F59E0B" fill="#F59E0B" />
+              </View>
+              <HelixaText style={[styles.glanceValue, { color: '#FFF' }]} weight="bold">
+                {stats.rating_avg != null ? stats.rating_avg.toFixed(1) : '—'}
+              </HelixaText>
+              <HelixaText style={[styles.glanceLabel, { color: '#D1D5DB' }]}>Rating</HelixaText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+                <Feather name="star" size={12} color="#F59E0B" fill="#F59E0B" />
+                <HelixaText style={{ color: '#FFF', fontSize: 12, marginLeft: 4 }}>
+                  {stats.rating_count ? `${stats.rating_count} rating${stats.rating_count === 1 ? '' : 's'}` : 'No ratings yet'}
+                </HelixaText>
+              </View>
+            </View>
+            <View style={styles.glanceCardLight}>
+              <View style={styles.glanceIconBox}>
+                <Feather name="check-circle" size={16} color="#000" />
+              </View>
+              <HelixaText style={styles.glanceValue} weight="bold">
+                {stats.today_calls ?? 0}
+              </HelixaText>
+              <HelixaText style={styles.glanceLabel}>Calls Today</HelixaText>
+              <HelixaText style={styles.glanceSub}>Since midnight</HelixaText>
+            </View>
+          </ScrollView>
+        </Reveal>
 
         {/* Recent Activity */}
-        <View style={[styles.sectionHeader, { marginTop: 32 }]}>
-          <HelixaText style={styles.sectionTitle}>Recent Activity</HelixaText>
-          {recentActivities.length > 0 && (
-            <TouchableOpacity onPress={() => router.push('/(tabs)/history' as any)}>
-              <HelixaText style={styles.viewAllText}>View all ❯</HelixaText>
-            </TouchableOpacity>
-          )}
-        </View>
+        <Reveal index={5}>
+          <View style={[styles.sectionHeader, { marginTop: 32 }]}>
+            <HelixaText style={styles.sectionTitle}>Recent Activity</HelixaText>
+            {recentActivities.length > 0 && (
+              <TouchableOpacity onPress={() => router.push('/(tabs)/history' as any)}>
+                <HelixaText style={styles.viewAllText}>View all ❯</HelixaText>
+              </TouchableOpacity>
+            )}
+          </View>
 
-        {recentActivities.length > 0 ? (
-          <View style={styles.recentContainer}>
-            {recentActivities.map((activity, index) => {
-              return (
-                <View key={activity.id}>
-                  <View style={styles.recentItem}>
-                    <Avatar 
-                      uri={activity.img}
-                      name={activity.name}
-                      style={styles.recentAvatar}
-                    />
-                    <View style={styles.recentInfo}>
-                      <HelixaText style={styles.recentName} weight="bold">
-                        {activity.name}
-                      </HelixaText>
-                      {activity.trimester && activity.trimester !== 'Unknown' && (
-                        <View style={styles.trimesterRow}>
-                          <TrimesterIcon />
-                          <HelixaText style={styles.trimesterText}>{activity.trimester}</HelixaText>
+          {recentActivities.length > 0 ? (
+            <View style={styles.recentContainer}>
+              {recentActivities.map((activity, index) => {
+                return (
+                  <RevealList key={activity.id} index={index}>
+                      <View style={styles.recentItem}>
+                        <Avatar 
+                          uri={activity.img}
+                          name={activity.name}
+                          style={styles.recentAvatar}
+                        />
+                        <View style={styles.recentInfo}>
+                          <HelixaText style={styles.recentName} weight="bold">
+                            {activity.name}
+                          </HelixaText>
+                          {activity.trimester && activity.trimester !== 'Unknown' && (
+                            <View style={styles.trimesterRow}>
+                              <TrimesterIcon />
+                              <HelixaText style={styles.trimesterText}>{activity.trimester}</HelixaText>
+                            </View>
+                          )}
                         </View>
-                      )}
-                    </View>
-                    <View style={styles.recentRight}>
-                      <HelixaText style={styles.recentTimeTop}>
-                        {activity.durationFormatted}
-                      </HelixaText>
-                      <HelixaText style={styles.recentTimeBottom}>
-                        {activity.relativeTime}
-                      </HelixaText>
-                    </View>
-                    <TouchableOpacity style={styles.recentArrow} onPress={() => router.push({ pathname: '/(tabs)/history', params: { callId: String(activity.id) } } as any)}>
-                      <Feather name="chevron-right" size={16} color="#6B7280" />
-                    </TouchableOpacity>
-                  </View>
-                  {index < recentActivities.length - 1 && <View style={styles.divider} />}
-                </View>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={[styles.emptyCard, { marginBottom: 40 }]}>
-            <HelixaText style={styles.emptyText}>No recent activity.</HelixaText>
-          </View>
-        )}
+                        <View style={styles.recentRight}>
+                          <HelixaText style={styles.recentTimeTop}>
+                            {activity.durationFormatted}
+                          </HelixaText>
+                          <HelixaText style={styles.recentTimeBottom}>
+                            {activity.relativeTime}
+                          </HelixaText>
+                        </View>
+                        <TouchableOpacity style={styles.recentArrow} onPress={() => router.push({ pathname: '/(tabs)/history', params: { callId: String(activity.id) } } as any)}>
+                          <Feather name="chevron-right" size={16} color="#6B7280" />
+                        </TouchableOpacity>
+                      </View>
+                      {index < recentActivities.length - 1 && <View style={styles.divider} />}
+                  </RevealList>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={[styles.emptyCard, { marginBottom: 40 }]}>
+              <HelixaText style={styles.emptyText}>No recent activity.</HelixaText>
+            </View>
+          )}
+        </Reveal>
       </ScrollView>
 
       {/* View All Incoming Requests Modal */}

@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAIChatHistory } from '../../hooks/useAIChatHistory';
+import { Reveal, RevealList } from '../../components/motion';
 
 export default function ChatHistoryScreen() {
   const { colors } = useTheme();
@@ -76,6 +77,7 @@ export default function ChatHistoryScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       {/* Header */}
+      <Reveal index={0}>
       <View className="flex-row items-center justify-between px-6 pt-4 pb-6">
         <TouchableOpacity 
           onPress={() => router.back()}
@@ -96,6 +98,7 @@ export default function ChatHistoryScreen() {
           </TouchableOpacity>
         )}
       </View>
+      </Reveal>
 
       {isLoading && historyItems.length === 0 ? (
         <View className="flex-1 items-center justify-center">
@@ -119,7 +122,8 @@ export default function ChatHistoryScreen() {
               <HelixaText className="text-gray-400 text-[16px]">No chat history found.</HelixaText>
             </View>
           )}
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
+            <RevealList index={index} delay={70}>
             <View className="flex-row items-center justify-between py-4 border-b"
               style={{ borderBottomColor: colors.divider }}>
               <TouchableOpacity 
@@ -148,6 +152,7 @@ export default function ChatHistoryScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+            </RevealList>
           )}
         />
       )}

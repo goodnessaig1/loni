@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Pressable, 
   StyleSheet, 
   ActivityIndicator, 
   StyleProp, 
@@ -8,6 +7,7 @@ import {
   PressableProps
 } from 'react-native';
 import { HelixaText } from './HelixaText';
+import { PressableScale } from './motion';
 
 interface ButtonProps extends PressableProps {
   title: string;
@@ -25,7 +25,7 @@ export function Button({
   const isDisabled = disabled || isLoading;
 
   return (
-    <Pressable 
+    <PressableScale 
       style={[
         styles.button,
         isDisabled ? styles.buttonDisabled : styles.buttonActive,
@@ -41,7 +41,7 @@ export function Button({
           {title}
         </HelixaText>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 

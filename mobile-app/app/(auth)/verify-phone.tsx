@@ -17,6 +17,7 @@ import { Button } from '../../components/Button';
 import { useVerifyPhone } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 export default function VerifyPhoneScreen() {
   const { colors } = useTheme();
@@ -69,6 +70,7 @@ export default function VerifyPhoneScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
@@ -77,7 +79,9 @@ export default function VerifyPhoneScreen() {
           <HelixaText style={styles.subtext}>
             We sent a 4-digit code to {phone || '(234) 804-3456-574'}
           </HelixaText>
+          </Reveal>
 
+          <Reveal index={1}>
           <View style={styles.inputSection}>
             <HelixaText style={styles.inputLabel} weight="bold">Enter Code</HelixaText>
             
@@ -97,7 +101,9 @@ export default function VerifyPhoneScreen() {
               ))}
             </View>
           </View>
+          </Reveal>
 
+          <Reveal index={2}>
           <Pressable style={styles.resendContainer}>
             <HelixaText style={styles.resendText} weight="bold">Resend Code</HelixaText>
           </Pressable>
@@ -108,6 +114,7 @@ export default function VerifyPhoneScreen() {
             isLoading={isSubmitting}
             disabled={!isComplete}
           />
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>

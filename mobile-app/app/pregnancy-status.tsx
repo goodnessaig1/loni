@@ -13,6 +13,7 @@ import { StageChange, useUpdateStage } from '../hooks/useStage';
 import { recoveryStageOf, trimesterOf } from '../lib/pregnancy';
 import { useTheme } from '../context/ThemeContext';
 import type { Palette } from '../lib/theme';
+import { PressableScale, Reveal } from '../components/motion';
 
 export default function PregnancyStatusScreen() {
   const { user } = useAuth();
@@ -96,6 +97,7 @@ export default function PregnancyStatusScreen() {
       </View>
 
       {/* Header */}
+      <Reveal index={0}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Feather name="arrow-left" size={24} color={colors.text} />
@@ -103,9 +105,11 @@ export default function PregnancyStatusScreen() {
         <HelixaText style={styles.headerTitle} weight="bold">Pregnancy Status</HelixaText>
         <View style={styles.placeholder} />
       </View>
+      </Reveal>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Stage Section */}
+        <Reveal index={1}>
         {isGeneral ? (
           <View style={styles.stageSection}>
             <HelixaText style={styles.stageLabel}>Your journey</HelixaText>
@@ -148,8 +152,10 @@ export default function PregnancyStatusScreen() {
             </View>
           </View>
         )}
+        </Reveal>
 
         {/* Toggle Pill */}
+        <Reveal index={2}>
         <View style={styles.toggleContainer}>
           <Pressable
             accessibilityRole="button"
@@ -176,8 +182,10 @@ export default function PregnancyStatusScreen() {
             <HelixaText style={isGeneral ? styles.toggleTextActive : styles.toggleTextInactive} weight={isGeneral ? "bold" : "regular"}>Not pregnant</HelixaText>
           </Pressable>
         </View>
+        </Reveal>
 
         {/* Stage List */}
+        <Reveal index={3}>
         <View style={styles.trimestersSection}>
           {!isGeneral && (
           <HelixaText style={styles.sectionTitle} weight="bold">
@@ -229,10 +237,13 @@ export default function PregnancyStatusScreen() {
             </>
           )}
         </View>
+        </Reveal>
 
+        <Reveal index={4}>
         <HelixaText style={styles.footerText}>
           Your stage helps us personalize your care. You can update this anytime, we are always here for you.
         </HelixaText>
+        </Reveal>
 
       </ScrollView>
 
@@ -266,7 +277,7 @@ function TrimesterCard({ title, weeks, isActive, onPress }: { title: string, wee
   // The highlighted row is a bright pink in dark mode, so its text must stay dark there.
   const onActive = isActive && isDark ? { color: '#1B1B1F' } : undefined;
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="radio"
       accessibilityState={{ selected: isActive }}
       onPress={onPress}
@@ -286,7 +297,7 @@ function TrimesterCard({ title, weeks, isActive, onPress }: { title: string, wee
           <Feather name="check" size={14} color="#FFF" />
         </View>
       )}
-    </Pressable>
+    </PressableScale>
   );
 }
 

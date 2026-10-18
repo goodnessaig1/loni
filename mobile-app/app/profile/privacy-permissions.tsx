@@ -11,6 +11,7 @@ import { checkinsApi } from '../../api/checkins';
 import { useCheckinPreferences } from '../../hooks/useCheckins';
 import { queryClient } from '../../lib/queryClient';
 import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
+import { Reveal } from '../../components/motion';
 
 export default function PrivacyPermissionsScreen() {
   const router = useRouter();
@@ -54,6 +55,7 @@ export default function PrivacyPermissionsScreen() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
+      <Reveal index={0}>
       <View className="flex-row items-center justify-center py-4 mb-2 relative px-6">
         <TouchableOpacity
           className="absolute left-6 w-12 h-12 rounded-full border justify-center items-center"
@@ -66,10 +68,12 @@ export default function PrivacyPermissionsScreen() {
           Privacy & Permissions
         </HelixaText>
       </View>
+      </Reveal>
 
       <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
         
         {/* Warning Card */}
+        <Reveal index={1}>
         <View className="rounded-[16px] p-5 mb-8 flex-row mt-4" style={{ backgroundColor: colors.roseSoft }}>
           <Feather name="lock" size={20} color="#E11D48" className="mr-3 mt-0.5" />
           <View className="flex-1">
@@ -79,8 +83,10 @@ export default function PrivacyPermissionsScreen() {
             </HelixaText>
           </View>
         </View>
+        </Reveal>
 
         {/* Sharing Preferences */}
+        <Reveal index={2}>
         <HelixaText className="text-[16px] mb-4">Sharing Preferences</HelixaText>
         <View className="flex flex-col gap-3 p-4 rounded-[12px] overflow-hidden" style={{ backgroundColor: colors.surface }}>
           {renderToggleItem('Location Sharing', 'Share with your care team and partner', toggles.location, () => toggleSwitch('location'))}
@@ -88,8 +94,10 @@ export default function PrivacyPermissionsScreen() {
           {renderToggleItem('Emergency-Only Tracking', 'Share location only during emergencies', toggles.emergencyTracking, () => toggleSwitch('emergencyTracking'))}
           {renderToggleItem('Recovery Visibility', 'Share recovery progress with care team', toggles.recoveryVisibility, () => toggleSwitch('recoveryVisibility'), true)}
         </View>
+        </Reveal>
 
         {/* What Loni remembers */}
+        <Reveal index={3}>
         <HelixaText className="mt-6 text-[16px] mb-4">Loni&apos;s Memory</HelixaText>
         <View className="flex flex-col gap-3 p-4 rounded-[12px] overflow-hidden" style={{ backgroundColor: colors.surface }}>
           {renderToggleItem(
@@ -108,15 +116,19 @@ export default function PrivacyPermissionsScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        </Reveal>
 
         {/* App Permissions */}
+        <Reveal index={4}>
         <HelixaText className="mt-6 text-[16px] mb-4">App Permissions</HelixaText>
         <View className="flex flex-col gap-3 p-4 rounded-[12px] overflow-hidden" style={{ backgroundColor: colors.surface }}>
           {renderToggleItem('Microphone', 'For voice calls and check-ins', toggles.microphone, () => toggleSwitch('microphone'), true)}
         </View>
+        </Reveal>
 
         {/* Other Options */}
         {/* <HelixaText className="mt-6 text-[16px] mb-4 text-black">Other Options</HelixaText> */}
+        <Reveal index={5}>
         <View className="flex flex-col mt-6 gap-3 p-4 rounded-[12px] overflow-hidden" style={{ backgroundColor: colors.surface }}>
           <TouchableOpacity activeOpacity={0.6} className="flex-row justify-between items-center p-4 rounded-[14px]" style={{ backgroundColor: colors.elevated }}>
             <View className="flex-1 pr-4">
@@ -152,11 +164,14 @@ export default function PrivacyPermissionsScreen() {
             </View>
           </TouchableOpacity>
         </View>
+        </Reveal>
 
         {/* Footer text */}
+        <Reveal index={6}>
         <HelixaText className="text-[13px] text-center leading-5 px-4 mt-8 mb-10" style={{ color: colors.textSecondary }}>
           Your health information is kept private, sent over encrypted connections and only shared with the people you choose.
         </HelixaText>
+        </Reveal>
 
       </ScrollView>
 

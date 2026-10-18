@@ -8,6 +8,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { ScreenHeader } from '../../components/ScreenHeader';
 import { partnerApi, PartnerMilestone } from '../../api/partner';
+import { Reveal, RevealList } from '../../components/motion';
 
 const PINK = '#D62D88';
 
@@ -49,15 +50,20 @@ export default function PregnancyUpdatesScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScreenHeader title={isRecovery ? 'Recovery Updates' : 'Pregnancy Updates'} />
+      <Reveal index={0}>
+        <ScreenHeader title={isRecovery ? 'Recovery Updates' : 'Pregnancy Updates'} />
+      </Reveal>
       {isLoading ? (
         <ActivityIndicator color={PINK} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
+          <Reveal index={1}>
           <HelixaText style={styles.intro}>
             Follow {name}'s journey and see what she may be going through each week.
           </HelixaText>
+          </Reveal>
 
+          <Reveal index={2}>
           <View style={styles.hero}>
             <Image source={require('../../assets/images/partner-pregnant.png')} style={StyleSheet.absoluteFill} resizeMode="cover" />
             <LinearGradient colors={['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.6)']} style={StyleSheet.absoluteFill} />
@@ -68,19 +74,28 @@ export default function PregnancyUpdatesScreen() {
             </View>
             <CalText style={styles.heroTitle}>{current?.title ?? (isRecovery ? 'Her recovery journey' : 'Her pregnancy journey')}</CalText>
           </View>
+          </Reveal>
 
           {!data?.shared ? (
+            <Reveal index={3}>
             <View style={styles.empty}>
               <Feather name="lock" size={18} color="#6B7280" />
               <HelixaText style={styles.emptyText}>{name} isn't sharing updates with you right now.</HelixaText>
             </View>
+            </Reveal>
           ) : !data.milestones.length ? (
+            <Reveal index={3}>
             <View style={styles.empty}>
               <HelixaText style={styles.emptyText}>Updates appear here while she is pregnant or recovering after birth.</HelixaText>
             </View>
+            </Reveal>
           ) : (
             <View style={{ marginTop: 8 }}>
-              {data.milestones.map((m, i) => <Step key={m.week} m={m} last={i === data.milestones.length - 1} />)}
+              {data.milestones.map((m, i) => (
+                <RevealList key={m.week} index={i}>
+                  <Step m={m} last={i === data.milestones.length - 1} />
+                </RevealList>
+              ))}
             </View>
           )}
         </ScrollView>

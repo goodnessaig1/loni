@@ -20,6 +20,7 @@ import { emergencyContactsApi } from '../../api/emergencyContacts';
 import Toast from 'react-native-toast-message';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { Reveal, RevealList } from '../../components/motion';
 
 const ContactSchema = Yup.object().shape({
   contacts: Yup.array().of(
@@ -57,6 +58,7 @@ export default function EmergencyContactsScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
@@ -65,6 +67,7 @@ export default function EmergencyContactsScreen() {
           <HelixaText style={styles.subtext}>
             We'll notify these people if you request emergency help
           </HelixaText>
+          </Reveal>
 
           <Formik
             initialValues={{ contacts: [{ name: '', phone: '', email: '', relationship: '' }] }}
@@ -80,7 +83,8 @@ export default function EmergencyContactsScreen() {
                       const contactTouched = (touched.contacts?.[index] as any) || {};
 
                       return (
-                        <View key={index} style={styles.formContainer}>
+                        <RevealList key={index} index={index + 1}>
+                        <View style={styles.formContainer}>
                           {values.contacts.length > 1 && (
                             <Pressable onPress={() => remove(index)} style={styles.removeContactButton}>
                               <Feather name="trash-2" size={16} color="#EF4444" />
@@ -149,14 +153,18 @@ export default function EmergencyContactsScreen() {
                             )}
                           </View>
                         </View>
+                        </RevealList>
                       );
                     })}
 
+                    <Reveal index={2}>
                     <Pressable style={styles.addAnotherButton} onPress={() => push({ name: '', phone: '', email: '', relationship: '' })}>
                       <Feather name="plus" size={16} color="#D62D88" />
                       <HelixaText style={styles.addAnotherText}>Add another contact</HelixaText>
                     </Pressable>
+                    </Reveal>
 
+                    <Reveal index={3}>
                     <View style={styles.footer}>
                       <Button 
                         title="Continue"
@@ -172,6 +180,7 @@ export default function EmergencyContactsScreen() {
                         <HelixaText style={styles.skipButtonText} weight="bold">Skip for now</HelixaText>
                       </Pressable>
                     </View>
+                    </Reveal>
                   </>
                 )}
               </FieldArray>

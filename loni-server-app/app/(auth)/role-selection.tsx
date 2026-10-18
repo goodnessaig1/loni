@@ -12,6 +12,7 @@ import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal, PressableScale } from '../../components/motion';
 
 type Role = 'nurse' | 'driver' | null;
 
@@ -34,56 +35,62 @@ export default function RoleSelectionScreen() {
           <Feather name="chevron-left" size={28} color="black" />
         </Pressable>
 
-        <CalText style={styles.heading}>How will you use LONI Server?</CalText>
-        <HelixaText style={styles.subtext}>Select your role to continue.</HelixaText>
+        <Reveal index={0}>
+          <CalText style={styles.heading}>How will you use LONI Server?</CalText>
+          <HelixaText style={styles.subtext}>Select your role to continue.</HelixaText>
+        </Reveal>
 
-        <View style={styles.cardsContainer}>
-          {/* Nurse Card */}
-          <Pressable 
-            style={[styles.card, selectedRole === 'nurse' && styles.cardSelected]}
-            onPress={() => setSelectedRole('nurse')}
-          >
-            <View style={styles.iconContainer}>
-              <FontAwesome5 name="user-nurse" size={24} color="#D62D88" />
-            </View>
-            <View style={styles.cardTextContainer}>
-              <HelixaText style={styles.cardTitle} weight="bold">Nurse</HelixaText>
-              <HelixaText style={styles.cardDescription}>
-                Receive support calls, speak with mothers, and provide compassionate care.
-              </HelixaText>
-            </View>
-            <View style={[styles.radio, selectedRole === 'nurse' && styles.radioSelected]}>
-              {selectedRole === 'nurse' && <Feather name="check" size={14} color="#FFFFFF" />}
-            </View>
-          </Pressable>
+        <Reveal index={1} style={{ flex: 1 }}>
+          <View style={styles.cardsContainer}>
+            {/* Nurse Card */}
+            <PressableScale
+              style={[styles.card, selectedRole === 'nurse' && styles.cardSelected]}
+              onPress={() => setSelectedRole('nurse')}
+            >
+              <View style={styles.iconContainer}>
+                <FontAwesome5 name="user-nurse" size={24} color="#D62D88" />
+              </View>
+              <View style={styles.cardTextContainer}>
+                <HelixaText style={styles.cardTitle} weight="bold">Nurse</HelixaText>
+                <HelixaText style={styles.cardDescription}>
+                  Receive support calls, speak with mothers, and provide compassionate care.
+                </HelixaText>
+              </View>
+              <View style={[styles.radio, selectedRole === 'nurse' && styles.radioSelected]}>
+                {selectedRole === 'nurse' && <Feather name="check" size={14} color="#FFFFFF" />}
+              </View>
+            </PressableScale>
 
-          {/* Driver Card */}
-          <Pressable 
-            style={[styles.card, selectedRole === 'driver' && styles.cardSelected]}
-            onPress={() => setSelectedRole('driver')}
-          >
-            <View style={styles.iconContainer}>
-              <FontAwesome5 name="car" size={24} color="#D62D88" />
-            </View>
-            <View style={styles.cardTextContainer}>
-              <HelixaText style={styles.cardTitle} weight="bold">Driver</HelixaText>
-              <HelixaText style={styles.cardDescription}>
-                Transport mothers and supplies with reliable, safe delivery service.
-              </HelixaText>
-            </View>
-            <View style={[styles.radio, selectedRole === 'driver' && styles.radioSelected]}>
-              {selectedRole === 'driver' && <Feather name="check" size={14} color="#FFFFFF" />}
-            </View>
-          </Pressable>
-        </View>
+            {/* Driver Card */}
+            <PressableScale
+              style={[styles.card, selectedRole === 'driver' && styles.cardSelected]}
+              onPress={() => setSelectedRole('driver')}
+            >
+              <View style={styles.iconContainer}>
+                <FontAwesome5 name="car" size={24} color="#D62D88" />
+              </View>
+              <View style={styles.cardTextContainer}>
+                <HelixaText style={styles.cardTitle} weight="bold">Driver</HelixaText>
+                <HelixaText style={styles.cardDescription}>
+                  Transport mothers and supplies with reliable, safe delivery service.
+                </HelixaText>
+              </View>
+              <View style={[styles.radio, selectedRole === 'driver' && styles.radioSelected]}>
+                {selectedRole === 'driver' && <Feather name="check" size={14} color="#FFFFFF" />}
+              </View>
+            </PressableScale>
+          </View>
+        </Reveal>
 
-        <View style={styles.buttonWrapper}>
-          <Button 
-            title="Continue"
-            onPress={handleContinue}
-            disabled={!selectedRole}
-          />
-        </View>
+        <Reveal index={2}>
+          <View style={styles.buttonWrapper}>
+            <Button 
+              title="Continue"
+              onPress={handleContinue}
+              disabled={!selectedRole}
+            />
+          </View>
+        </Reveal>
 
       </ScrollView>
     </SafeAreaView>

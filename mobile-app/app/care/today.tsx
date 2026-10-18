@@ -8,6 +8,7 @@ import { CareScreen, Checkbox, Chip } from '../../components/care/CareParts';
 import { useTheme } from '../../context/ThemeContext';
 import { useTodayPlan, useToggleTask } from '../../hooks/useCare';
 import { BRAND } from '../../lib/theme';
+import { Reveal, RevealList } from '../../components/motion';
 import type { TaskCategory } from '../../api/care';
 
 const TABS: { id: 'all' | TaskCategory; label: string }[] = [
@@ -45,8 +46,8 @@ export default function TodaysCareScreen() {
 
       <View style={{ borderRadius: 16, borderWidth: 1, borderColor: colors.divider, backgroundColor: colors.card }}>
         {tasks.map((t, i) => (
+          <RevealList key={t.key} index={i}>
           <TouchableOpacity
-            key={t.key}
             activeOpacity={0.7}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: t.done }}
@@ -66,12 +67,15 @@ export default function TodaysCareScreen() {
             </View>
             <HelixaText style={{ fontSize: 11, color: t.done ? BRAND.pink : colors.textMuted }}>{t.done ? 'Completed' : 'Pending'}</HelixaText>
           </TouchableOpacity>
+          </RevealList>
         ))}
       </View>
 
+      <Reveal index={Math.min(tasks.length, 8)}>
       <View style={{ marginTop: 20 }}>
         <CareCard tone="orange" title="Nutrition Plan" icon="coffee" description="View today's personalized meal recommendations." onPress={() => router.push('/care/nutrition')} />
       </View>
+      </Reveal>
     </CareScreen>
   );
 }

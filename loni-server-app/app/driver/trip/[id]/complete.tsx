@@ -8,6 +8,7 @@ import { CalText } from '../../../../components/CalText';
 import { HelixaText } from '../../../../components/HelixaText';
 import { ridesApi } from '../../../../api/rides';
 import { useRideStore } from '../../../../store/rideStore';
+import { PressableScale, Reveal } from '../../../../components/motion';
 
 const PINK = '#D62D88';
 const GREEN = '#15B300';
@@ -52,23 +53,34 @@ export default function TripComplete() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.body}>
+        <Reveal index={0}>
         <View style={styles.check}>
           <Feather name="check" size={38} color="#FFF" />
         </View>
+        </Reveal>
+        <Reveal index={1}>
         <CalText style={styles.title}>Trip complete</CalText>
+        </Reveal>
+        <Reveal index={2}>
         <HelixaText style={styles.sub}>
           {(ride?.pickup_address || 'Pickup')} → {(ride?.dropoff_name || 'Hospital')}
         </HelixaText>
+        </Reveal>
 
+        <Reveal index={3}>
         <View style={styles.earnCard}>
           <HelixaText style={styles.earnLabel}>You earned</HelixaText>
           <CalText style={styles.earnValue}>{naira(ride?.fare_final ?? ride?.fare_estimate)}</CalText>
           <HelixaText style={styles.earnMeta}>{km(ride?.distance_meters)} trip</HelixaText>
         </View>
+        </Reveal>
 
         {!done && !alreadyRated ? (
           <>
+            <Reveal index={4}>
             <HelixaText weight="bold" style={styles.rateLabel}>Rate your passenger</HelixaText>
+            </Reveal>
+            <Reveal index={5}>
             <View style={styles.stars}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <Pressable key={n} onPress={() => setRating(n)} hitSlop={8}>
@@ -80,13 +92,17 @@ export default function TripComplete() {
                 </Pressable>
               ))}
             </View>
-            <Pressable style={styles.primary} onPress={submit} disabled={submitting}>
+            </Reveal>
+            <Reveal index={6} style={{ alignSelf: 'stretch' }}>
+            <PressableScale style={styles.primary} onPress={submit} disabled={submitting}>
               {submitting ? <ActivityIndicator color="#FFF" /> : <HelixaText weight="bold" style={styles.primaryText}>Submit</HelixaText>}
-            </Pressable>
+            </PressableScale>
+            </Reveal>
           </>
         ) : (
           <>
             {(done || alreadyRated) && (
+              <Reveal index={4}>
               <View style={styles.starsReadonly}>
                 {[1, 2, 3, 4, 5].map((n) => (
                   <MaterialCommunityIcons
@@ -97,10 +113,13 @@ export default function TripComplete() {
                   />
                 ))}
               </View>
+              </Reveal>
             )}
-            <Pressable style={styles.primary} onPress={finish}>
+            <Reveal index={5} style={{ alignSelf: 'stretch' }}>
+            <PressableScale style={styles.primary} onPress={finish}>
               <HelixaText weight="bold" style={styles.primaryText}>Back to dashboard</HelixaText>
-            </Pressable>
+            </PressableScale>
+            </Reveal>
           </>
         )}
       </View>

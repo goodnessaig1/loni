@@ -13,6 +13,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
+import { PressableScale, Reveal } from '../../components/motion';
 import {
   PermissionStatus,
   getNotificationPermissionStatus,
@@ -75,6 +76,7 @@ export default function PermissionsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Reveal index={0}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Feather name="chevron-left" size={28} color={colors.text} />
         </Pressable>
@@ -88,9 +90,11 @@ export default function PermissionsScreen() {
             These permissions help us provide the best care and support
           </HelixaText>
         </View>
+        </Reveal>
 
         <View style={styles.cardsContainer}>
           {/* Notifications */}
+          <Reveal index={1}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
@@ -125,8 +129,10 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
 
           {/* Microphone */}
+          <Reveal index={2}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
@@ -161,8 +167,10 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
 
           {/* Location Access */}
+          <Reveal index={3}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
@@ -195,8 +203,10 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
 
           {/* Emergency Contacts */}
+          <Reveal index={4}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
@@ -226,15 +236,18 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
         </View>
 
-        <Pressable
+        <Reveal index={5}>
+        <PressableScale
           style={[styles.continueButton, canContinue ? styles.continueButtonActive : styles.continueButtonDisabled]}
           disabled={!canContinue}
           onPress={() => router.push('/(auth)/emergency-contacts')}
         >
           <HelixaText style={styles.continueButtonText} weight="bold">Continue</HelixaText>
-        </Pressable>
+        </PressableScale>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );
