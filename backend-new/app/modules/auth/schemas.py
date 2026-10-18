@@ -93,6 +93,7 @@ class SetupPartnerRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     phone: str = Field(..., min_length=10)
+    name: Optional[str] = Field(default=None, max_length=255)
 
 class VerifyPartnerSetupRequest(BaseModel):
     email: EmailStr

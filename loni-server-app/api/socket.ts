@@ -30,12 +30,33 @@ let pingInterval: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
 let manuallyClosed = false;
+let currentUserType: string | undefined;
+
+/** Set by NotificationContext whenever the signed-in user changes. */
+export function setSocketUserType(t: string | undefined) {
+  currentUserType = t;
+}
 
 function wsBaseUrl(): string {
   return API_URL.replace(/^http/, 'ws');
 }
 
+// Coming back to the foreground: reconnect now (not after the backoff) and resync calls.
+let appStateSub: { remove: () => void } | null = null;
+function watchAppState() {
+  if (appStateSub) return;
+  const { AppState } = require('react-native');
+  appStateSub = AppState.addEventListener('change', (next: string) => {
+    if (next !== 'active' || manuallyClosed) return;
+    reconnectAttempts = 0;
+    connectCallSocket();
+    require('../lib/callSync').reconcileCall();
+    if (currentUserType === 'partner') require('../lib/partnerEvents').refreshPartnerViews();
+  });
+}
+
 export async function connectCallSocket(): Promise<void> {
+  watchAppState();
   manuallyClosed = false;
 
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
@@ -57,6 +78,10 @@ export async function connectCallSocket(): Promise<void> {
 
   socket.onopen = () => {
     reconnectAttempts = 0;
+    // Anything that happened to a call or a ringing request while we were disconnected.
+    require('../lib/callSync').reconcileCall();
+    // A partner may have missed her sharing/stage changes or new updates while offline.
+    if (currentUserType === 'partner') require('../lib/partnerEvents').refreshPartnerViews();
     console.log('[CallSocket] connected');
     if (pingInterval) clearInterval(pingInterval);
     pingInterval = setInterval(() => {
@@ -76,8 +101,13 @@ export async function connectCallSocket(): Promise<void> {
         if (msg.data?.account_status === 'active') handleAccountApproved();
         return;
       }
+      if (typeof msg.type === 'string' && msg.type.startsWith('partner_')) {
+        applyPartnerEvent(msg.type, msg.data);
+        return;
+      }
       if (typeof msg.type === 'string' && (msg.type.startsWith('ride_') || msg.type === 'pregnancy_update')) {
-        applyServerRideEvent(msg.type, msg.data);
+        // A partner's events are about the mother's ride, never a trip of their own.
+        if (currentUserType !== 'partner') applyServerRideEvent(msg.type, msg.data);
         // Harmless no-op for a driver/nurse session - see lib/partnerEvents.ts.
         applyPartnerEvent(msg.type, msg.data);
         return;

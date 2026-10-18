@@ -10,6 +10,8 @@ import { apiClient } from '../api/client';
 import { connectCallSocket, disconnectCallSocket } from '../api/socket';
 import { applyServerCallEvent } from '../lib/callEvents';
 import { applyServerRideEvent } from '../lib/rideEvents';
+import { applyPartnerEvent, isPartnerEvent } from '../lib/partnerSync';
+import { router } from 'expo-router';
 import { setupCallKeep } from '../lib/callKeepService';
 import { requestMicrophonePermission } from '../lib/permissions';
 
@@ -64,6 +66,11 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     // Tapping a notification (app in background, or launching the app from it) opens what it points at.
     const handleOpen = (remoteMessage: any) => {
       const data: PushData = remoteMessage?.data;
+      // A partner joined or left: open her support-partner list.
+      if (isPartnerEvent((data as any)?.type)) {
+        if (userRef.current) router.push('/profile/emergency-contacts' as any);
+        return;
+      }
       if (data?.type !== 'checkin') return;
       if (userRef.current) openFromPush(data);
       else pendingOpen.current = data;   // cold start: wait until she is signed in
@@ -87,6 +94,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       }
       if (typeof data?.type === 'string' && data.type.startsWith('ride_')) {
         applyServerRideEvent(data.type, data);
+        return;
+      }
+      if (isPartnerEvent(data?.type)) {
+        applyPartnerEvent(data.type, data, { title: remoteMessage.notification?.title, body: remoteMessage.notification?.body });
         return;
       }
       if (data?.type) {

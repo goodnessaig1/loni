@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { Avatar } from '../../components/Avatar';
 import { SupportIcon } from '../../components/icons/SupportIcon';
 import { useAuth, useUploadProfilePicture } from '../../hooks/useAuth';
 import { usePartnerConnection } from '../../hooks/usePartnerConnection';
+import { partnerApi } from '../../api/partner';
 import { relativeTime } from '../../lib/relativeTime';
 
 function ShareRow({ title, description, shared }: { title: string; description: string; shared: boolean }) {
@@ -37,7 +38,26 @@ function ShareRow({ title, description, shared }: { title: string; description: 
 }
 
 export default function PartnerProfile() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logoutUser } = useAuth();
+  const [leaving, setLeaving] = React.useState(false);
+
+  const confirmLeave = () =>
+    Alert.alert('Stop getting alerts?', `You will no longer receive ${connection?.inviter_name ?? 'her'}'s updates or emergency alerts.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Stop alerts', style: 'destructive', onPress: async () => {
+          setLeaving(true);
+          try {
+            await partnerApi.leaveConnection();
+            Toast.show({ type: 'success', text1: 'Done', text2: 'You will no longer receive her alerts.' });
+            await logoutUser();
+          } catch (e: any) {
+            setLeaving(false);
+            Toast.show({ type: 'error', text1: 'Could not remove the connection', text2: e?.response?.data?.message });
+          }
+        },
+      },
+    ]);
   const { data: connection } = usePartnerConnection();
   const uploadMutation = useUploadProfilePicture();
 
@@ -103,6 +123,10 @@ export default function PartnerProfile() {
             <HelixaText weight="black" style={styles.infoValue}>{user?.email || '—'}</HelixaText>
           </View>
           <View style={styles.infoRow}>
+            <HelixaText style={styles.infoLabel}>Phone</HelixaText>
+            <HelixaText weight="black" style={styles.infoValue}>{user?.phone || '—'}</HelixaText>
+          </View>
+          <View style={styles.infoRow}>
             <HelixaText style={styles.infoLabel}>Role</HelixaText>
             <View style={styles.roleBadge}>
               <HelixaText style={styles.roleBadgeText} weight="black">PARTNER</HelixaText>
@@ -166,6 +190,16 @@ export default function PartnerProfile() {
                 </HelixaText>
               </View>
             </View>
+
+            <Pressable style={styles.leaveCard} onPress={confirmLeave} disabled={leaving}>
+              <Feather name="bell-off" size={18} color="#FA3532" />
+              <View style={{ flex: 1 }}>
+                <HelixaText weight="black" style={styles.leaveTitle}>{leaving ? 'Removing…' : 'Stop getting alerts'}</HelixaText>
+                <HelixaText style={styles.warningBody}>
+                  You'll stop receiving {inviterName}'s updates and emergency alerts, and this partner account will be closed. She can invite you again.
+                </HelixaText>
+              </View>
+            </Pressable>
           </View>
         )}
       </ScrollView>
@@ -175,6 +209,11 @@ export default function PartnerProfile() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
+  leaveCard: {
+    flexDirection: 'row', gap: 12, alignItems: 'flex-start', marginTop: 18,
+    backgroundColor: 'rgba(250,53,50,0.06)', borderRadius: 14, padding: 16,
+  },
+  leaveTitle: { fontSize: 14, color: '#FA3532', marginBottom: 4 },
   scroll: { paddingHorizontal: 21, paddingTop: 8, paddingBottom: 140 },
   heading: { fontSize: 20, color: '#000000', textAlign: 'center', marginBottom: 32 },
   avatarWrap: { alignSelf: 'center', marginBottom: 24 },

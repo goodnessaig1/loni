@@ -13,6 +13,7 @@ from app.modules.notifications.service import NotificationService
 from app.modules.users.models import User
 
 import app.modules.auth.models  # noqa: F401  (register every table on Base.metadata)
+import app.modules.account.models  # noqa: F401
 import app.modules.calls.models  # noqa: F401
 import app.modules.care.models  # noqa: F401
 import app.modules.checkins.models  # noqa: F401
@@ -50,6 +51,16 @@ async def make_user(session_factory):
             await s.commit()
             return user
     return _make
+
+
+@pytest.fixture(autouse=True)
+def _no_redis(monkeypatch):
+    """Tests never touch a real Redis (a developer's .env may set REDIS_URL): limits count in memory."""
+    from app.core import ratelimit
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "REDIS_URL", None)
+    monkeypatch.setattr(ratelimit, "_redis", None)
+    monkeypatch.setattr(ratelimit, "_local", {})
 
 
 @pytest.fixture(autouse=True)

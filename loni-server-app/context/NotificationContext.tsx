@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import notifee, { EventType } from '@notifee/react-native';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { Platform } from 'react-native';
@@ -6,7 +6,7 @@ import * as Device from 'expo-device';
 import { AuthContext } from './AuthContext';
 import { apiClient } from '../api/client';
 import { router } from 'expo-router';
-import { connectCallSocket, disconnectCallSocket } from '../api/socket';
+import { connectCallSocket, disconnectCallSocket, setSocketUserType } from '../api/socket';
 import { applyServerCallEvent, acceptCallDirect, rejectCallDirect } from '../lib/callEvents';
 import { useCallStore } from '../store/callStore';
 import { setupCallKeep } from '../lib/callKeepService';
@@ -14,6 +14,7 @@ import { setupVoipPush } from '../lib/voipPush';
 import { requestMicrophonePermission } from '../lib/permissions';
 import { handleAccountApproved, registerAuthRefresh } from '../lib/accountStatus';
 import { applyServerRideEvent, parseRideData, acceptRideDirect, declineRideDirect, openRideRequest } from '../lib/rideEvents';
+import { applyPartnerEvent, registerPartnerSignOut } from '../lib/partnerEvents';
 
 interface NotificationContextType {
   pushToken: string | null;
@@ -24,14 +25,19 @@ const NotificationContext = createContext<NotificationContextType | null>(null);
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
   const [pushToken, setPushToken] = useState<string | null>(null);
 
-  const { user, refreshUser } = useContext(AuthContext);
+  const { user, refreshUser, logoutUser } = useContext(AuthContext);
+  // Push handlers are registered once; they read the current role from here.
+  const userTypeRef = useRef<string | undefined>(user?.user_type);
+  userTypeRef.current = user?.user_type;
+  setSocketUserType(user?.user_type);
 
   useEffect(() => {
     // Let module-scope code (the call socket, FCM tap handlers) trigger a
     // user refresh after an account-approval event - `refreshUser` lives on
     // the React context and can't be imported directly there.
     registerAuthRefresh(refreshUser);
-    return () => registerAuthRefresh(null);
+    registerPartnerSignOut(logoutUser);
+    return () => { registerAuthRefresh(null); registerPartnerSignOut(null); };
   }, [refreshUser]);
 
   useEffect(() => {
@@ -63,6 +69,13 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       // de-duped in handleAccountApproved.)
       if (data?.type === 'account_approved') {
         handleAccountApproved();
+        return;
+      }
+
+      // A partner's updates about the mother's ride / pregnancy (same split as api/socket.ts).
+      if (userTypeRef.current === 'partner' && typeof data?.type === 'string'
+          && (data.type.startsWith('ride_') || data.type.startsWith('partner_') || data.type === 'pregnancy_update')) {
+        applyPartnerEvent(data.type, parseRideData(data));
         return;
       }
 
@@ -190,7 +203,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         const rideId = Number(rideData.ride_id);
         await notifee.cancelNotification(detail.notification!.id!).catch(() => {});
         if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'ride_accept') {
-          try { await acceptRideDirect(rideId); router.replace(`/driver/trip/${rideId}`); } catch {}
+          try { await acceptRideDirect(rideId); router.replace(`/driver/overview/${rideId}` as any); } catch {}
         } else if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'ride_decline') {
           try { await declineRideDirect(rideId); } catch {}
         } else if (type === EventType.PRESS) {
@@ -264,6 +277,13 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       const t = remoteMessage?.data?.type;
       if (t === 'account_approved') {
         handleAccountApproved();
+      } else if (userTypeRef.current === 'partner') {
+        // Partners open her ride / updates, never the driver's trip screen.
+        const rideId = Number(remoteMessage?.data?.ride_id ?? remoteMessage?.data?.id);
+        if (t === 'pregnancy_update' || t === 'partner_stage_changed') router.push('/partner/pregnancy-updates' as any);
+        else if (t === 'partner_sharing_changed') router.push('/(partner)/profile' as any);
+        else if (t === 'ride_arrived_safely' || t === 'ride_completed' || t === 'ride_cancelled') router.push('/partner/notifications' as any);
+        else if (typeof t === 'string' && t.startsWith('ride_') && rideId) router.push(`/partner/ride/${rideId}` as any);
       } else if (typeof t === 'string' && t.startsWith('ride_')) {
         const parsed = parseRideData(remoteMessage.data);
         const rideId = Number(parsed.ride_id ?? parsed.id);

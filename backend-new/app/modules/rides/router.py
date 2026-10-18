@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.ratelimit import limit
 from app.core.database import get_db
 from app.modules.users.models import User, UserTypeEnum
 from app.modules.rides.schemas import (
     QuoteRequest, QuoteResponse, RideRequestBody, RideResponse,
-    AvailableRidesResponse, DriverStatsResponse, RideRatingBody, CancelBody,
+    AvailableRidesResponse, DriverStatsResponse, RideRatingBody, CancelBody, NotifyContactsBody,
     LocationPing, AvailabilityBody, SimpleOk, RiderInfo, DriverInfo, LatLng,
 )
 from app.modules.rides.services.ride_service import RideService, _rider_info, _driver_info
@@ -56,7 +57,7 @@ def _ride_to_response(ride, *, viewer_id: str) -> dict:
 # --------------------------------------------------------------------------
 # Quote / hospital lookup (mother)
 # --------------------------------------------------------------------------
-@router.post("/quote", response_model=QuoteResponse)
+@router.post("/quote", response_model=QuoteResponse, dependencies=[Depends(limit("rides.quote", 30, 60))])
 async def quote(payload: QuoteRequest, current_user: User = Depends(get_current_user)):
     """Fare + route + ETA preview for the request screen. No Ride row created."""
     return await RideService.quote(payload)
@@ -75,7 +76,8 @@ async def hospitals(
 # --------------------------------------------------------------------------
 # Ride lifecycle (mother)
 # --------------------------------------------------------------------------
-@router.post("/request", response_model=RideResponse)
+@router.post("/request", response_model=RideResponse,
+             dependencies=[Depends(limit("rides.request", 5, 300, "Too many ride requests. Please wait a moment."))])
 async def request_ride(
     body: RideRequestBody,
     current_user: User = Depends(get_current_user),
@@ -142,7 +144,7 @@ async def set_availability(
                     data={"is_available": body.is_available})
 
 
-@router.post("/location", response_model=SimpleOk)
+@router.post("/location", response_model=SimpleOk, dependencies=[Depends(limit("rides.location", 120, 60))])
 async def post_location(
     ping: LocationPing,
     current_user: User = Depends(get_current_user),
@@ -164,7 +166,13 @@ async def get_ride(
     db: AsyncSession = Depends(get_db),
 ):
     ride = await RideService.get_ride(db, ride_id, current_user.id)
-    return _ride_to_response(ride, viewer_id=current_user.id)
+    out = _ride_to_response(ride, viewer_id=current_user.id)
+    if current_user.id not in (ride.rider_id, ride.driver_id) and not await RideService.partner_sees_location(db, ride.rider_id, current_user.id):
+        # A support partner without location sharing sees the status, driver and hospital, not where she is.
+        out.update(pickup=None, pickup_address=None, route_polyline=None, location_shared=False)
+        if out.get("driver"):
+            out["driver"] = {**out["driver"], "current_lat": None, "current_lng": None, "heading": None}
+    return out
 
 
 @router.get("/{ride_id}/route")
@@ -183,16 +191,17 @@ async def get_ride_route(
     if leg == "auto":
         leg = "dropoff" if ride.status.value == "IN_PROGRESS" else "pickup"
 
-    if leg == "dropoff":
+    # Re-routes start from where the driver is now, on either leg; the hospital leg
+    # otherwise starts at the pickup (that is where the trip begins).
+    prof = getattr(ride.driver, "driver_profile", None)
+    if from_lat is not None and from_lng is not None:
+        origin = (from_lat, from_lng)
+    elif leg == "dropoff":
         origin = (ride.pickup_lat, ride.pickup_lng)
+    elif prof and prof.current_lat is not None:
+        origin = (prof.current_lat, prof.current_lng)
     else:
-        prof = getattr(ride.driver, "driver_profile", None)
-        if from_lat is not None and from_lng is not None:
-            origin = (from_lat, from_lng)
-        elif prof and prof.current_lat is not None:
-            origin = (prof.current_lat, prof.current_lng)
-        else:
-            origin = (ride.pickup_lat, ride.pickup_lng)
+        origin = (ride.pickup_lat, ride.pickup_lng)
     dest = (ride.pickup_lat, ride.pickup_lng) if leg == "pickup" else (ride.dropoff_lat, ride.dropoff_lng)
     route = await maps_service.get_directions(origin[0], origin[1], dest[0], dest[1])
     return {"success": True, "data": {"leg": leg, "route": route.model_dump()}}
@@ -248,3 +257,14 @@ async def rate(ride_id: int, body: RideRatingBody,
                db: AsyncSession = Depends(get_db)):
     await RideService.rate_ride(db, ride_id, current_user.id, body.rating, body.feedback)
     return SimpleOk(message="Thanks for the feedback")
+
+
+@router.post("/{ride_id}/notify-contacts", response_model=SimpleOk)
+async def notify_contacts(ride_id: int, body: NotifyContactsBody,
+                          current_user: User = Depends(get_current_user),
+                          db: AsyncSession = Depends(get_db)):
+    """The mother shares her live trip with her support partners, or tells them she arrived safely."""
+    count = await RideService.notify_contacts(db, ride_id, current_user.id, body.kind)
+    msg = "No connected support partner to notify" if count == 0 else (
+        "Your support partner has been notified" if count == 1 else f"{count} support partners notified")
+    return SimpleOk(message=msg, data={"notified": count})

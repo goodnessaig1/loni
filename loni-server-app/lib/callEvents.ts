@@ -28,6 +28,9 @@ export type ServerCallEventType =
   | 'call_missed'
   | 'call_failed';
 
+// WS and FCM both deliver `call_accepted`; only one POST /join per call.
+const joinInFlight = new Set<number>();
+
 function toParticipant(raw: any): ParticipantInfo | null {
   if (!raw) return null;
   return {
@@ -62,7 +65,21 @@ export async function acceptCallDirect(callId: number) {
 
 export async function rejectCallDirect(callId: number) {
   await apiClient.post(`/calls/${callId}/reject`);
-  useCallStore.getState().endCall('REJECTED');
+  // Only this request goes; others that are still ringing stay.
+  useCallStore.getState().removeIncomingCall(callId);
+}
+
+/** A request is no longer ringing for this user: clear its notification and ringtone too
+ *  (the WebSocket path never went through NotificationContext's notifee cleanup). */
+function clearRinging(callId: number) {
+  try {
+    const notifee = require('@notifee/react-native').default;
+    notifee.cancelNotification(`incoming-${callId}`).catch(() => {});
+  } catch { /* notifee unavailable */ }
+  try {
+    require('react-native-incall-manager').default.stopRingtone();
+  } catch { /* not ringing */ }
+  try { reportCallEnded(callId); } catch { /* CallKeep off */ }
 }
 
 export async function applyServerCallEvent(type: string, data: any) {
@@ -72,7 +89,10 @@ export async function applyServerCallEvent(type: string, data: any) {
   switch (type) {
     case 'incoming_call': {
       if (callId == null) return;
-      store.setIncomingCall(callId, data.room_name, toParticipant(data.caller));
+      store.setIncomingCall(callId, data.room_name, toParticipant(data.caller), {
+        kind: data.kind === 'ride' ? 'ride' : 'nurse',
+        rideId: data.ride_id != null ? Number(data.ride_id) : null,
+      });
       // Ensures the native CallKit/ConnectionService UI shows up even when
       // this event arrived over the WebSocket or a foreground Firebase
       // message rather than the VoIP-push/FCM-background path (which
@@ -89,8 +109,30 @@ export async function applyServerCallEvent(type: string, data: any) {
     case 'call_accepted': {
       if (callId == null) return;
       if (store.callId === callId && (store.status === 'CONNECTING' || store.status === 'CONNECTED')) return;
+      // A call this user started (a driver calling the passenger) was answered: fetch a room token.
+      if (store.isOutgoing && store.callId === callId) {
+        if (joinInFlight.has(callId)) return;
+        joinInFlight.add(callId);
+        store.setAccepted({ remote: toParticipant(data.receiver) });
+        try {
+          const res = await apiClient.post(`/calls/${callId}/join`);
+          store.setConnecting({
+            callId,
+            roomToken: res.data.token,
+            livekitUrl: res.data.livekit_url,
+            remote: toParticipant(res.data.participant) ?? toParticipant(data.receiver),
+          });
+        } catch (e) {
+          console.error('[callEvents] Failed to join accepted call', e);
+          store.endCall('FAILED');
+        } finally {
+          joinInFlight.delete(callId);
+        }
+        return;
+      }
+      // Another nurse answered (`taken`), or the caller's own accept echo: stop ringing here.
       store.removeIncomingCall(callId);
-      try { reportCallEnded(callId); } catch {}
+      clearRinging(callId);
       return;
     }
 
@@ -126,9 +168,10 @@ export async function applyServerCallEvent(type: string, data: any) {
     case 'call_failed': {
       if (callId == null) return;
       
-      if (store.callId !== callId) {
+      clearRinging(callId);
+      if (store.callId !== callId || (store.isIncoming && !store.isActive)) {
+        // A request that was ringing (not the call we're on) - drop just that request.
         store.removeIncomingCall(callId);
-        try { reportCallEnded(callId); } catch {}
         return;
       }
 

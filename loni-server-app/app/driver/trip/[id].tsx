@@ -18,7 +18,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { HelixaText } from '../../../components/HelixaText';
 import { CalText } from '../../../components/CalText';
 import { ridesApi } from '../../../api/rides';
-import { apiClient } from '../../../api/client';
+import { useCall } from '../../../hooks/useCall';
 import { useRideStore, RouteStep } from '../../../store/rideStore';
 import { decodePolyline } from '../../../lib/navigation/polyline';
 import { computeTbt, maneuverIcon } from '../../../lib/navigation/useTurnByTurn';
@@ -215,18 +215,44 @@ export default function TripNavigation() {
     }
   };
 
+  const { requestCall } = useCall();
+
   const callPassenger = async () => {
+    if (!ride) return;
     try {
-      const res = await apiClient.post('/calls/request', { nurse_id: ride?.rider_id });
-      router.push({ pathname: '/incoming-call', params: { callId: res.data?.id, outgoing: '1' } } as any);
-    } catch {}
+      // The call screen (components/CallModals.tsx) takes over from here: ringing, then the live call.
+      await requestCall({
+        rideId: ride.id,
+        remote: ride.rider ? { id: ride.rider.id, name: ride.rider.name, profile_picture: ride.rider.profile_picture ?? null } : null,
+      });
+    } catch (e: any) {
+      Alert.alert('Could not call', e?.response?.data?.message || 'Please try again.');
+    }
   };
 
-  const cancel = async () => {
-    try { await ridesApi.cancel(rideId, 'Driver cancelled'); } catch {}
-    Speech.stop();
-    clear('CANCELLED');
-    router.replace('/(driver)');
+  // Backing out hands the mother to another driver (backend re-dispatches). Only leave the trip once
+  // the server agreed - otherwise this app would drop a trip the server still has as ours.
+  const cancel = () => {
+    if (ride?.status === 'IN_PROGRESS') {
+      Alert.alert('Trip in progress', 'You can\'t cancel once the trip has started. Complete it at the hospital.');
+      return;
+    }
+    Alert.alert('Can\'t make it?', 'We will find the mother another driver right away.', [
+      { text: 'Keep trip', style: 'cancel' },
+      {
+        text: 'Cancel trip', style: 'destructive', onPress: async () => {
+          try {
+            await ridesApi.cancel(rideId, 'Driver cancelled');
+          } catch (e: any) {
+            Alert.alert('Could not cancel', e?.response?.data?.message || 'Check your connection and try again.');
+            return;
+          }
+          Speech.stop();
+          clear('CANCELLED');
+          router.replace('/(driver)');
+        },
+      },
+    ]);
   };
 
   const openExternalNav = () => {
@@ -338,7 +364,7 @@ export default function TripNavigation() {
           <Pressable style={[styles.primary, acting && { opacity: 0.6 }]} onPress={primaryAction} disabled={acting}>
             {acting ? <ActivityIndicator color="#FFF" /> : <HelixaText weight="bold" style={styles.primaryText}>{actionLabel}</HelixaText>}
           </Pressable>
-          <Pressable style={styles.iconBtn} onPress={cancel}>
+          <Pressable style={[styles.iconBtn, ride?.status === 'IN_PROGRESS' && { opacity: 0.4 }]} onPress={cancel}>
             <Feather name="x" size={18} color="#B91C1C" />
           </Pressable>
         </View>

@@ -13,6 +13,11 @@ import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAu
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
 import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
 import { useRouter } from 'expo-router';
+import Toast from 'react-native-toast-message';
+import { setActiveRoom, toggleMicrophone as toggleActiveMicrophone } from '../lib/activeRoom';
+import { useRideStore } from '../store/rideStore';
+
+const RIDE_LIVE = ['SEARCHING', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
 
 const LOG = '[Call/Mother]';
 const CONNECT_TIMEOUT_MS = 20000;
@@ -45,11 +50,14 @@ const RemoteMutedBadge = ({ participant }: { participant: any }) => {
   return null;
 };
 
-const ActiveCallUI = () => {
+/**
+ * Everything a live call needs while the room is mounted (connection, reconnect, quality,
+ * foreground service), whether the full call screen is showing or the call is shown
+ * inline in the emergency-ride card.
+ */
+function useRoomLifecycle(onOutputs?: (outputs: string[]) => void) {
   const room = useRoomContext();
-  const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
-  const remoteParticipants = useRemoteParticipants();
-  const callId = useCallStore((s) => s.callId);
+  const { localParticipant } = useLocalParticipant();
   const remoteParticipant = useCallStore((s) => s.remoteParticipant);
   const connectedAt = useCallStore((s) => s.connectedAt);
   const status = useCallStore((s) => s.status);
@@ -57,22 +65,11 @@ const ActiveCallUI = () => {
   const setReconnecting = useCallStore((s) => s.setReconnecting);
   const setConnectionQuality = useCallStore((s) => s.setConnectionQuality);
   const endCall = useCallStore((s) => s.endCall);
-  const { hangupCall } = useCall();
-  
-  const [duration, setDuration] = useState(0);
-  const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
-  const [selectedOutput, setSelectedOutput] = useState<string>('earpiece');
-  const [showOutputPicker, setShowOutputPicker] = useState(false);
 
-  const actualRemoteParticipant = remoteParticipants.length > 0 ? remoteParticipants[0] : null;
-  const connectionQuality = useCallStore((s) => s.connectionQuality);
-
-  const localMic = localParticipant?.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
-  const remoteMic = actualRemoteParticipant?.getTrackPublication(Track.Source.Microphone)?.track as RemoteAudioTrack | undefined;
-  const localVol = useTrackVolume(localMic) || 0;
-  const remoteVol = useTrackVolume(remoteMic) || 0;
-  const activeVol = Math.max(localVol, remoteVol);
-  const scale = 1 + activeVol * 1.5;
+  useEffect(() => {
+    setActiveRoom(room);
+    return () => setActiveRoom(null);
+  }, [room]);
 
   useEffect(() => {
     const onConnected = () => console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
@@ -100,7 +97,7 @@ const ActiveCallUI = () => {
     };
     const onMediaDevicesChanged = () => {
       if (Platform.OS === 'android') {
-        listAudioOutputs().then(setAudioOutputs);
+        listAudioOutputs().then((o) => onOutputs?.(o));
       }
     };
 
@@ -150,6 +147,42 @@ const ActiveCallUI = () => {
     return () => { stopCallForegroundService(); };
   }, [status === 'CONNECTED']);
 
+}
+
+/** The call runs in the background of the ride card: no screen of its own. */
+const HeadlessCall = () => {
+  useRoomLifecycle();
+  return null;
+};
+
+const ActiveCallUI = () => {
+  const room = useRoomContext();
+  const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
+  const remoteParticipants = useRemoteParticipants();
+  const callId = useCallStore((s) => s.callId);
+  const remoteParticipant = useCallStore((s) => s.remoteParticipant);
+  const connectedAt = useCallStore((s) => s.connectedAt);
+  const status = useCallStore((s) => s.status);
+  const endCall = useCallStore((s) => s.endCall);
+  const { hangupCall } = useCall();
+  
+  const [duration, setDuration] = useState(0);
+  const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
+  const [selectedOutput, setSelectedOutput] = useState<string>('earpiece');
+  const [showOutputPicker, setShowOutputPicker] = useState(false);
+
+  const actualRemoteParticipant = remoteParticipants.length > 0 ? remoteParticipants[0] : null;
+  const connectionQuality = useCallStore((s) => s.connectionQuality);
+
+  const localMic = localParticipant?.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+  const remoteMic = actualRemoteParticipant?.getTrackPublication(Track.Source.Microphone)?.track as RemoteAudioTrack | undefined;
+  const localVol = useTrackVolume(localMic) || 0;
+  const remoteVol = useTrackVolume(remoteMic) || 0;
+  const activeVol = Math.max(localVol, remoteVol);
+  const scale = 1 + activeVol * 1.5;
+
+  useRoomLifecycle(setAudioOutputs);
+
   useEffect(() => {
     if (!connectedAt) {
       setDuration(0);
@@ -168,9 +201,7 @@ const ActiveCallUI = () => {
   };
 
   const toggleMicrophone = () => {
-    if (localParticipant) {
-      localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
-    }
+    toggleActiveMicrophone();
   };
 
   const outputIcon = (deviceId: string) => {
@@ -323,9 +354,14 @@ export const CallModals = () => {
   const livekitUrl = useCallStore((s) => s.livekitUrl);
   const remoteParticipant = useCallStore((s) => s.remoteParticipant);
   const callerName = useCallStore((s) => s.callerName);
+  const kind = useCallStore((s) => s.kind);
   const endCall = useCallStore((s) => s.endCall);
   const { hangupCall, acceptCall, rejectCall } = useCall();
   const router = useRouter();
+  // While an emergency ride is live, the ride card shows the call inline (Figma "ride pill" states),
+  // so the full-screen call UI stays out of the way. Incoming calls still take the screen so she can answer.
+  const rideLive = useRideStore((s) => RIDE_LIVE.includes(s.ride?.status ?? s.status));
+  const lastKind = useRef(kind);
   
   const wasConnected = useRef(false);
   const lastCallId = useRef<number | null>(null);
@@ -346,13 +382,36 @@ export const CallModals = () => {
   if (remoteParticipant?.name || callerName) {
     lastNurseName.current = remoteParticipant?.name || callerName;
   }
+  if (status !== 'IDLE') {
+    lastKind.current = kind;
+  }
   const currentConnectedAt = useCallStore.getState().connectedAt;
   if (currentConnectedAt) {
     lastConnectedAt.current = currentConnectedAt;
   }
-  if (status === 'CONNECTED' || (isActive && status !== 'RINGING' && status !== 'INCOMING')) {
+  // Only a call that actually connected gets the rating screen.
+  if (status === 'CONNECTED' || currentConnectedAt) {
     wasConnected.current = true;
   }
+
+  // Tell her why the call screen went away when nobody answered.
+  const lastEventStatus = useCallStore((s) => s.lastEventStatus);
+  const wasRinging = useRef(false);
+  if (isOutgoing && status === 'RINGING') wasRinging.current = true;
+  useEffect(() => {
+    if (status !== 'IDLE' || !wasRinging.current) return;
+    wasRinging.current = false;
+    if (wasConnected.current) return;
+    const who = lastKind.current === 'ride' ? 'Your driver' : 'No nurse';
+    const msg: Record<string, [string, string]> = {
+      TIMEOUT: [lastKind.current === 'ride' ? 'Your driver did not answer' : 'No nurse answered', 'Please try again in a moment.'],
+      REJECTED: [lastKind.current === 'ride' ? 'Your driver declined the call' : 'No nurse could take your call', 'Please try again in a few minutes.'],
+      MISSED: [`${who} could be reached`, 'Please try again in a moment.'],
+      FAILED: ['The call could not be connected', 'Check your connection and try again.'],
+    };
+    const m = lastEventStatus ? msg[lastEventStatus] : undefined;
+    if (m) Toast.show({ type: 'info', text1: m[0], text2: m[1] });
+  }, [status, lastEventStatus]);
 
   useEffect(() => {
     // When the call terminates (status transitions to IDLE) and was previously connected/active, route to rating
@@ -377,6 +436,8 @@ export const CallModals = () => {
       lastCallId.current = null;
       lastNurseName.current = null;
       lastConnectedAt.current = null;
+      // Only nurse sessions are rated; a call with her driver just ends.
+      if (lastKind.current === 'ride') return;
 
       console.log(LOG, 'Call ended, navigating to nurse rating screen for callId:', idToRate);
       router.push({
@@ -478,6 +539,17 @@ export const CallModals = () => {
   }, [isOutgoing, isIncoming, status]);
 
   if (!visible) return null;
+
+  const compact = rideLive && !(isIncoming && !isActive);
+  if (compact && !(isActive && roomToken)) return null; // ringing/connecting: the ride card shows it
+  if (compact && isActive && roomToken && livekitUrl && micGranted && audioSessionReady && !connectTimedOut) {
+    return (
+      <LiveKitRoom serverUrl={livekitUrl} token={roomToken} connect audio video={false}
+        options={{ adaptiveStream: true, dynacast: true }}>
+        <HeadlessCall />
+      </LiveKitRoom>
+    );
+  }
 
   const handleCancel = () => {
     if (callId) hangupCall(callId);
@@ -591,10 +663,11 @@ export const CallModals = () => {
     );
   } else {
     // OUTGOING CALL
+    const who = kind === 'ride' ? 'Your driver' : 'A nurse';
     const label =
-      status === 'ACCEPTED' ? `${remoteParticipant?.name || 'A nurse'} accepted - connecting...` :
+      status === 'ACCEPTED' ? `${remoteParticipant?.name || who} accepted - connecting...` :
       remoteParticipant?.name ? `Calling ${remoteParticipant.name}...` :
-      'Searching for available nurse...';
+      kind === 'ride' ? 'Calling your driver...' : 'Searching for available nurse...';
     content = (
       <View style={styles.container}>
         <RNImage source={require('../assets/images/talk-to-nurse.png')} style={styles.bgImage} resizeMode="cover" />
@@ -603,12 +676,12 @@ export const CallModals = () => {
             <View style={styles.header}>
               <View style={styles.badge}>
                 <Feather name="phone" size={16} color="#FFF" style={{ marginRight: 8 }} />
-                <Text style={styles.badgeText}>Talk to a Nurse</Text>
+                <Text style={styles.badgeText}>{kind === 'ride' ? 'Call Driver' : 'Talk to a Nurse'}</Text>
               </View>
             </View>
             <View style={styles.content}>
               <Text style={styles.outgoingTitle}>{label}</Text>
-              <Text style={styles.subtitle}>Please wait while we connect you with a certified maternal nurse</Text>
+              <Text style={styles.subtitle}>{kind === 'ride' ? 'Please wait while we connect you with your driver' : 'Please wait while we connect you with a certified maternal nurse'}</Text>
             </View>
             <View style={styles.footer}>
               <TouchableOpacity style={styles.cancelBtnFull} onPress={handleCancel}>

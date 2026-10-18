@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 import { CalText } from '../../components/CalText';
@@ -35,6 +36,13 @@ export default function HistoryScreen() {
   const [selectedCall, setSelectedCall] = useState<CallRecord | null>(null);
   
   const { data: calls = [], isLoading } = useCallHistory(50);
+  // Opened from a row on Home: go straight to that call's details.
+  const { callId } = useLocalSearchParams<{ callId?: string }>();
+  useEffect(() => {
+    if (!callId || !calls.length) return;
+    const hit = calls.find((c) => String(c.id) === String(callId));
+    if (hit) setSelectedCall(hit);
+  }, [callId, calls.length]);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -14,6 +14,7 @@ import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { EmergencyContactsProvider } from '../context/EmergencyContactsContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { CallModals } from '../components/CallModals';
+import { RideTrackerHost } from '../components/RideTrackerModal';
 import { useSubscriptionSync } from '../hooks/useSubscription';
 import { useSyncTimezone } from '../hooks/useCheckins';
 
@@ -33,6 +34,7 @@ function ThemedShell() {
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
       </Stack>
+      <RideTrackerHost />
       <CallModals />
       <StatusBar style="auto" />
       <Toast />

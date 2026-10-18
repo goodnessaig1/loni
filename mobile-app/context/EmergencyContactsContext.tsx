@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { emergencyContactsApi, EmergencyContact } from '../api/emergencyContacts';
 import { useAuth } from 'hooks/useAuth';
+import { onPartnerChange } from '../lib/partnerSync';
 // import { useAuth } from './AuthContext';
 
 interface EmergencyContactsContextType {
@@ -79,6 +80,9 @@ export const EmergencyContactsProvider = ({ children }: { children: ReactNode })
   useEffect(() => {
     refreshContacts();
   }, [user]);
+
+  // A partner finished setting up or left: the server tells us live (lib/partnerSync.ts).
+  useEffect(() => onPartnerChange(() => { refreshContacts(); }), [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <EmergencyContactsContext.Provider value={{ contacts, isLoading, error, refreshContacts, removeContact, updateContactPermissions }}>

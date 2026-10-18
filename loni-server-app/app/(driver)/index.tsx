@@ -46,6 +46,7 @@ export default function DriverDashboard() {
   const offers = useRideStore((s) => s.offers);
   const setOffers = useRideStore((s) => s.setOffers);
   const activeRide = useRideStore((s) => s.ride);
+  const setRide = useRideStore((s) => s.setRide);
 
   // Seed online state from the server the first time stats land.
   useEffect(() => {
@@ -62,6 +63,15 @@ export default function DriverDashboard() {
       stats.refetch();
       history.refetch();
       if (isOnline) available.refetch();
+      // Match the server: bring back a trip still in progress (after a restart the store is empty),
+      // and drop one that ended or was reassigned while the app was in the background.
+      ridesApi.active()
+        .then((r) => {
+          const local = useRideStore.getState().ride;
+          if (r && r.driver_id) setRide(r);
+          else if (local && !['COMPLETED', 'IDLE'].includes(local.status)) useRideStore.getState().clear('IDLE');
+        })
+        .catch(() => {});
     }, [isOnline]), // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -156,7 +166,7 @@ export default function DriverDashboard() {
               </View>
             </View>
           </View>
-          <Pressable style={styles.bellBtn}>
+          <Pressable style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
             <Feather name="bell" size={20} color="#111" />
           </Pressable>
         </View>

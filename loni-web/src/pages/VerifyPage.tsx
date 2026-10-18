@@ -1,7 +1,9 @@
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { Eye, EyeOff, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { Link } from 'react-router';
 import { apiRequest } from '../utils/api';
+import { SITE } from '../config/site';
 
 type Phase = 'setup' | 'verify' | 'success';
 
@@ -10,7 +12,10 @@ export default function VerifyPage() {
   const email = searchParams.get('email') || '';
 
   const [phase, setPhase] = useState<Phase>('setup');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,13 +32,21 @@ export default function VerifyPage() {
 
   const handleSetupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== confirm) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (!agreed) {
+      setError('Please accept the Terms of Service and Privacy Policy.');
+      return;
+    }
     setIsLoading(true);
     setError('');
 
     try {
       await apiRequest('/auth/setup-partner', {
         method: 'POST',
-        body: { email, password, phone }
+        body: { email, password, phone, name: name.trim() || undefined }
       });
 
       setPhase('verify');
@@ -149,7 +162,7 @@ export default function VerifyPage() {
           </div>
           <button 
             className="w-full mt-6 bg-[#D62D88] hover:bg-[#B51E71] transition-colors text-white py-4 rounded-xl font-semibold shadow-sm shadow-pink-200"
-            onClick={() => window.location.href = 'https://loni.app'}
+            onClick={() => window.location.href = SITE.downloadHref}
           >
             Download the Loni App
           </button>
@@ -263,6 +276,19 @@ export default function VerifyPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Full Name</label>
+              <input
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoComplete="name"
+                className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#D62D88] focus:border-transparent outline-none transition-all"
+                placeholder="Your full name"
+              />
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Create Password</label>
               <div className="relative">
                 <input
@@ -285,6 +311,19 @@ export default function VerifyPage() {
             </div>
 
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm Password</label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                className="w-full px-4 py-3.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#D62D88] focus:border-transparent outline-none transition-all"
+                placeholder="Re-enter your password"
+                minLength={8}
+              />
+            </div>
+
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone Number</label>
               <input
                 type="tel"
@@ -299,9 +338,23 @@ export default function VerifyPage() {
             </div>
           </div>
 
+          <label className="flex items-start gap-3 text-sm text-gray-600">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[#D62D88]"
+            />
+            <span>
+              I agree to the{' '}
+              <Link to="/terms" className="text-[#D62D88] underline">Terms of Service</Link> and{' '}
+              <Link to="/privacy" className="text-[#D62D88] underline">Privacy Policy</Link>
+            </span>
+          </label>
+
           <button
             type="submit"
-            disabled={isLoading || !email}
+            disabled={isLoading || !email || !agreed}
             className="w-full flex justify-center items-center py-4 px-4 border border-transparent rounded-xl shadow-sm shadow-pink-200 text-base font-semibold text-white bg-[#D62D88] hover:bg-[#B51E71] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#D62D88] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {isLoading ? (

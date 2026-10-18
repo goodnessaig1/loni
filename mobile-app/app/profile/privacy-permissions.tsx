@@ -155,7 +155,7 @@ export default function PrivacyPermissionsScreen() {
 
         {/* Footer text */}
         <HelixaText className="text-[13px] text-center leading-5 px-4 mt-8 mb-10" style={{ color: colors.textSecondary }}>
-          LONI is HIPAA-compliant. Your health information is encrypted and stored securely.
+          Your health information is kept private, sent over encrypted connections and only shared with the people you choose.
         </HelixaText>
 
       </ScrollView>

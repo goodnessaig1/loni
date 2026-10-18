@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useCallStore } from '../store/callStore';
+import { useCallStore, ParticipantInfo } from '../store/callStore';
 import { apiClient } from '../api/client';
 import { startOutgoingCall, reportCallEnded } from '../lib/callKeepService';
 
@@ -24,16 +24,22 @@ export const useCall = () => {
     setOutgoingCall, setConnecting, endCall,
   } = useCallStore();
 
-  const requestCall = useCallback(async (nurseId?: string) => {
+  /**
+   * Start a call. No options rings every online nurse; `nurseId` rings one nurse;
+   * `rideId` calls the other party of her active emergency ride (her driver).
+   */
+  const requestCall = useCallback(async (opts: { nurseId?: string; rideId?: number; remote?: ParticipantInfo | null } = {}) => {
+    // One call at a time: a second tap while ringing must not start another call.
+    if (useCallStore.getState().status !== 'IDLE') return null;
     try {
-      const response = await apiClient.post('/calls/request', { nurse_id: nurseId });
+      const response = await apiClient.post('/calls/request', { nurse_id: opts.nurseId, ride_id: opts.rideId });
       const call = response.data;
-      setOutgoingCall(call.id, call.room_name);
+      setOutgoingCall(call.id, call.room_name, { kind: call.kind ?? 'nurse', rideId: call.ride_id ?? null }, opts.remote ?? null);
       // Native outgoing-call UI (Issue 5): on iOS this gives a real
       // system ringback tone via CallKit for free - no bundled audio file
       // needed there anymore (see app/nurse/connecting.tsx, which now
       // skips its bundled ringback specifically on iOS).
-      try { startOutgoingCall(call.id, 'Nurse'); } catch { /* CallKeep unavailable - in-app UI still works */ }
+      try { startOutgoingCall(call.id, opts.remote?.name || (call.kind === 'ride' ? 'Driver' : 'Nurse')); } catch { /* CallKeep unavailable - in-app UI still works */ }
       return call;
     } catch (error) {
       console.error('Failed to request call', error);

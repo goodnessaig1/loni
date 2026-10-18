@@ -78,6 +78,14 @@ export default function DriverProfile() {
           <Feather name="edit-2" size={16} color="#111" />
           <HelixaText weight="bold" style={styles.editText}>Edit profile</HelixaText>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/settings' as any)}>
+          <Feather name="settings" size={16} color="#111" />
+          <HelixaText weight="bold" style={styles.editText}>Settings</HelixaText>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/support' as any)}>
+          <Feather name="help-circle" size={16} color="#111" />
+          <HelixaText weight="bold" style={styles.editText}>Help & Support</HelixaText>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.signOut} onPress={signOut}>
           <Feather name="log-out" size={16} color={PINK} />

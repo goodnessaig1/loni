@@ -10,15 +10,25 @@ import { useNotifications, useMarkNotificationsRead } from '../../hooks/useNotif
 import { relativeTimeWithClock } from '../../lib/relativeTime';
 import type { PartnerNotification } from '../../api/notifications';
 
+/** Where a notification leads: her updates, her ride, or what she shares. */
+function targetFor(n: PartnerNotification): string | null {
+  const rideId = Number((n.data as any)?.ride_id ?? (n.data as any)?.id);
+  if (n.type === 'pregnancy_update' || n.type === 'partner_stage_changed') return '/partner/pregnancy-updates';
+  if (n.type === 'partner_sharing_changed') return '/(partner)/profile';
+  if (n.type.startsWith('ride_') && rideId) return `/partner/ride/${rideId}`;
+  return null;
+}
+
 function InfoEventCard({ notification }: { notification: PartnerNotification }) {
+  const target = targetFor(notification);
   return (
-    <View style={styles.eventCard}>
+    <Pressable style={styles.eventCard} disabled={!target} onPress={() => target && router.push(target as any)}>
       <CalText style={styles.eventTitle}>{notification.title}</CalText>
       <HelixaText style={styles.eventBody} weight="bold">{notification.body}</HelixaText>
       <HelixaText style={styles.eventTime} weight="bold">
         {relativeTimeWithClock(notification.created_at)}
       </HelixaText>
-    </View>
+    </Pressable>
   );
 }
 

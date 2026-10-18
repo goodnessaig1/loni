@@ -15,6 +15,7 @@ State machine:
 """
 import enum
 from sqlalchemy import (
+    Index,
     Column, String, Integer, Float, Boolean, DateTime, Enum, ForeignKey, JSON, Text
 )
 from sqlalchemy.orm import relationship as sa_relationship
@@ -60,6 +61,7 @@ TERMINAL_STATUSES = (
 
 class Ride(Base):
     __tablename__ = 'rides'
+    __table_args__ = (Index('ix_rides_status_requested', 'status', 'requested_at'),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     rider_id = Column(String(12), ForeignKey('users.id'), index=True, nullable=False)
@@ -128,6 +130,7 @@ class RideEvent(Base):
 
 class RideOffer(Base):
     __tablename__ = 'ride_offers'
+    __table_args__ = (Index('ix_ride_offers_ride_status', 'ride_id', 'status'),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     ride_id = Column(Integer, ForeignKey('rides.id'), index=True, nullable=False)

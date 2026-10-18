@@ -67,7 +67,7 @@ export default function RideRequestSheet() {
     closed.current = true; // we're navigating away deliberately
     try {
       await acceptRideDirect(rideId);
-      router.replace(`/driver/trip/${rideId}`);
+      router.replace(`/driver/overview/${rideId}` as any);
     } catch (e: any) {
       closed.current = false;
       setBusy(null);

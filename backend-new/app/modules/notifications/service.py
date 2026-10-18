@@ -1,3 +1,4 @@
+import asyncio
 import json
 import firebase_admin
 from firebase_admin import messaging
@@ -96,7 +97,9 @@ class NotificationService:
             )
 
         try:
-            response = messaging.send_each_for_multicast(message)
+            # The Firebase SDK call is blocking HTTP; run it on a worker thread so one slow push
+            # never stalls every other request, socket and timer on this process.
+            response = await asyncio.to_thread(messaging.send_each_for_multicast, message)
             print(f"Push response: {response.success_count} messages were sent successfully")
             if response.failure_count > 0:
                 responses = response.responses
@@ -123,6 +126,28 @@ class NotificationService:
         except Exception as e:
             print(f"Error sending push notification via Firebase: {e}")
 
+    # Pushes that keep someone safe or let a call/ride work at all go out whatever the settings say.
+    _ALWAYS = ("call_", "ride_", "account_", "incoming_call")
+
+    @staticmethod
+    async def _user_wants(user_id: str, event_type: Optional[str]) -> bool:
+        """Honour the user's saved notification settings (account module) for optional pushes."""
+        t = event_type or ""
+        try:
+            from app.core.database import AsyncSessionLocal
+            from app.modules.account.models import UserSettings
+            from app.modules.account.service import effective
+            async with AsyncSessionLocal() as db:
+                row = await db.get(UserSettings, user_id)
+            prefs = effective(row.prefs if row else None)
+        except Exception:
+            return True  # settings unavailable: fail open, never drop a push by accident
+        if t == "incoming_call":
+            return prefs["incoming_calls"]
+        if t == "ride_contact_alert" or any(t.startswith(p) for p in NotificationService._ALWAYS):
+            return True
+        return prefs["push"]
+
     @staticmethod
     async def notify_user(user_id: str, title: str, body: str, data: Optional[Dict[str, Any]] = None):
         """
@@ -142,6 +167,9 @@ class NotificationService:
         for other notification types risks App Store rejection / API
         access revocation).
         """
+        if not await NotificationService._user_wants(user_id, (data or {}).get("type")):
+            return
+
         collection = mongo_db.db["devices"]
         cursor = collection.find({"user_id": user_id})
         devices = await cursor.to_list(length=100)

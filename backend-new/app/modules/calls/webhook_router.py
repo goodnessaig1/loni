@@ -9,6 +9,8 @@ from app.core.database import get_db
 from app.core.ws_manager import manager as ws_manager
 from app.modules.calls.models import Call, CallEvent, CallParticipant, CallStatusEnum
 from sqlalchemy.future import select
+import asyncio
+from app.modules.calls.services.call_service import CallService
 
 logger = logging.getLogger("calls.webhook")
 router = APIRouter()
@@ -113,15 +115,18 @@ async def livekit_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             joined_result = await db.execute(joined_stmt)
             joined_count = len(joined_result.scalars().all())
 
-            if joined_count >= 2 and call.status != CallStatusEnum.CONNECTED:
+            if joined_count >= 2 and call.status not in TERMINAL and call.status != CallStatusEnum.CONNECTED:
                 call.status = CallStatusEnum.CONNECTED
-                call.started_at = now  # <-- the call timer's t=0 (Issue 3)
+                # t=0 of the call timer (Issue 3). Set once: a participant rejoining after a drop
+                # must not restart talk time.
+                if call.started_at is None:
+                    call.started_at = now
                 db.add(CallEvent(call_id=call.id, event_type="CallConnected"))
 
                 connected_payload = {
                     "call_id": str(call.id),
                     "status": CallStatusEnum.CONNECTED.value,
-                    "started_at": now.isoformat(),
+                    "started_at": call.started_at.isoformat(),
                 }
                 for uid in (call.caller_id, call.receiver_id):
                     if uid:
@@ -150,6 +155,9 @@ async def livekit_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                         "call_id": str(call.id),
                         "status": CallStatusEnum.RECONNECTING.value,
                     })
+                # If they don't rejoin in time, end the call for both instead of waiting for
+                # LiveKit's empty-room timeout (which never fires while the other side stays in).
+                asyncio.create_task(CallService._reconnect_watchdog(call.id))
 
         elif event_name == "room_finished":
             # Safety net for Issue 14: if a client crashed / lost network

@@ -7,10 +7,7 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
 import { useRouter } from 'expo-router';
-import RideTrackerModal from '../../components/RideTrackerModal';
 import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
-import { useRideStore } from '../../store/rideStore';
-import { useActiveRideSync } from '../../hooks/useRides';
 import { CommunityBubbleIcon } from '../../components/community/CommunityIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { PregnancyCard } from '../../components/home/PregnancyCard';
@@ -27,13 +24,7 @@ export default function HomeTab() {
   const router = useRouter();
   const [isInviteModalVisible, setIsInviteModalVisible] = React.useState(false);
 
-  // The tracker is shown whenever there's a live ride in the store - set by
-  // the request screen, by `ride_*` WebSocket/FCM events, or rehydrated from
-  // the server on launch.
-  const ride = useRideStore((s) => s.ride);
-  const clearRide = useRideStore((s) => s.clear);
-  useActiveRideSync(!!user);
-  const rideActive = !!ride && ride.status !== 'IDLE';
+  // The emergency-ride card is mounted app-wide (components/RideTrackerModal.tsx RideTrackerHost).
 
   const hour = new Date().getHours();
   let greeting = 'Evening';
@@ -49,9 +40,9 @@ export default function HomeTab() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      {rideActive && <RideTrackerModal onClose={() => clearRide('IDLE')} />}
       
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 120 }}>
+      {/* Room at the end so the last card scrolls clear of the floating buttons and the tab bar. */}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 32, paddingBottom: 260 }}>
 
         {/* Header */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 }}>
@@ -149,25 +140,6 @@ export default function HomeTab() {
               />
             </TouchableOpacity>
 
-            {/* My Community: sits just above Add Support Partner, right-aligned and shrink-wrapped to its label */}
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/(tabs)/community')}
-              accessibilityRole="button"
-              accessibilityLabel="My Community"
-              style={{ backgroundColor: '#000', borderWidth: 1, borderColor: isDark ? '#2A2D34' : '#000', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 12, position: 'absolute', bottom: 100, right: 0, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
-              <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>My Community</HelixaText>
-              <CommunityBubbleIcon size={20} />
-            </TouchableOpacity>
-
-            {/* Add Support Partner Button */}
-            <TouchableOpacity 
-              activeOpacity={0.6}
-              onPress={() => setIsInviteModalVisible(true)}
-              style={{ backgroundColor: '#00C300', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 40, left: -16, right: 0, zIndex: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
-              <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>Add Support Partner</HelixaText>
-              <Feather name="plus" size={18} color="#FFF" />
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -180,6 +152,29 @@ export default function HomeTab() {
 
       </ScrollView>
       
+      {/* Always on screen: floats above the tab bar (bottom 40 + height 87) instead of scrolling away. */}
+      <View pointerEvents="box-none" style={{ position: 'absolute', right: 20, bottom: 140, alignItems: 'flex-end', gap: 10, zIndex: 10 }}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => router.push('/(tabs)/community')}
+          accessibilityRole="button"
+          accessibilityLabel="My Community"
+          style={{ backgroundColor: '#000', borderWidth: 1, borderColor: isDark ? '#2A2D34' : '#000', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'center', gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
+          <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>My Community</HelixaText>
+          <CommunityBubbleIcon size={20} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.6}
+          onPress={() => setIsInviteModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Add Support Partner"
+          style={{ backgroundColor: '#00C300', borderRadius: 25, paddingVertical: 14, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', gap: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 5, elevation: 5 }}>
+          <HelixaText weight="bold" style={{ color: '#FFF', fontSize: 14 }}>Add Support Partner</HelixaText>
+          <Feather name="plus" size={18} color="#FFF" />
+        </TouchableOpacity>
+      </View>
+
       <InvitePartnerModal 
         visible={isInviteModalVisible} 
         onClose={() => setIsInviteModalVisible(false)} 

@@ -40,5 +40,7 @@ export async function handleAccountApproved() {
     console.warn('[AccountStatus] refresh after approval failed', e);
   }
 
-  router.replace('/(tabs)');
+  // The approval screen shows the role's "You're ready" copy and then routes by role
+  // (a driver to the driver dashboard, a nurse to the nurse tabs).
+  router.replace('/(auth)/approved' as any);
 }

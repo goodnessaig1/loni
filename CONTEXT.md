@@ -84,7 +84,7 @@ Not in the repo (gitignored): `.env` files, `node_modules`, `dist`, `venv`. `Goo
 
 **Flows**
 - **Register** (`POST /auth/register`): name, email, password, stage fields. A 4-digit **email OTP** is generated (and also printed to the server console in dev) and emailed via Brevo. `verify-email` → verified. "Phone verification" (`add-phone` / `verify-phone`) also uses an **emailed OTP**, there is **no SMS provider**.
-- **Support partner:** a mother adds contacts (`POST /users/emergency-contacts` or `/invite-partner`). The backend creates a `partner` user with an unusable password and emails an invite. The partner completes setup (set password + phone) on the web `/verify?email=…` page or in the server app (`/auth/setup-partner`, `/auth/verify-partner-setup`). A `EmergencyContact` row links them with **per-contact permissions** `location`, `updates`, `emergency` and a `pending → connected` status.
+- **Support partner:** a mother adds contacts (`POST /users/emergency-contacts` or `/invite-partner`). The backend creates a `partner` user with an unusable password and emails an invite. The partner completes setup (set password + phone) on the web `/verify?email=…` page or in the server app (`/auth/setup-partner`, `/auth/verify-partner-setup`). A `EmergencyContact` row links them with **per-contact permissions** `location`, `updates`, `emergency` and a `pending → connected` status. **Sync (2026-10-18 audit, `users/partner_sync.py`):** each side hears the other's changes live (WebSocket), by push, and in its Notification Centre: `partner_connected` / `partner_left` → mother (her partner list and bell refresh); `partner_sharing_changed`, `partner_stage_changed` → partner (all partner screens refetch); `partner_removed` → partner app signs out. Milestone `pregnancy_update`s go out once per (stage, week) via an hourly sweep, on stage change, when she turns updates on, and when the partner opens the dashboard. Both apps refetch on reconnect / foreground. Limitation: one partner account can belong to only one mother.
 - **Nurse onboarding:** role selection → complete profile (hospital, years of experience, documents) → `pending` → review → `active`.
 - **Driver onboarding** (state machine in `driver_training/onboarding.py`): training modules → **aptitude test** (random 10 questions, 3 attempts, pass at 8/10, answers never exposed to the client) → personal info → vehicle info → documents → under review → approved.
 
@@ -103,8 +103,8 @@ backend-new/
   app/modules/<name>/    models.py · schemas.py · router.py · service(s).py   (one folder per feature)
   app/utils/             user_enrichment.py (stage/week/trimester), partner_content.py (week-by-week partner copy), generateId.py
   app/scripts/           seed_admin.py, seed_aptitude_questions.py, migrate_contacts*.py
-  db/migrations/         Alembic (versions/ has 15 revisions)
-  tests/                 435 tests, fakes.py (fake Mongo), triage_cases.py (safety gold set)
+  db/migrations/         Alembic (versions/ has 19 revisions; head b3d5f7a9c102)
+  tests/                 481 tests, fakes.py (fake Mongo), triage_cases.py (safety gold set)
 ```
 Docs: `/docs` (Swagger), `/redoc`, OpenAPI at `/api/v1/openapi.json`.
 
@@ -115,7 +115,7 @@ pip install -r requirements.txt && pip install -r tests/requirements-test.txt
 # create .env (see 5.3), then:
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
-python -m pytest tests -q           # 435 pass
+python -m pytest tests -q           # 481 pass
 ```
 Default `DATABASE_URL` in the local `.env` is local Postgres (`localhost/loni`); a Neon URL is kept commented. **Never run migrations against a shared DB by accident.**
 
@@ -124,11 +124,13 @@ Default `DATABASE_URL` in the local `.env` is local Postgres (`localhost/loni`);
 | --- | --- |
 | Core | `DATABASE_URL`, `SECRET_KEY` (**change the default**), `ACCESS_TOKEN_EXPIRE_MINUTES` (8 days), `FRONTEND_URL`, `PROJECT_NAME` |
 | Email | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` |
+| Scale | `REDIS_URL` (**required with >1 process**), `DB_POOL_SIZE` 20, `DB_MAX_OVERFLOW` 20, `DB_POOL_TIMEOUT` 10, `CALL_RING_MAX_NURSES` 25, `RIDE_MAX_OFFERS_PER_ROUND` 15, `RIDE_DISPATCH_ANYWHERE` (dev only), `DRIVER_LOCATION_PERSIST_SECONDS` 15 / `_METERS` 50, `TIMEOUT_SWEEP_SECONDS` 15, `RATE_LIMITS_ENABLED` |
+| Support | `SUPPORT_EMAIL`, `SUPPORT_PHONE`, `SUPPORT_HOURS` (served to the apps by `GET /account/support`; **phone/hours are placeholders**) |
 | Media | `CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET` |
 | Push | `FIREBASE_SERVICE_ACCOUNT` (JSON string), `APNS_VOIP_AUTH_KEY` (.p8 contents), `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_BUNDLE_ID` (`com.loni.server`), `APNS_USE_SANDBOX` |
 | Mongo | `MONGODB_URI` |
 | LiveKit | `LIVEKIT_URL` (backend→LiveKit, internal), `LIVEKIT_PUBLIC_URL` (wss URL phones use), `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET` |
-| AI | `AI_ENVIRONMENT` (`production`=Abacus, `openai`, `local`=Ollama), `OPENAI_API_KEY`, `ABACUS_API_KEY`, `OLLAMA_BASE_URL`, `AI_TRIAGE_CLASSIFIER` (true), `EMERGENCY_PHONE` ("112") |
+| AI | `AI_PROVIDER` (`gemini` default \| `openai` \| `abacus` \| `ollama`), `AI_MODEL` (optional override), `GEMINI_API_KEY`, `GEMINI_MODEL` (`gemini-3.8-flash`), `GEMINI_REASONING_EFFORT` (`low`), `GEMINI_FAST_MODEL` (`gemini-3.5-flash-lite`), `OPENAI_API_KEY`/`OPENAI_MODEL`, `ABACUS_API_KEY`/`ABACUS_MODEL`, `OLLAMA_BASE_URL`/`OLLAMA_MODEL`, legacy `AI_ENVIRONMENT` (used only if `AI_PROVIDER` is empty), `AI_TRIAGE_CLASSIFIER` (true), `EMERGENCY_PHONE` ("112") |
 | Facility look-up | `FACILITY_LOOKUP_ENABLED` (true), `GOOGLE_MAPS_API_KEY` (Places API enabled), `WEB_SEARCH_API_KEY` (optional Tavily fallback) |
 | Check-ins | `CHECKINS_ENABLED` (**false**), `CHECKIN_TICK_SECONDS` (900), `CHECKIN_DEFAULT_TZ` (Africa/Lagos), `CHECKIN_DEFAULT_HOUR` (9), `CHECKIN_END_HOUR` (20), `CHECKIN_MAX_PER_DAY` (2) |
 | Rides | `RIDE_BASE_FARE` 1500, `RIDE_PER_KM` 200, `RIDE_PER_MIN` 50, `RIDE_MIN_FARE` 2000, `RIDE_SEARCH_RADIUS_KM` 8, `RIDE_SEARCH_RADIUS_MAX_KM` 20, `RIDE_OFFER_TIMEOUT_SECONDS` 120 |
@@ -140,15 +142,16 @@ Prefix for everything: `/api/v1`.
 | Module (prefix) | Purpose | Key endpoints | Tables / stores |
 | --- | --- | --- | --- |
 | **auth** (`/auth`) | Registration, login, OTP, password reset, partner setup | `register`, `login`, `verify-email`, `resend-otp`, `forgot-password`, `reset-password`, `add-phone`, `verify-phone`, `setup-partner`, `verify-partner-setup` | `otps` |
-| **users** (`/users`) | Profile, stage, emergency contacts/partners, notification history, nurse/driver profiles | `GET me`, `PATCH update-profile`, **`PATCH stage`**, `PUT me/password`, `POST/GET emergency-contacts`, `DELETE emergency-contacts/{id}`, `PATCH …/permissions`, `POST invite-partner`, `GET partner-connection`, `GET partner-dashboard`, `GET notifications`, `POST notifications/mark-read`, `POST profile-picture`, `POST upload-document`, `POST profile/nurse`, driver profile steps, `PATCH online-status`, `PATCH profile`, `PATCH nurse-profile` | `users`, `emergency_contacts`, `nurse_profiles`, `driver_profiles` |
-| **calls** (`/calls`) | Mother ↔ nurse voice calls (LiveKit) | `POST request`, `{id}/accept`, `{id}/join`, `{id}/reject`, `{id}/end`, `{id}/rate`, `GET history`, `GET stats`; **WS `/calls/ws`**; LiveKit webhook `POST /livekit/webhook` | `calls`, `call_participants`, `call_events` |
-| **rides** (`/rides`) | Emergency ride dispatch | `POST quote`, `GET hospitals`, `POST request`, `GET active`, `GET history`, driver: `available`, `stats`, `PATCH availability`, `POST location`, `{id}/accept|decline|arrived|start|complete`, rider: `{id}/cancel|rate`, `GET {id}`, `GET {id}/route` | `rides`, `ride_events`, `ride_offers` |
+| **users** (`/users`) | Profile, stage, emergency contacts/partners, notification history, nurse/driver profiles | `GET me`, `PATCH update-profile`, **`PATCH stage`**, `PUT me/password`, `POST/GET emergency-contacts`, `DELETE emergency-contacts/{id}`, `PATCH …/permissions`, `POST invite-partner`, `GET partner-connection`, **`DELETE partner-connection`** (partner stops alerts), `GET partner-dashboard`, **`GET partner-updates`** (week timeline), `GET notifications`, `POST notifications/mark-read`, `POST profile-picture`, `POST upload-document`, `POST profile/nurse`, driver profile steps, `PATCH online-status`, `PATCH profile`, `PATCH nurse-profile` | `users`, `emergency_contacts`, `nurse_profiles`, `driver_profiles` |
+| **calls** (`/calls`) | Mother ↔ nurse voice calls, and mother ↔ driver calls during a ride (LiveKit). `calls.kind` = `nurse` \| `ride`; `POST request {ride_id}` rings the other party of an active ride | `POST request`, `{id}/accept`, `{id}/join`, `{id}/reject`, `{id}/end`, `{id}/rate`, `GET history`, `GET stats` (incl. `today_calls`, `rating_avg`); **WS `/calls/ws`**; LiveKit webhook `POST /livekit/webhook` | `calls`, `call_participants`, `call_events` |
+| **rides** (`/rides`) | Emergency ride dispatch | `POST quote`, `GET hospitals`, `POST request`, `GET active`, `GET history`, driver: `available`, `stats`, `PATCH availability`, `POST location`, `{id}/accept|decline|arrived|start|complete`, rider: `{id}/cancel|rate`, **`{id}/notify-contacts`** (share live trip / arrived safely), `GET {id}`, `GET {id}/route` | `rides`, `ride_events`, `ride_offers` |
 | **driver-training** (`/driver-training`, `/admin/aptitude`) | Driver signup flow + admin question bank | `start`, `onboarding`, `modules`, `modules/complete`, aptitude status/start/submit; admin CRUD + seed + attempts | `aptitude_questions`, `aptitude_attempts`, `driver_training_progress` (content in `seeds/*.json`) |
 | **notifications** (`/notifications`) | Device registration and push | `POST/GET devices`, `POST test` | Mongo `devices`; Postgres `notification_logs` (the Notification Centre) |
 | **ai-chat** (`/ai-chat`) | Loni AI sessions, streaming messages, admin review | sessions CRUD, `POST sessions/{id}/messages` (**SSE stream**), `GET/POST admin/safety-events…` | Mongo `sessions`, `messages`, `ai_safety_events` |
 | **checkins** (`/checkins`) | Proactive daily check-ins + Loni's memory | `GET/PUT preferences`, `GET/DELETE memory`, `POST {id}/opened`, admin `preview` / `run` | `checkin_preferences`, `checkin_logs`, `wellbeing_notes` |
 | **subscriptions** (`/subscriptions`) | LONI Plus trial/cancel/resume | `plans`, `me`, `POST trial`, `cancel`, `resume` | `subscriptions` |
 | **care** (`/care`, LONI Plus only) | Daily care plan, nutrition, weekly report, hospital bag, labour prep | `overview`, `today`, `PUT today/{key}`, `nutrition`, `weekly-report`, `hospital-bag`, `labour-prep[/{slug}]` | `care_task_logs`, `hospital_bag_checks` (content in `care/content.py`) |
+| **account** (`/account`) | Every role: saved notification settings, contact support | `GET/PUT settings`, `GET support` (contact info + subjects), `POST support` (stored + forwarded by email) | `user_settings`, `support_messages` |
 | **community** (`/community`) | Feed, likes, comments, views | `posts`, `images`, `posts/{id}/like`, `…/comments`, `views` | `community_posts`, `community_post_stats`, `community_likes`, `community_comments`, `community_views` |
 | **admin** (`/admin`) | Approve nurses/drivers | `GET users`, `PATCH users/{id}/status` | — |
 | **health** (`/health`) | Liveness + DB check | `GET /` | `health_checks` |
@@ -166,10 +169,10 @@ Prefix for everything: `/api/v1`.
 - Per-call **ring-timeout watchdog** (45 s → MISSED/TIMEOUT) and per-ride **offer-timeout watchdog** (120 s per round, two rounds, then `NO_DRIVERS`), each in its own DB session.
 
 ### 5.7 Voice calls (mother → nurse)
-`POST /calls/request` creates a `Call` (status RINGING, room `room-<uuid>`). If `nurse_id` is set that nurse is rung; otherwise **all online nurses**. States: REQUESTED → RINGING → ACCEPTED → CONNECTING → CONNECTED → ENDED (+ MISSED, REJECTED, CANCELLED, FAILED, TIMEOUT, RECONNECTING). Nurse `accept` → the backend issues LiveKit tokens; both apps `join` the room. State changes are broadcast over WS and mirrored by data-only FCM; iOS can use **PushKit VoIP** (direct to APNs) to wake a killed app. LiveKit webhooks update call status. Details, root causes and fixes of every call bug: `CALL_SYSTEM_AUDIT.md`.
+`POST /calls/request` creates a `Call` (status RINGING, room `room-<uuid>`). If `nurse_id` is set that nurse is rung; otherwise **all online nurses**. States: REQUESTED → RINGING → ACCEPTED → CONNECTING → CONNECTED → ENDED (+ MISSED, REJECTED, CANCELLED, FAILED, TIMEOUT, RECONNECTING). Nurse `accept` → the backend issues LiveKit tokens; both apps `join` the room. Only the person a call was rung to can answer it, and an open (all-nurses) call only by a nurse. **Ride calls:** `POST /calls/request {ride_id}` from the mother or the driver of an active ride rings the other party only; in the mother app the call plays inline in the ride card, in the server app on the full call screen; ride calls are not rated. State changes are broadcast over WS and mirrored by data-only FCM; iOS can use **PushKit VoIP** (direct to APNs) to wake a killed app. LiveKit webhooks update call status. **Rules (2026-10-18 audit):** an open call rings only approved, online nurses not already on a call (none → 409 straight away); who was rung is recorded on the `CallRequested` event, and every one of them is told when the call is answered (`call_accepted` with `taken`), cancelled, missed or timed out; it ends early if all of them decline. One live call per person (a new request replaces her ringing one; 409 while talking; a busy nurse can't accept). A participant who drops out of a connected call has 30 s to rejoin before the call ends for both; reconnecting never resets talk time. Both apps resync from `GET /calls/{id}/state` when the socket reconnects or the app returns to the foreground. Details, root causes and fixes of earlier call bugs: `CALL_SYSTEM_AUDIT.md`.
 
 ### 5.8 Emergency rides
-`quote` (fare + route + ETA, no row) → `request` (mother's pickup lat/lng, destination hospital from Google Places, optional `notify_contacts`). Dispatch finds online, available drivers near pickup (8 km, widening to 20 km), creates `RideOffer`s, **first accept wins**. Ride states: SEARCHING → DRIVER_ASSIGNED → DRIVER_EN_ROUTE → DRIVER_ARRIVED → IN_PROGRESS → COMPLETED (+ CANCELLED, NO_DRIVERS, FAILED). Driver GPS heartbeats stream to the mother and, if she opted in, to connected emergency contacts (`ws_only` for the high-rate location events). Fare = `max(min, base + per_km·km + per_min·min)` rounded up to ₦100; **no payment integration** (fare is a displayed number and recorded driver earnings). Without a Maps key it falls back to straight-line distance.
+`quote` (fare + route + ETA, no row) → `request` (mother's pickup lat/lng, destination hospital from Google Places, optional `notify_contacts`). Dispatch finds online, available drivers near pickup (8 km, widening to 20 km), creates `RideOffer`s, **first accept wins**. Ride states: SEARCHING → DRIVER_ASSIGNED → DRIVER_EN_ROUTE → DRIVER_ARRIVED → IN_PROGRESS → COMPLETED (+ CANCELLED, NO_DRIVERS, FAILED). Driver GPS heartbeats stream to the mother and, if she opted in, to **connected** emergency contacts with `emergency` on; **live location only to contacts with `location` on** (`ws_only` for the high-rate location events). Each heartbeat carries progress (`ride_progress`: `phase`, `remaining_meters`, `eta_seconds`, `near`) which drives "driver getting close" / "almost there". Partners also get `ride_accepted`. `DRIVER_EN_ROUTE` exists in the enum but nothing sets it (progress covers it). **Dispatch rules (2026-10-18 audit):** unanswered offers expire each round (`RIDE_OFFER_TIMEOUT_SECONDS`) and leave those drivers' screens (`ride_taken`); after 3 rounds, or as soon as nobody is left to wait on (e.g. every driver declined), she gets `ride_no_drivers`. Her cancel reaches drivers still viewing the request. If the assigned driver backs out before the trip starts, the ride goes back to SEARCHING without them and is re-offered (`ride_driver_cancelled` to her and her partners); a started trip can't be cancelled. Only approved drivers can accept. The driver app only leaves a trip once the server agrees, and its Home re-checks the stored trip with `GET /rides/active` on focus. Fare = `max(min, base + per_km·km + per_min·min)` rounded up to ₦100; **no payment integration** (fare is a displayed number and recorded driver earnings). Without a Maps key it falls back to straight-line distance.
 
 ### 5.8b LONI Plus subscriptions
 One row per user. Plans (server-side so prices change without an app release): monthly ₦9,900 and annual ₦5,900 (as in the Figma, which looks like a design typo; verify). **7-day free trial, once per user, no card taken.** Access is **computed from dates**, never a stored flag: `trialing | active | cancelled` all grant access until `current_period_end`; then `expired`. Cancelling keeps access to period end; `resume` undoes it. `require_plus` (a FastAPI dependency) gates `/care/*`. **No payment provider is connected**; a provider webhook would set `status='active'` and `current_period_end`.
@@ -181,6 +184,21 @@ Content is curated copy in `care/content.py` (daily tasks by stage: pregnancy / 
 `PATCH /users/stage` (`users/stage.py`) switches trimester / recovery stage / pregnant ↔ postpartum ↔ trying-to-conceive ↔ general. It moves `pregnancy_start_date` (otherwise the live recompute would undo it).
 
 ---
+
+### 5.9 Scaling (2026-10-18)
+**What changed so thousands of calls/rides can run at once:**
+- **Several API processes:** live events go through Redis pub/sub (`core/ws_manager.py`), so a user is reached whichever process holds their socket. Set `REDIS_URL` and run e.g. `uvicorn app.main:app --workers 4` (or several containers behind a load balancer; no sticky sessions needed). Without Redis, run ONE process.
+- **Timeouts survive restarts:** `core/timeouts.py` sweeps every 15 s (one process, Postgres advisory lock) and finishes overdue ringing calls, dropped calls, calls answered but never connected (2 min), and stuck ride searches. The fast in-process timers still fire first.
+- **Pushes never block:** Firebase sends run on a worker thread (they used to freeze the event loop per push).
+- **Bounded fan-out:** an open call rings at most 25 free nurses (least recently busy first); a ride is offered to at most 15 nearest drivers per round, found with a lat/lng box query.
+- **Cheaper GPS:** every ping is streamed live; the DB copy is written at most every 15 s / 50 m; partner lookups for location fan-out are cached 30 s (cleared on sharing changes in that process).
+- **DB:** pool 20+20 per process; indexes for busy checks, rung lists, offers, partner lookups, notifications (migration `b3d5f7a9c102`).
+- **Rate limits (429):** start call 10/min, ride request 5/5 min, quote 30/min, GPS 120/min, AI message 30/min, support 5/h (`core/ratelimit.py`, Redis-backed when set).
+- **LiveKit:** single UDP port mux (`udp_port: 7882`). The old 50000-50050 range capped the whole service at ~25 simultaneous calls.
+
+**Rough capacity:** one API process (async) handles a few thousand open sockets; scale out horizontally with Redis. Postgres: keep `processes × (pool+overflow)` under the server's connection limit or put PgBouncer in front (asyncpg statement cache is already off for it). One LiveKit node (4-8 vCPU) carries roughly 1-2k concurrent audio participants; beyond that run several LiveKit nodes sharing the same Redis (already configured) behind a load balancer, plus TURN capacity.
+
+**Still to do for very large scale:** move the check-in scheduler to a `next_due_at` index; community like counters to sharded/Redis counters; community view buffer and the 30 s contact cache are per process; a proper job queue (e.g. arq/Celery) if timers grow beyond these sweeps; load-test calls/rides with k6 or Locust before launch; monitoring (request latency, WS connections, DB pool wait, push failures).
 
 ## 6. Loni AI in depth (`app/modules/ai_chat`, `app/modules/checkins`)
 
@@ -202,7 +220,7 @@ Loni is for **every woman**. It is warm, human-sounding and a good listener, but
 The stream is **SSE**: `data: {"meta": {...}}` first, then `data: {"content": "..."}` chunks, then `data: [DONE]`.
 
 ### 6.3 LLM providers
-`AI_ENVIRONMENT=production` → Abacus RouteLLM (`deepseek-v4-flash`); `openai` → `gpt-3.5-turbo`; `local` → Ollama `qwen3:8b`. Temperature 0.5. The system prompt (`prompts.py`) covers identity, voice, listening mode, answer structure, safety rules, what LONI can actually do, Nigerian context, women's health, emotional support, newborns, privacy.
+Chosen in `.env` with `AI_PROVIDER` (`app/modules/ai_chat/providers.py`): **`gemini` (default)** via Google's OpenAI-compatible endpoint (`gemini-3.8-flash` for replies, reasoning effort `low`; the urgency classifier uses `GEMINI_FAST_MODEL` = `gemini-3.5-flash-lite`, ~1 s). Reasoning levels differ per model (`minimal` is rejected by 3.8-flash); if a model rejects the level, calls retry without it. **Gemini's free tier allows only ~20 requests/day per model** (3.8-flash), so enable billing on the Google AI Studio project before real use; when quota runs out the chat shows its fallback message, `openai` (`gpt-4o-mini`), `abacus` RouteLLM (`deepseek-v4-flash`), `ollama` local (`qwen3:8b`). Each provider's model can be changed (`GEMINI_MODEL` etc. or `AI_MODEL`). One client per process; the startup log prints the provider/model and warns if its key is missing. Temperature 0.5. The system prompt (`prompts.py`) covers identity, voice, listening mode, answer structure, safety rules, what LONI can actually do, Nigerian context, women's health, emotional support, newborns, privacy.
 
 ### 6.4 Proactive check-ins ("Loni says hello")
 Scheduler → for each woman: **category** (`preg_t1/t2/t3/term`, `pp_early/active/extended`, `women`, `ttc`, `general`) and **care level** (`standard | enhanced | intensive`, raised by recent danger, mental-health flags, worrying answers, or low-mood days) → **guards** (opted out, quiet hours **in her timezone**, already sent today, 2/day cap, too soon for her level, active/chatting today, ride in progress, no device) → **claim** the slot with an `INSERT` into `checkin_logs` (UNIQUE `(user_id, dedupe_key)`; only the inserter sends, so duplicates are impossible) → create an AI chat seeded with the hello + quick replies, a Notification Centre row, and the push. Tapping the notification opens that chat. Follow-ups after urgent/mental-health conversations (20–48 h later). Silent users are eased to weekly after 3 ignored hellos. Hellos can pick up what she said ("how's the headache?"), mark milestones, and vary wording. **Off by default**; use `GET /checkins/admin/preview` first.
@@ -243,7 +261,7 @@ npx tsc --noEmit -p .                    # typecheck;  npm run lint
 | Care (LONI Plus) | `care/today`, `nutrition`, `report`, `hospital-bag`, `labour`, `labour/[slug]` |
 | Subscription | `subscribe/index`, `subscribe/welcome`, `profile/cancel-subscription` |
 | Calls | `nurse/connecting`, `nurse/rating`; in-call UI is `components/CallModals.tsx` (global) |
-| Rides | `ride/request`; tracker `components/RideTrackerModal.tsx` |
+| Rides | `ride/request`; status card `components/RideTrackerModal.tsx` (Figma "ride pill": ~10 stages, inline nurse/driver calls, Share Live Trip, Call Support Partner, Notify Partner; collapsible; mounted app-wide as `RideTrackerHost` in `app/_layout.tsx`) |
 | Profile | `pregnancy-status` (stage picker with confirm), `profile/emergency-contacts`, `profile/privacy-permissions` (+ Loni's Memory controls), `profile/theme`, `notification-settings`, `notifications/index` (real history) |
 | Other | `recovery/index`, `journey`, `+not-found` |
 
@@ -265,9 +283,10 @@ One app, three experiences, chosen by `user_type` (`lib/driverOnboarding.ts::get
 
 | Role | Route group | What they do |
 | --- | --- | --- |
-| **Nurse** | `(tabs)` (home, history, profile) + `incoming-call` | Go online/offline, receive incoming-call requests (full-screen notifee / CallKeep), accept, talk in LiveKit, see call history; edit profile. Onboarding: `role-selection` → `complete-profile-nurse` → `review-profile-nurse` → `verification-progress` (waits for admin approval; reacts to `account_status` over WS/FCM/polling). |
-| **Driver** | `(driver)` (home, history, profile), `driver/request/[id]`, `driver/trip/[id]` (+ `complete`) | Training modules → aptitude test → personal/vehicle/document steps → approval. Then: drag-to-go-online toggle, receive ride offers, accept, navigate (pickup → hospital), complete. `components/driver/DriverRuntime.tsx` owns GPS: foreground streaming while available, background + foreground service on a trip. |
-| **Partner** | `(partner)` (home, profile), `partner/notifications`, `partner/ride/[id]`, `partner/settings`, `partner/shared-location`, `partner/support` | Sees the mother's pregnancy journey by week, "Her Latest Updates" (canned week-in-review copy from `partner_content.py`), emergency alerts with a live map and ride tracking. First login shows `connected`/`whats-shared`. Support phone/email in `lib/support.ts` are **placeholders**. |
+| **All roles (shared)** | `settings`, `change-password`, `support`, `legal/[doc]`, `notifications`, `(auth)/approved` | Saved settings (`/account/settings`), contact support form, in-app Privacy/Terms (`lib/legal.ts`, placeholder wording), approval "You're ready" screen. |
+| **Nurse** | `(tabs)` (home, history, profile) + `incoming-call` + `call-summary` | Go online/offline, receive incoming-call requests (full-screen notifee / CallKeep), accept, talk in LiveKit, see call history; edit profile. Onboarding: `role-selection` → `complete-profile-nurse` → `review-profile-nurse` → `verification-progress` (waits for admin approval; reacts to `account_status` over WS/FCM/polling). |
+| **Driver** | `(driver)` (home, history, profile), `driver/request/[id]`, `driver/trip/[id]` (+ `complete`) | Training modules → aptitude test → personal/vehicle/document steps → approval. Then: drag-to-go-online toggle, receive ride offers, accept → `driver/overview/[id]` (Connecting Route → Trip Overview) → navigate (pickup → hospital), complete. Can call the passenger (`ride_id` call). An active trip is restored from `GET /rides/active` after a restart. `components/driver/DriverRuntime.tsx` owns GPS: foreground streaming while available, background + foreground service on a trip. |
+| **Partner** | `(partner)` (home, profile), `partner/notifications`, `partner/ride/[id]`, `partner/settings`, `partner/shared-location`, `partner/support` | Sees the mother's pregnancy journey by week, "Her Latest Updates" (canned week-in-review copy from `partner_content.py`), emergency alerts with a live map and ride tracking. `partner/pregnancy-updates` (full week timeline), "Stop getting alerts" on Profile (`DELETE /users/partner-connection`), alert detail with driver rating/call, distance and a status timeline. Partners without `location` see the ride but not where she is. First login shows `connected`/`whats-shared`. |
 
 State: zustand `callStore`/`rideStore`, React Query, contexts for auth/notifications/emergency contacts. Libraries under `lib/` mirror the mother app (`callEvents`, `rideEvents`, `partnerEvents`, `accountStatus`, `voipPush`, `driverLocation`…).
 
@@ -325,12 +344,14 @@ React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. De
 - `SECRET_KEY` default is a placeholder; CORS is `*` with credentials; OTPs are 4 digits from `random` (not `secrets`) and are **printed to the console**; phone "verification" is an email OTP (no SMS).
 - `backend-new/.env` historically held a Neon URL with credentials (commented); rotate if it was ever committed or shared. `livekit.yaml` has dev API key/secret and a LAN `node_ip`.
 - Support partners' account password is set later via OTP; invite flow trusts the email owner.
-- The Privacy screen footer says "LONI is HIPAA-compliant" (a claim that has not been verified; HIPAA is a US law, Nigeria's NDPA is the relevant regime). Review privacy/terms/disclaimer copy with counsel.
+- OTPs have no attempt limit (4 digits = brute-forceable): add rate limiting / attempt caps.
+- Review privacy/terms/disclaimer copy with counsel (web + `loni-server-app/lib/legal.ts`). The mother app's unverified "HIPAA-compliant" claim was removed.
 
 **Product**
 - **No payment provider.** Subscriptions are trial-only; "Change payment method" and "Download invoices" show a notice; expired users cannot buy. Annual price (₦5,900) is cheaper than one month (₦9,900): confirm.
 - LONI Plus does not yet gate AI message limits (the design shows a "free messages left" counter; no limit exists).
-- Not built from Figma: "Add your hospitals" screen, extra ride-pill states ("Notifying your support circle", "Almost there"…), Apple Watch quick-reply notification actions (watch mirroring and tap-to-open work).
+- Not built from Figma: "Add your hospitals" screen, Apple Watch quick-reply notification actions (watch mirroring and tap-to-open work). Design checks so far were done from low-resolution overview exports; compare screen by screen against Figma at full size.
+- SMS alerts toggle is shown as "Coming soon" (no SMS provider). Support phone/hours are placeholders (`SUPPORT_PHONE`, `SUPPORT_HOURS`).
 - Check-in scheduler scans all eligible women each tick (fine at thousands; at scale store a `next_due_at`). Likes still write one stats row per post (hot-post contention; see sharded counters / Redis plan). Community view buffer is in-process.
 - No clinician-approved knowledge base for the AI; English-centred triage (Pidgin only partly).
 - Recovery Reminders toggle is local only; several Privacy toggles (location sharing etc.) are not persisted.
@@ -341,7 +362,7 @@ React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. De
 - The mother app and server app **duplicate** a lot of code (call store/hooks/modals, notification context, audio/CallKeep libs). Bugs have had to be fixed twice; consider a shared package.
 - Native call UI (CallKeep) is behind a kill switch after unexplained crashes; see `CALL_SYSTEM_AUDIT.md` for how to resume debugging.
 - The FCM Firebase setup requires the native config files and a service-account JSON on the server.
-- The new AI/care/check-in/subscription work has backend tests (435) and typechecks, but has **not been exercised on physical devices**; verify push, taps, and screens on a real phone before release.
+- The new AI/care/check-in/subscription/ride-call/partner work has backend tests (451) and typechecks, but has **not been exercised on physical devices**; verify push, taps, and screens on a real phone before release.
 - `ft-*` branches and ~80 uncommitted files: decide what to commit and open PRs.
 
 ---
@@ -355,6 +376,8 @@ React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. De
 - **Loni AI:** emergency triage + classifier + fixed safety messages + output validator + prompt rewrite + human-review queue; women's health for everyone (not only pregnancy); memory; live hospital hours/phone look-up with sources; proactive check-ins with follow-up flows; tap-to-chat from notifications.
 
 ---
+
+- **Figma pass (2026-10-18):** ride status card with all states + inline calls; mother↔driver calls (backend `kind`/`ride_id`); answer authorization on calls; contact fan-out respects connected status + location permission; ride progress signal; share-trip / arrived-safely notifications; shared Settings/Support/Change Password/Legal screens + `account` module; nurse call summary, real stats/ratings, approval screen; driver Trip Overview, role-aware Edit Profile, active-trip restore; partner Pregnancy Updates, Stop getting alerts, richer alert detail, live dashboard pin, partner push routing; secure partner setup (password applied only after the emailed code); date-dependent check-in tests fixed.
 
 ## 16. Glossary
 

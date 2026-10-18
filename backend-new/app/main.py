@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -71,11 +72,27 @@ async def startup_db_client():
     start_view_flusher()
     from app.modules.checkins.scheduler import start_checkin_scheduler
     start_checkin_scheduler()
+    from app.modules.ai_chat.providers import describe as describe_ai
+    print(describe_ai())
+    from app.modules.users.partner_sync import start_partner_sweeper
+    start_partner_sweeper()
+    from app.core.timeouts import start_timeout_sweeper
+    start_timeout_sweeper()
+    from app.core.ws_manager import manager as ws_manager
+    await ws_manager.start_relay(settings.REDIS_URL)
+    if not settings.REDIS_URL and int(os.environ.get("WEB_CONCURRENCY", "1")) > 1:
+        print("WARNING: several workers but no REDIS_URL - live events only reach users on the same worker.")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     from app.modules.checkins.scheduler import stop_checkin_scheduler
     await stop_checkin_scheduler()
+    from app.modules.users.partner_sync import stop_partner_sweeper
+    await stop_partner_sweeper()
+    from app.core.timeouts import stop_timeout_sweeper
+    await stop_timeout_sweeper()
+    from app.core.ws_manager import manager as ws_manager
+    await ws_manager.stop_relay()
     from app.modules.community.router import stop_view_flusher
     await stop_view_flusher()
     mongo_db.client.close()

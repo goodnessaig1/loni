@@ -85,9 +85,9 @@ function PregnancyJourneyCard({ status, week }: { status: 'pregnant' | 'newMom' 
           <View style={[styles.journeyDot, { left: `${progress * 100}%` }]}>
             <View style={styles.journeyDotInner} />
           </View>
-          <View style={styles.journeyNextButton}>
+          <Pressable style={styles.journeyNextButton} hitSlop={10} onPress={() => router.push('/partner/pregnancy-updates' as any)}>
             <Feather name="chevron-right" size={12} color="#FFFFFF" />
-          </View>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -129,9 +129,10 @@ export default function PartnerDashboard() {
           <PregnancyJourneyCard status={data.inviter.status} week={data.inviter.week} />
         )}
 
-        {!!data?.active_alert && (() => {
+        {!!data?.active_alert && (data.active_alert.driver_location ?? data.active_alert.pickup) && (() => {
+          // No map when she keeps her location private; the emergency card above still shows.
           const alert = data.active_alert!;
-          const fix = alert.driver_location ?? alert.pickup;
+          const fix = (alert.driver_location ?? alert.pickup)!;
           return (
             <Pressable style={styles.mapCard} onPress={() => router.push('/partner/shared-location' as any)}>
               <Image
@@ -155,7 +156,12 @@ export default function PartnerDashboard() {
 
         {!!data?.updates.length && (
           <View style={styles.updatesSection}>
-            <CalText style={styles.updatesHeading}>Her Latest Updates</CalText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <CalText style={styles.updatesHeading}>Her Latest Updates</CalText>
+              <Pressable hitSlop={8} onPress={() => router.push('/partner/pregnancy-updates' as any)}>
+                <HelixaText weight="bold" style={{ color: '#D62D88', fontSize: 13 }}>See all</HelixaText>
+              </Pressable>
+            </View>
             <View style={styles.updatesGrid}>
               {data.updates.map((u, i) => {
                 const colors = CARD_COLORS[i % CARD_COLORS.length];

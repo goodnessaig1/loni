@@ -22,7 +22,7 @@ export default function VerificationProgressScreen() {
     if (navigatedRef.current) return;
     if (user?.account_status === 'active') {
       navigatedRef.current = true;
-      router.replace('/(tabs)');
+      router.replace('/(auth)/approved' as any);
     }
   }, [user?.account_status]);
 

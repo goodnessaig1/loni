@@ -38,7 +38,22 @@ function wsBaseUrl(): string {
   return API_URL.replace(/^http/, 'ws');
 }
 
+// Coming back to the foreground: reconnect now (not after the backoff) and resync any live call.
+let appStateSub: { remove: () => void } | null = null;
+function watchAppState() {
+  if (appStateSub) return;
+  const { AppState } = require('react-native');
+  appStateSub = AppState.addEventListener('change', (next: string) => {
+    if (next !== 'active' || manuallyClosed) return;
+    reconnectAttempts = 0;
+    connectCallSocket();
+    require('../lib/callSync').reconcileCall();
+    require('../lib/partnerSync').resyncPartners();
+  });
+}
+
 export async function connectCallSocket(): Promise<void> {
+  watchAppState();
   manuallyClosed = false;
 
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
@@ -61,6 +76,9 @@ export async function connectCallSocket(): Promise<void> {
   socket.onopen = () => {
     reconnectAttempts = 0;
     console.log('[CallSocket] connected');
+    // Anything that happened to a live call while we were disconnected.
+    require('../lib/callSync').reconcileCall();
+    require('../lib/partnerSync').resyncPartners();
     topics.forEach((topic) => sendFrame({ type: 'subscribe', topic }));
     if (pingInterval) clearInterval(pingInterval);
     pingInterval = setInterval(() => {
@@ -82,6 +100,10 @@ export async function connectCallSocket(): Promise<void> {
       }
       if (typeof msg.type === 'string' && msg.type.startsWith('ride_')) {
         applyServerRideEvent(msg.type, msg.data);
+        return;
+      }
+      if (typeof msg.type === 'string' && msg.type.startsWith('partner_')) {
+        require('../lib/partnerSync').applyPartnerEvent(msg.type, msg.data);
         return;
       }
       applyServerCallEvent(msg.type, msg.data);

@@ -98,9 +98,9 @@ async def test_memory_off_means_nothing_is_kept_and_forgetting_erases_everything
 
 # ── the next hello picks up where she left off ───────────────────────────────────────────────────────
 
-async def note(session_factory, user_id, days_ago, **kw):
+async def note(session_factory, user_id, days_ago, base=NOW, **kw):
     async with session_factory() as db:
-        db.add(WellbeingNote(user_id=user_id, day=(NOW - timedelta(days=days_ago)).date(), mood=kw.get("mood"),
+        db.add(WellbeingNote(user_id=user_id, day=(base - timedelta(days=days_ago)).date(), mood=kw.get("mood"),
                              symptoms=kw.get("symptoms", []), topics=kw.get("topics", [])))
         await db.commit()
 
@@ -170,7 +170,8 @@ async def talk(user_id, text, status=StatusEnum.general, session="s1"):
 
 async def test_the_ai_is_told_what_she_mentioned_yesterday_and_learns_from_today(make_user, session_factory, chat):
     u = await make_user("Ngozi Eze")
-    await note(session_factory, u.id, 1, mood=2, symptoms=["headache"])
+    # a live chat reads the real clock, so "yesterday" has to be relative to today, not the fixed NOW
+    await note(session_factory, u.id, 1, base=datetime.now(timezone.utc), mood=2, symptoms=["headache"])
     await talk(u.id, "I haven't been sleeping well")
     block = next(m["content"] for m in chat.stream_calls[0] if m["content"].startswith("WHAT SHE HAS TOLD YOU RECENTLY"))
     assert "Yesterday: felt low; mentioned headache" in block and "Today: " in block and "trouble sleeping" in block

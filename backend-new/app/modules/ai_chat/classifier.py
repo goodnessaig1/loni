@@ -58,14 +58,16 @@ def _transcript(history: List[dict], text: str) -> str:
     return "\n".join(lines)
 
 
-async def classify(client, model: str, text: str, stage: StageContext, history: List[dict]) -> Optional[Tuple[Urgency, str]]:
+async def classify(client, model: str, text: str, stage: StageContext, history: List[dict],
+                   max_tokens: int = 40) -> Optional[Tuple[Urgency, str]]:
     stage_line = (f"Profile: pregnant, week {stage.week}" if stage.kind == "pregnancy" and stage.week
                   else "Profile: pregnant" if stage.kind == "pregnancy"
                   else f"Profile: postpartum, baby {stage.week} weeks old" if stage.kind == "postpartum" and stage.week is not None
                   else "Profile: unknown")
     try:
-        resp = await asyncio.wait_for(client.chat.completions.create(
-            model=model, temperature=0, max_tokens=40, stream=False,
+        from app.modules.ai_chat.providers import create_chat
+        resp = await asyncio.wait_for(create_chat(
+            client, model=model, temperature=0, max_tokens=max_tokens, stream=False,
             messages=[{"role": "system", "content": CLASSIFIER_PROMPT},
                       {"role": "user", "content": f"{stage_line}\n\n{_transcript(history, text)}"}],
         ), timeout=TIMEOUT_SECONDS)

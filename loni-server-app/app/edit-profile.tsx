@@ -21,16 +21,22 @@ import { HelixaText } from '../components/HelixaText';
 import { useAuth, useUploadProfilePicture } from '../hooks/useAuth';
 import { apiClient } from '../api/client';
 
-const EditProfileSchema = Yup.object().shape({
+const BaseSchema = {
   name: Yup.string().required('Full Name is required'),
   phone: Yup.string().required('Phone Number is required'),
+  gender: Yup.string().oneOf(['Female', 'Male']).required('Gender is required'),
+};
+// Nurses also keep their professional details here; drivers edit vehicle details through onboarding.
+const NurseSchema = Yup.object().shape({
+  ...BaseSchema,
   hospitalAffiliation: Yup.string().nullable(),
+  licenseNumber: Yup.string().required('License number is required'),
   yearsOfExperience: Yup.number()
     .typeError('Must be a number')
     .min(0, 'Cannot be negative')
     .required('Years of Experience is required'),
-  gender: Yup.string().oneOf(['Female', 'Male']).required('Gender is required'),
 });
+const BasicSchema = Yup.object().shape(BaseSchema);
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -38,6 +44,7 @@ export default function EditProfileScreen() {
   const uploadMutation = useUploadProfilePicture();
 
   const nurseProfile = (user as any)?.nurse_profile;
+  const isNurse = user?.user_type === 'nurse';
   const licenseNumber = nurseProfile?.verification_documents?.licenseNumber || '';
 
   const handlePickImage = async () => {
@@ -105,22 +112,26 @@ export default function EditProfileScreen() {
           hospitalAffiliation: nurseProfile?.hospital_affiliation || '',
           yearsOfExperience: nurseProfile?.years_of_experience?.toString() || '',
           gender: (user as any)?.gender || 'Female',
+          licenseNumber,
         }}
-        validationSchema={EditProfileSchema}
+        validationSchema={isNurse ? NurseSchema : BasicSchema}
         onSubmit={async (values, { setSubmitting }) => {
           try {
-            // 1. Update general profile (gender)
-            if (values.gender !== (user as any)?.gender) {
-              await apiClient.patch('/users/profile', { gender: values.gender });
+            if (isNurse) {
+              if (values.gender !== (user as any)?.gender) {
+                await apiClient.patch('/users/profile', { gender: values.gender });
+              }
+              await apiClient.patch('/users/nurse-profile', {
+                name: values.name,
+                phone: values.phone,
+                hospital_affiliation: values.hospitalAffiliation,
+                years_of_experience: parseInt(values.yearsOfExperience) || 0,
+                license_number: values.licenseNumber,
+              });
+            } else {
+              // Drivers and partners: the general profile endpoint (nurse-profile is nurses only).
+              await apiClient.patch('/users/profile', { name: values.name, phone: values.phone, gender: values.gender });
             }
-
-            // 2. Update nurse profile (name, phone, hospital, years)
-            await apiClient.patch('/users/nurse-profile', {
-              name: values.name,
-              phone: values.phone,
-              hospital_affiliation: values.hospitalAffiliation,
-              years_of_experience: parseInt(values.yearsOfExperience) || 0,
-            });
 
             await refreshUser();
 
@@ -259,6 +270,8 @@ export default function EditProfileScreen() {
                 )}
               </View>
 
+              {isNurse && (
+              <>
               <View style={styles.formGroup}>
                 <HelixaText style={styles.label}>Hospital Affiliation</HelixaText>
                 <TextInput
@@ -277,12 +290,17 @@ export default function EditProfileScreen() {
               <View style={styles.formGroup}>
                 <HelixaText style={styles.label}>Nursing License Number *</HelixaText>
                 <TextInput
-                  style={[styles.input, styles.inputDisabled]}
-                  value={licenseNumber || '—'}
-                  editable={false}
+                  style={[styles.input, touched.licenseNumber && errors.licenseNumber ? styles.inputError : null]}
+                  value={values.licenseNumber}
+                  onChangeText={handleChange('licenseNumber')}
+                  onBlur={handleBlur('licenseNumber')}
+                  autoCapitalize="characters"
                   placeholder="e.g. RN-2024-08742"
                   placeholderTextColor="#9CA3AF"
                 />
+                {touched.licenseNumber && errors.licenseNumber && (
+                  <HelixaText style={styles.errorText}>{errors.licenseNumber as string}</HelixaText>
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -303,6 +321,8 @@ export default function EditProfileScreen() {
                   <HelixaText style={styles.errorText}>{errors.yearsOfExperience as string}</HelixaText>
                 )}
               </View>
+              </>
+              )}
             </ScrollView>
 
             {/* Footer / Save Button */}

@@ -49,6 +49,9 @@ export const ridesApi = {
   active: async (): Promise<Ride | null> => (await apiClient.get('/rides/active')).data ?? null,
   cancel: async (rideId: number, reason?: string): Promise<Ride> =>
     (await apiClient.post(`/rides/${rideId}/cancel`, { reason })).data,
+  /** 'share' = share the live trip with her support partners; 'arrived' = tell them she arrived safely */
+  notifyContacts: async (rideId: number, kind: 'share' | 'arrived'): Promise<{ message: string; data: { notified: number } }> =>
+    (await apiClient.post(`/rides/${rideId}/notify-contacts`, { kind })).data,
   rate: async (rideId: number, rating: number, feedback?: string) =>
     (await apiClient.post(`/rides/${rideId}/rate`, { rating, feedback })).data,
   history: async (limit = 20): Promise<any[]> => {

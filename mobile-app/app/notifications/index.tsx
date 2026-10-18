@@ -69,6 +69,7 @@ export default function NotificationsScreen() {
   const onPressItem = (n: AppNotification) => {
     if (n.type === 'checkin') openFromPush({ type: 'checkin', session_id: n.data?.session_id, checkin_id: n.data?.checkin_id });
     else if (n.type.startsWith('community')) router.push('/(tabs)/community');
+    else if (n.type.startsWith('partner_')) router.push('/profile/emergency-contacts' as any);
   };
 
   const items = activeTab === 'Recent' ? recent : earlier;

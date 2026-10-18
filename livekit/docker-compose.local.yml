@@ -1,0 +1,6 @@
+# Local development override: the host already runs Redis on 6379 (used by the backend's
+# REDIS_URL), so LiveKit's own Redis stays inside Docker instead of publishing that port.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d livekit redis
+services:
+  redis:
+    ports: !reset []

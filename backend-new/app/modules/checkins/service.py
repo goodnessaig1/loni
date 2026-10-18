@@ -180,11 +180,10 @@ def _chip_payload(chips) -> List[dict]:
 
 
 async def _deliver(db, mongo, user: User, log_id: int, *, template: content.Template, chips, category: str, level: str, kind: str,
-                   stage_week: Optional[int], symptom: Optional[str] = None) -> bool:
+                   stage_week: Optional[int], now: datetime, symptom: Optional[str] = None) -> bool:
     """Create the AI conversation that opens when she taps, the Notification Centre row, and the push."""
     title, body = content.render(template, first_name(user.name), stage_week, symptom)
     session_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
     try:
         await mongo["sessions"].insert_one({
             "id": session_id, "user_id": user.id, "title": "Loni check-in", "created_at": now, "updated_at": now,
@@ -278,7 +277,7 @@ async def run_cycle(session_factory, mongo, now: Optional[datetime] = None, *, d
                     report.duplicates += 1
                     continue
                 ok = await _deliver(db, mongo, user, log_id, template=template, chips=content.CHIPS, category=category,
-                                    level=decision.level, kind="daily", stage_week=stage.week, symptom=symptom)
+                                    level=decision.level, kind="daily", stage_week=stage.week, now=now, symptom=symptom)
                 report.sent += int(ok)
                 report.failed += int(not ok)
     return report
@@ -341,7 +340,7 @@ async def run_followups(session_factory, mongo, now: Optional[datetime] = None, 
                 report.duplicates += 1
                 continue
             ok = await _deliver(db, mongo, user, log_id, template=template, chips=chips, category=category, level=decision.level,
-                                kind="followup", stage_week=stage.week)
+                                kind="followup", stage_week=stage.week, now=now)
             report.sent += int(ok)
             report.failed += int(not ok)
     return report

@@ -14,10 +14,12 @@ import { useRouter } from 'expo-router';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { useAuth } from '../../hooks/useAuth';
+import { useCallStats } from '../../hooks/useCallHistory';
 
 export default function ProfileScreen() {
   const { user, logoutUser } = useAuth();
   const router = useRouter();
+  const { data: stats } = useCallStats();
 
   const nurseProfile = (user as any)?.nurse_profile;
   const firstName = user?.name ? user.name.split(' ')[0] : 'Nurse';
@@ -61,7 +63,7 @@ export default function ProfileScreen() {
               style={styles.avatar}
             />
             <View style={styles.profileInfo}>
-              <HelixaText style={styles.profileName} weight="bold">{firstName}</HelixaText>
+              <HelixaText style={styles.profileName} weight="bold">{user?.name || firstName}</HelixaText>
               <View style={styles.profileSubRow}>
                 <HelixaText style={styles.profileRole}>Nurse</HelixaText>
                 <HelixaText style={styles.dot}> • </HelixaText>
@@ -80,7 +82,7 @@ export default function ProfileScreen() {
             <View style={styles.statItem}>
               <View style={styles.ratingRow}>
                 <MaterialCommunityIcons name="star" size={16} color="#F59E0B" />
-                <HelixaText style={styles.statValue} weight="bold">4.9</HelixaText>
+                <HelixaText style={styles.statValue} weight="bold">{stats?.rating_avg != null ? stats.rating_avg.toFixed(1) : '—'}</HelixaText>
               </View>
               <HelixaText style={styles.statLabel}>Rating</HelixaText>
             </View>
@@ -88,7 +90,7 @@ export default function ProfileScreen() {
             <View style={styles.statSeparator} />
 
             <View style={styles.statItem}>
-              <HelixaText style={styles.statValue} weight="bold">342</HelixaText>
+              <HelixaText style={styles.statValue} weight="bold">{stats?.total_calls ?? 0}</HelixaText>
               <HelixaText style={styles.statLabel}>Calls</HelixaText>
             </View>
 
@@ -118,7 +120,7 @@ export default function ProfileScreen() {
 
         {/* Settings + Support */}
         <View style={styles.groupCard}>
-          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7} onPress={() => router.push('/settings' as any)}>
             <Feather name="settings" size={20} color="#111827" style={styles.menuIcon} />
             <HelixaText style={styles.menuLabel} weight="bold">Settings</HelixaText>
             <View style={[styles.chevronBox, styles.chevronRight]}>
@@ -128,7 +130,7 @@ export default function ProfileScreen() {
 
           <View style={styles.groupDivider} />
 
-          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.groupMenuRow} activeOpacity={0.7} onPress={() => router.push('/support' as any)}>
             <Feather name="help-circle" size={20} color="#111827" style={styles.menuIcon} />
             <HelixaText style={styles.menuLabel} weight="bold">Support</HelixaText>
             <View style={[styles.chevronBox, styles.chevronRight]}>

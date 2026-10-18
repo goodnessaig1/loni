@@ -1,7 +1,7 @@
 import uuid
 import asyncio
 from datetime import datetime, timezone
-from openai import AsyncOpenAI
+from app.modules.ai_chat.providers import create_chat, get_provider
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.mongo_db import get_mongo_db
@@ -14,9 +14,6 @@ from app.modules.ai_chat.prompts import (
     build_system_prompt,
 )
 from app.modules.ai_chat.triage import ANSWER_PATTERNS, StageContext, TriageResult, Urgency, triage
-
-# Default model configuration
-DEFAULT_MODEL = "gpt-3.5-turbo"
 
 async def generate_and_update_title(session_id: str, user_id: str, content: str, client, model: str):
     try:
@@ -104,11 +101,9 @@ async def _record_safety_event(db, user_id: str, session_id: str, result: Triage
 
 
 def _client_and_model():
-    if settings.AI_ENVIRONMENT == "local":
-        return AsyncOpenAI(base_url=settings.OLLAMA_BASE_URL, api_key="ollama"), "qwen3:8b"
-    if settings.AI_ENVIRONMENT == "openai":
-        return AsyncOpenAI(api_key=settings.OPENAI_API_KEY), DEFAULT_MODEL
-    return AsyncOpenAI(base_url="https://routellm.abacus.ai/v1", api_key=settings.ABACUS_API_KEY), "deepseek-v4-flash"
+    """The configured LLM (AI_PROVIDER in .env; Gemini by default) - see providers.py."""
+    p = get_provider()
+    return p.client, p.model
 
 
 async def _learn_and_recall(user_id: str, text: str) -> list:
@@ -154,7 +149,9 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
     #     raise urgency and fails open (rules only) if it is slow or broken.
     if settings.AI_TRIAGE_CLASSIFIER and result.urgency != Urgency.emergency:
         recent = (await get_session_messages(session_id))[-5:]
-        result = classifier.merge(result, await classifier.classify(client, model, content, stage, recent), content)
+        result = classifier.merge(result, await classifier.classify(
+            client, get_provider().classifier_model, content, stage, recent,
+            max_tokens=get_provider().short_max_tokens), content)
     meta = _meta(result)
     yield _sse({"meta": meta})
 
@@ -207,7 +204,7 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
 
     # 6. Stream the model
     try:
-        response = await client.chat.completions.create(model=model, messages=openai_messages, temperature=0.5, stream=True)
+        response = await create_chat(client, model=model, messages=openai_messages, temperature=0.5, stream=True)
         model_text = ""
         async for chunk in response:
             delta = chunk.choices[0].delta.content if chunk.choices else None

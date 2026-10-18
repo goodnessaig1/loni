@@ -93,3 +93,4 @@ class UpdateNurseProfileRequest(BaseModel):
     phone: Optional[str] = None
     hospital_affiliation: Optional[str] = None
     years_of_experience: Optional[int] = None
+    license_number: Optional[str] = None

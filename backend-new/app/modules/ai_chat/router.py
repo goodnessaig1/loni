@@ -6,6 +6,7 @@ from typing import Optional
 from app.api.deps import get_admin_user, get_current_user
 from pydantic import BaseModel, Field
 from app.modules.ai_chat import schemas, service
+from app.core.ratelimit import limit
 
 router = APIRouter()
 
@@ -67,7 +68,7 @@ async def update_session_title(
         raise HTTPException(status_code=404, detail="Session not found")
     return {"success": True, "message": "Session updated"}
 
-@router.post("/sessions/{session_id}/messages")
+@router.post("/sessions/{session_id}/messages", dependencies=[Depends(limit("ai.message", 30, 60, "You're sending messages very quickly. Please wait a moment."))])
 async def send_message(
     session_id: str,
     data: schemas.ChatMessageRequest,
