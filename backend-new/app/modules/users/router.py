@@ -36,6 +36,7 @@ from app.core.ws_manager import manager as ws_manager
 from app.utils.user_enrichment import enrich_user_data, calculate_pregnancy_start_date
 from app.utils.partner_content import get_latest_updates, get_timeline
 from app.modules.users import partner_sync
+from app.core.ratelimit import limit, hit as rate_hit
 
 router = APIRouter()
 
@@ -537,6 +538,8 @@ async def remove_emergency_contact(
     partner_user = contact.contact_user
     partner_email = partner_user.email if partner_user else None
     partner_name = partner_user.name if partner_user else "Partner"
+    # Revoking an invite nobody accepted yet: no "you were removed" email to someone who never joined.
+    was_connected = contact.status == EmergencyContactStatus.connected
 
     # Their app is told first (live + push) so it signs out instead of failing on a deleted account.
     if partner_user and partner_user.user_type.value == "partner":
@@ -553,14 +556,44 @@ async def remove_emergency_contact(
 
     await db.commit()
 
-    # 4. Dispatch emails
+    # 4. Dispatch emails (only for a partner who had actually joined)
     inviter_name = current_user.name if current_user.name else "A Loni User"
-    if current_user.email:
-        background_tasks.add_task(send_partner_removal_user_email, current_user.email, partner_name)
-    if partner_email:
-        background_tasks.add_task(send_partner_removal_partner_email, partner_email, inviter_name)
+    if was_connected:
+        if current_user.email:
+            background_tasks.add_task(send_partner_removal_user_email, current_user.email, partner_name)
+        if partner_email:
+            background_tasks.add_task(send_partner_removal_partner_email, partner_email, inviter_name)
 
-    return {"success": True, "message": "Contact removed successfully"}
+    return {"success": True, "message": "Contact removed successfully" if was_connected else "Invite revoked"}
+
+
+DEFAULT_INVITE_MESSAGE = ("I'm using LONI for pregnancy and recovery support. I'd love for you to join my support "
+                          "circle so we can stay connected during important moments 💜")
+
+
+@router.post("/emergency-contacts/{contact_id}/resend-invite", response_model=StandardResponse,
+             dependencies=[Depends(limit("partners.resend", 10, 3600, "You've resent several invites. Please try again later."))])
+async def resend_partner_invite(
+    contact_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send the invite email again to a support partner who hasn't set up their account yet."""
+    contact = (await db.execute(
+        select(EmergencyContact).where(EmergencyContact.id == contact_id, EmergencyContact.user_id == current_user.id)
+        .options(selectinload(EmergencyContact.contact_user))
+    )).scalars().first()
+    if not contact or not contact.contact_user:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    if contact.status == EmergencyContactStatus.connected:
+        raise HTTPException(status_code=409, detail="They have already accepted your invite.")
+    # At most one resend per minute for the same person, so a double tap doesn't send two emails.
+    if not await rate_hit(f"partners.resend.contact:{contact.id}", 1, 60):
+        raise HTTPException(status_code=429, detail="Invite just sent. Please wait a minute before sending again.")
+    background_tasks.add_task(send_partner_invite_email, contact.contact_user.email,
+                              current_user.name or "A Loni User", DEFAULT_INVITE_MESSAGE)
+    return {"success": True, "message": f"Invite sent again to {contact.contact_user.email}"}
 
 @router.patch("/emergency-contacts/{contact_id}/permissions", response_model=StandardResponse)
 async def update_emergency_contact_permissions(

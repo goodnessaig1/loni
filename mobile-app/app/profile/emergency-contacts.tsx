@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { Reveal, RevealList } from '../../components/motion';
+import { PressableScale, Reveal, RevealList } from '../../components/motion';
 
-const { width } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -18,7 +17,10 @@ import Toast from 'react-native-toast-message';
 
 import { CustomSwitch } from '../../components/CustomSwitch';
 import { ActionModal } from '../../components/ActionModal';
+import { emergencyContactsApi } from '../../api/emergencyContacts';
 import { useTheme } from '../../context/ThemeContext';
+
+const { width } = Dimensions.get('window');
 
 export default function EmergencyContactsScreen() {
   const router = useRouter();
@@ -26,6 +28,26 @@ export default function EmergencyContactsScreen() {
   const { contacts, isLoading, removeContact, refreshContacts, updateContactPermissions } = useEmergencyContacts();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
+  // A pending invite she tapped on: offer to resend or revoke it.
+  const [manageId, setManageId] = useState<number | null>(null);
+  const [isResending, setIsResending] = useState(false);
+  const managed = contacts.find((c) => c.id === manageId) ?? null;
+  const removing = contacts.find((c) => c.id === removeIndex) ?? null;
+  const removingPending = removing?.status === 'pending';
+
+  const handleResend = async () => {
+    if (manageId === null) return;
+    setIsResending(true);
+    try {
+      const res = await emergencyContactsApi.resendInvite(manageId);
+      Toast.show({ type: 'success', text1: 'Invite sent again', text2: res.message });
+      setManageId(null);
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Could not resend', text2: e?.response?.data?.message || 'Please try again.' });
+    } finally {
+      setIsResending(false);
+    }
+  };
   const [isDeleting, setIsDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -45,6 +67,7 @@ export default function EmergencyContactsScreen() {
     try {
       setIsDeleting(true);
       await removeContact(removeIndex);
+      if (removingPending) Toast.show({ type: 'success', text1: 'Invite revoked' });
       setRemoveIndex(null);
     } catch (error) {
       console.error(error);
@@ -173,6 +196,12 @@ export default function EmergencyContactsScreen() {
 
             return (
               <RevealList key={contact.id} index={i + 3}>
+              <PressableScale
+                disabled={!isPending}
+                onPress={() => setManageId(contact.id)}
+                accessibilityRole={isPending ? 'button' : undefined}
+                accessibilityLabel={isPending ? `Pending invite for ${contact.name}. Resend or revoke` : undefined}
+                scaleTo={0.98}>
               <View
                 className="w-full rounded-[24px] p-5 mb-4 overflow-hidden"
                 style={isPending ? { backgroundColor: colors.surface } : undefined}
@@ -225,6 +254,9 @@ export default function EmergencyContactsScreen() {
                     <HelixaText className="text-[14px]" style={{ color: isDark ? '#FCA5A5' : '#9A1316' }}>
                       Waiting for them to accept your invite.
                     </HelixaText>
+                    <HelixaText className="text-[12px] mt-1" style={{ color: isDark ? '#FCA5A5' : '#9A1316', opacity: 0.8 }}>
+                      Tap to resend or revoke the invite.
+                    </HelixaText>
                   </View>
                 ) : (
                   <View className="mt-5 relative z-10">
@@ -266,6 +298,7 @@ export default function EmergencyContactsScreen() {
                   </View>
                 )}
               </View>
+              </PressableScale>
               </RevealList>
             );
           })
@@ -278,14 +311,40 @@ export default function EmergencyContactsScreen() {
       <ActionModal
         visible={removeIndex !== null}
         onClose={() => !isDeleting && setRemoveIndex(null)}
-        title="Remove Contact?"
-        description="They will no longer be able to see your updates or receive emergency alerts."
+        title={removingPending ? 'Revoke Invite?' : 'Remove Contact?'}
+        description={removingPending
+          ? `${removing?.name ?? 'They'} won't be able to join your support circle with this invite. You can invite them again any time.`
+          : 'They will no longer be able to see your updates or receive emergency alerts.'}
         icon={<Image source={require('../../assets/images/iconn.png')} style={{ width: 120, height: 120 }} contentFit="contain" />}
-        primaryButtonText="Remove Contact"
+        primaryButtonText={removingPending ? 'Revoke Invite' : 'Remove Contact'}
         onPrimaryPress={handleRemoveContact}
         isPrimaryLoading={isDeleting}
-        secondaryButtonText="Keep Contact"
+        secondaryButtonText={removingPending ? 'Keep Invite' : 'Keep Contact'}
         onSecondaryPress={() => setRemoveIndex(null)}
+      />
+
+      {/* Pending invite: resend the email, or revoke it (which asks to confirm above). */}
+      <ActionModal
+        visible={manageId !== null}
+        onClose={() => !isResending && setManageId(null)}
+        title="Invite Pending"
+        description={managed ? `${managed.name} hasn't accepted yet. Send the invite to ${managed.email} again, or revoke it.` : ''}
+        icon={
+          <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#FDF0F7', alignItems: 'center', justifyContent: 'center' }}>
+            <Feather name="mail" size={40} color="#D62D88" />
+          </View>
+        }
+        primaryButtonText="Resend Invite"
+        onPrimaryPress={handleResend}
+        isPrimaryLoading={isResending}
+        secondaryButtonText="Revoke Invite"
+        secondaryButtonTextColor="#B91C1C"
+        onSecondaryPress={() => {
+          const id = manageId;
+          setManageId(null);
+          // iOS can't present a modal while another is still closing: open the confirm after it's gone.
+          setTimeout(() => setRemoveIndex(id), 350);
+        }}
       />
 
     </SafeAreaView>
