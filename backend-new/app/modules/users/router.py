@@ -13,8 +13,9 @@ from app.core.security import verify_password, get_password_hash
 from app.modules.users.schemas import (
     UpdateContactPermissions, ChangePasswordRequest,
     ToggleOnlineRequest, UpdateNurseProfileRequest, UpdateUserProfileRequest,
-    DriverPersonalInfoRequest, DriverVehicleInfoRequest, DriverDocumentsRequest
+    DriverPersonalInfoRequest, DriverVehicleInfoRequest, DriverDocumentsRequest, UpdateStageRequest
 )
+from app.modules.users.stage import apply_stage
 from app.modules.driver_training.onboarding import build_status, require_step
 from app.core.database import get_db
 from app.api.deps import get_current_user
@@ -74,6 +75,23 @@ async def update_profile(
     db.add(current_user)
     await db.commit()
     return {"success": True, "message": "Profile updated successfully"}
+
+@router.patch("/stage", response_model=StandardResponse)
+async def update_stage(
+    data: UpdateStageRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change trimester / recovery stage, or switch between pregnancy and postpartum. Returns the fresh user."""
+    if current_user.user_type not in (None, UserTypeEnum.user):
+        raise HTTPException(status_code=403, detail="Only mothers have a stage")
+    if data.status is None and data.trimester is None and data.recovery_stage is None:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    apply_stage(current_user, data.status, data.trimester, data.recovery_stage)
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+    return {"success": True, "message": "Stage updated", "data": {"user": enrich_user_data(current_user)}}
 
 @router.put("/me/password", response_model=StandardResponse)
 async def change_password(

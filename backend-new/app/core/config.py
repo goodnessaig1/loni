@@ -86,6 +86,26 @@ class Settings(BaseSettings):
     ABACUS_API_KEY: str = ""
     AI_ENVIRONMENT: str = "production" # "production" or "local"
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
+    # Number the app dials for "Call emergency services". Nigeria's national emergency number is 112, but it
+    # must be confirmed and set per deployment, never assumed by the AI.
+    EMERGENCY_PHONE: str = "112"
+    # A second, narrow model call that can only RAISE the urgency found by the keyword rules (never lower it).
+    AI_TRIAGE_CLASSIFIER: bool = True
+
+    # --- Proactive wellness check-ins ("hello" from Loni) ---
+    # OFF by default so a dev/staging database with real device tokens never messages anyone by accident.
+    CHECKINS_ENABLED: bool = False
+    CHECKIN_TICK_SECONDS: int = 900            # how often the scheduler looks for mothers who are due
+    CHECKIN_DEFAULT_TZ: str = "Africa/Lagos"   # until the app reports the phone's timezone
+    CHECKIN_DEFAULT_HOUR: int = 9              # local hour she is first eligible
+    CHECKIN_END_HOUR: int = 20                 # never send at or after this local hour (quiet hours)
+    CHECKIN_MAX_PER_DAY: int = 2               # hard cap on all proactive messages per local day
+
+    # --- Live look-up of hospital hours / phone numbers for the AI ---
+    # Uses Google Places (GOOGLE_MAPS_API_KEY, already used for rides). WEB_SEARCH_API_KEY (Tavily) is an optional fallback
+    # for places Google does not list. With neither key the AI says it cannot check, instead of guessing.
+    FACILITY_LOOKUP_ENABLED: bool = True
+    WEB_SEARCH_API_KEY: Optional[str] = None
 
     # --- Emergency ride dispatch (drivers) ---
     # Server-side Google Maps key used for Directions, Places (nearest

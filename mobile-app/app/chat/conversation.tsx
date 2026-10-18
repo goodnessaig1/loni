@@ -7,9 +7,13 @@ import { HelixaText } from '../../components/HelixaText';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LumaIcon } from '../../components/icons/LumaIcon';
+import { SafetyActions } from '../../components/chat/SafetyActions';
+import { QuickReplies } from '../../components/chat/QuickReplies';
+import { chatTopicsFor } from '../../lib/chatTopics';
 import { useAIChat } from '../../hooks/useAIChat';
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../hooks/useAuth';
 
 // --- Helper Components ---
 
@@ -119,6 +123,8 @@ const TypingIndicator = () => {
 
 export default function ConversationScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const firstName = user?.name?.trim().split(/\s+/)[0];
   const { colors, isDark } = useTheme();
   const { optionTitle, existingSessionId } = useLocalSearchParams<{ optionTitle: string, existingSessionId: string }>();
   const flatListRef = useRef<FlatList>(null);
@@ -219,7 +225,13 @@ export default function ConversationScreen() {
           <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full items-center justify-center shadow-sm" style={{ backgroundColor: colors.elevated }}>
             <LumaIcon size={24} />
           </View>
-          <View className="rounded-[24px] rounded-bl-none px-5 py-4 shadow-sm max-w-[80%]" style={{ backgroundColor: colors.elevated }}>
+          <View
+            className="rounded-[24px] rounded-bl-none px-5 py-4 shadow-sm max-w-[80%]"
+            style={{
+              backgroundColor: colors.elevated,
+              ...(msg.meta?.urgency === 'emergency' ? { borderWidth: 1.5, borderColor: '#DC2626' } : msg.meta?.urgency === 'urgent' ? { borderWidth: 1.5, borderColor: '#D97706' } : null),
+            }}
+          >
             {msg.isStreaming && !msg.content ? (
               <TypingIndicator />
             ) : (
@@ -239,6 +251,10 @@ export default function ConversationScreen() {
                 {msg.content}
               </Markdown>
             )}
+            {!msg.isStreaming || msg.content ? <SafetyActions meta={msg.meta} /> : null}
+            {index === 0 && !isLoading && msg.meta?.suggestions?.length ? (
+              <QuickReplies suggestions={msg.meta.suggestions} onReply={(text) => sendMessage(text)} onNurse={() => router.push('/nurse/connecting')} />
+            ) : null}
           </View>
         </View>
       );
@@ -297,11 +313,11 @@ export default function ConversationScreen() {
                 resizeMode="contain" 
               />
               <HelixaText className="text-[24px] text-center mt-6 mb-12" weight="regular" style={{ lineHeight: 32 }}>
-                Hey there, What are you{'\n'}looking for today?
+                Hey {firstName || 'there'}, What are you{'\n'}looking for today?
               </HelixaText>
               
               <View className="flex-row flex-wrap justify-between w-full">
-                {['Pregnancy Support ?', 'Recovery Support ?', 'Emotional Support ?', 'Emergency Guidance ?'].map((option, idx) => (
+                {chatTopicsFor(user?.status).map((t) => t.title).map((option, idx) => (
                   <TouchableOpacity 
                     key={idx}
                     onPress={async () => {

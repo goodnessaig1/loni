@@ -5,11 +5,22 @@ import EventSource from 'react-native-sse';
 
 export type MessageRole = 'user' | 'assistant';
 
+/** What the server decided about this reply (from its safety triage). Shown as warning strips and buttons. */
+export interface ChatMeta {
+  urgency: 'emergency' | 'urgent' | 'routine' | 'educational';
+  domain?: string;
+  answer_type?: string;
+  /** Tap-to-reply buttons on a check-in message (the server writes them). `action: 'talk_to_nurse'` opens a call instead of sending text. */
+  suggestions?: { key: string; label: string; message: string | null; action?: string | null }[];
+  actions: { type: 'request_ride' | 'talk_to_nurse' | 'call_emergency' | 'invite_partner'; label: string; route?: string; phone?: string }[];
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
   isStreaming?: boolean;
+  meta?: ChatMeta;
 }
 
 export function useAIChat() {
@@ -130,8 +141,18 @@ export function useAIChat() {
             }
             
             const parsedData = JSON.parse(event.data);
+
+            // The first event of a reply is the server's safety decision (urgency + which buttons to show).
+            if (parsedData.meta) {
+              setMessages(prev => prev.map(msg =>
+                msg.id === assistantMsgId ? { ...msg, meta: parsedData.meta as ChatMeta } : msg
+              ));
+              return;
+            }
+
             const chunk = parsedData.content;
-            
+            if (typeof chunk !== 'string') return;
+
             // Append chunk to the assistant's message
             setMessages(prev => prev.map(msg => {
               if (msg.id === assistantMsgId) {

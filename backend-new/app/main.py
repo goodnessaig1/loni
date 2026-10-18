@@ -69,9 +69,13 @@ async def startup_db_client():
 
     from app.modules.community.router import start_view_flusher
     start_view_flusher()
+    from app.modules.checkins.scheduler import start_checkin_scheduler
+    start_checkin_scheduler()
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    from app.modules.checkins.scheduler import stop_checkin_scheduler
+    await stop_checkin_scheduler()
     from app.modules.community.router import stop_view_flusher
     await stop_view_flusher()
     mongo_db.client.close()

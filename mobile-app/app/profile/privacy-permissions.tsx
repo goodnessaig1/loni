@@ -6,12 +6,26 @@ import { HelixaText } from '../../components/HelixaText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CustomSwitch } from '../../components/CustomSwitch';
 import { useTheme } from '../../context/ThemeContext';
+import Toast from 'react-native-toast-message';
+import { checkinsApi } from '../../api/checkins';
+import { useCheckinPreferences } from '../../hooks/useCheckins';
+import { queryClient } from '../../lib/queryClient';
 import { ChangePasswordModal } from '../../components/profile/ChangePasswordModal';
 
 export default function PrivacyPermissionsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const [isPasswordModalVisible, setIsPasswordModalVisible] = useState(false);
+  const { prefs, update: updatePrefs } = useCheckinPreferences();
+  const forgetAll = async () => {
+    try {
+      await checkinsApi.forget();
+      queryClient.invalidateQueries({ queryKey: ['checkins'] });
+      Toast.show({ type: 'success', text1: 'Done', text2: 'Loni has forgotten what you shared.' });
+    } catch (e: any) {
+      Toast.show({ type: 'error', text1: 'Could not clear it', text2: e?.response?.data?.message || e?.message });
+    }
+  };
   
   const [toggles, setToggles] = useState({
     location: false,
@@ -73,6 +87,26 @@ export default function PrivacyPermissionsScreen() {
           {renderToggleItem('Partner Visibility', 'Allow partner to see your updates', toggles.partnerVisibility, () => toggleSwitch('partnerVisibility'))}
           {renderToggleItem('Emergency-Only Tracking', 'Share location only during emergencies', toggles.emergencyTracking, () => toggleSwitch('emergencyTracking'))}
           {renderToggleItem('Recovery Visibility', 'Share recovery progress with care team', toggles.recoveryVisibility, () => toggleSwitch('recoveryVisibility'), true)}
+        </View>
+
+        {/* What Loni remembers */}
+        <HelixaText className="mt-6 text-[16px] mb-4">Loni&apos;s Memory</HelixaText>
+        <View className="flex flex-col gap-3 p-4 rounded-[12px] overflow-hidden" style={{ backgroundColor: colors.surface }}>
+          {renderToggleItem(
+            'Remember my day',
+            'Loni keeps short notes (like "headache" or "felt low", never your words) so chats feel continuous',
+            prefs?.remember ?? true,
+            () => updatePrefs.mutate({ remember: !(prefs?.remember ?? true) }),
+          )}
+          <TouchableOpacity activeOpacity={0.6} onPress={forgetAll} className="flex-row justify-between items-center p-4 rounded-[14px]" style={{ backgroundColor: colors.elevated }}>
+            <View className="flex-1 pr-4">
+              <HelixaText className="text-[15px] mb-1">Clear what Loni remembers</HelixaText>
+              <HelixaText className="text-[13px] leading-4" style={{ color: colors.textSecondary }}>Erase every note straight away</HelixaText>
+            </View>
+            <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: colors.surface }}>
+              <Feather name="trash-2" size={16} color={colors.text} />
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* App Permissions */}

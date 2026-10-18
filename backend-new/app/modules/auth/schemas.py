@@ -5,6 +5,8 @@ from enum import Enum
 class StatusEnum(str, Enum):
     pregnant = "pregnant"
     newMom = "newMom"
+    ttc = "ttc"
+    general = "general"
 
 class GenderEnum(str, Enum):
     Male = "Male"

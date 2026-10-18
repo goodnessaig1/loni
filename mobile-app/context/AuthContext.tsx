@@ -1,13 +1,15 @@
 import React, { createContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient } from '../api/client';
+import { queryClient } from '../lib/queryClient';
 
 export type User = {
   id: string;
   name: string;
   email: string;
   phone?: string;
-  status: 'pregnant' | 'newMom';
+  /** pregnant, a new mom, trying to conceive, or just here for her general health. */
+  status: 'pregnant' | 'newMom' | 'ttc' | 'general';
   trimester?: string;
   pregnancyWeek?: string;
   pregnancyStartDate?: string;
@@ -24,6 +26,8 @@ type AuthContextType = {
   loginUser: (token: string, user: User) => Promise<void>;
   logoutUser: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  /** Replace the cached user with a fresh copy a mutation already returned (no extra round trip). */
+  updateUser: (user: User) => void;
 };
 
 export const AuthContext = createContext<AuthContextType>({
@@ -32,6 +36,7 @@ export const AuthContext = createContext<AuthContextType>({
   loginUser: async () => {},
   logoutUser: async () => {},
   refreshUser: async () => {},
+  updateUser: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -64,6 +69,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logoutUser = async () => {
     await SecureStore.deleteItemAsync('userToken');
+    // Cached subscription / care / community data belongs to the account that just left.
+    queryClient.clear();
     setUser(null);
   };
 
@@ -72,7 +79,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, loginUser, logoutUser, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, loginUser, logoutUser, refreshUser, updateUser: setUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -22,6 +22,9 @@ import app.modules.driver_training.models
 import app.modules.rides.models
 import app.modules.notifications.models
 import app.modules.community.models
+import app.modules.subscriptions.models
+import app.modules.care.models
+import app.modules.checkins.models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

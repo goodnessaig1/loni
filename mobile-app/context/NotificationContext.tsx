@@ -1,4 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
+import { openFromPush, PushData } from '../lib/checkinLinks';
+import { queryClient } from '../lib/queryClient';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
@@ -20,6 +23,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [pushToken, setPushToken] = useState<string | null>(null);
 
   const { user } = useContext(AuthContext);
+  const userRef = useRef(user);
+  const pendingOpen = useRef<PushData>(undefined);
+  useEffect(() => {
+    userRef.current = user;
+    if (user && pendingOpen.current) {
+      const data = pendingOpen.current;
+      pendingOpen.current = undefined;
+      openFromPush(data);
+    }
+  }, [user]);
 
   useEffect(() => {
     // Native outgoing-call UI (Issue 5) - see lib/callKeepService.ts.
@@ -46,8 +59,32 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
      * foreground push and the WebSocket apply identical logic.
      */
     const importMessaging = require('@react-native-firebase/messaging').default;
-    const unsubscribeFirebase = importMessaging().onMessage(async (remoteMessage: any) => {
+    const messaging = importMessaging();
+
+    // Tapping a notification (app in background, or launching the app from it) opens what it points at.
+    const handleOpen = (remoteMessage: any) => {
+      const data: PushData = remoteMessage?.data;
+      if (data?.type !== 'checkin') return;
+      if (userRef.current) openFromPush(data);
+      else pendingOpen.current = data;   // cold start: wait until she is signed in
+    };
+    const unsubscribeOpened = messaging.onNotificationOpenedApp(handleOpen);
+    messaging.getInitialNotification().then(handleOpen).catch(() => {});
+
+    const unsubscribeFirebase = messaging.onMessage(async (remoteMessage: any) => {
       const data = remoteMessage.data;
+      if (data?.type === 'checkin') {
+        // App is open: a quiet in-app banner instead of a system alert. Tap it to open the conversation.
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        Toast.show({
+          type: 'info',
+          text1: data.title || remoteMessage.notification?.title || 'Loni',
+          text2: data.body || remoteMessage.notification?.body || '',
+          visibilityTime: 8000,
+          onPress: () => { Toast.hide(); openFromPush(data); },
+        });
+        return;
+      }
       if (typeof data?.type === 'string' && data.type.startsWith('ride_')) {
         applyServerRideEvent(data.type, data);
         return;
@@ -65,6 +102,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     return () => {
       unsubscribeFirebase();
+      unsubscribeOpened();
     };
   }, []);
 

@@ -10,8 +10,9 @@ import { SupportPartnersCard } from '../../components/profile/SupportPartnersCar
 import { ProfileSection } from '../../components/profile/ProfileSection';
 import { ProfileMenuItem } from '../../components/profile/ProfileMenuItem';
 import { InvitePartnerModal } from '../../components/profile/InvitePartnerModal';
-import { ActionModal } from '../../components/ActionModal';
-import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { CancelPrompt } from '../../components/subscription/CancelPrompt';
+import { useSubscription } from '../../hooks/useSubscription';
+import { shortDate } from '../../lib/format';
 import { useRouter } from 'expo-router';
 import { HelixaText } from '../../components/HelixaText';
 import { useTheme } from '../../context/ThemeContext';
@@ -28,8 +29,15 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCancelSubVisible, setIsCancelSubVisible] = useState(false);
-  const [cancelStep, setCancelStep] = useState<1 | 2>(1);
-  const [isCanceling, setIsCanceling] = useState(false);
+  const { subscription, hasAccess } = useSubscription();
+
+  const onCancelSubscription = () => {
+    if (!hasAccess) return router.push('/subscribe');
+    if (subscription?.state === 'cancelled') {
+      return Toast.show({ type: 'info', text1: 'Already cancelled', text2: `Your access runs until ${shortDate(subscription.access_ends_at)}.` });
+    }
+    setIsCancelSubVisible(true);
+  };
 
   const firstName = user?.name ? user.name.split(' ')[0] : 'User';
   let statusText = '';
@@ -113,14 +121,14 @@ export default function ProfileScreen() {
           <SupportPartnersCard onPress={() => setIsModalVisible(true)} />
 
           <ProfileSection>
-            <ProfileMenuItem icon="heart" title="Pregnancy Status" onPress={() => router.push('/pregnancy-status')} />
+            <ProfileMenuItem icon="heart" title={user?.status === 'general' || user?.status === 'ttc' ? 'My Journey' : 'Pregnancy Status'} onPress={() => router.push('/pregnancy-status')} />
             <ProfileMenuItem icon="users" title="Emergency Contacts" onPress={() => router.push('/profile/emergency-contacts')} isLast />
           </ProfileSection>
 
           <ProfileSection>
             <ProfileMenuItem icon="moon" title={`${themeLabel} Theme`} onPress={() => router.push('/profile/theme')} />
             <ProfileMenuItem icon="bell" title="Notification Settings" onPress={() => router.push('/notification-settings')} />
-            <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={() => { setCancelStep(1); setIsCancelSubVisible(true); }} />
+            <ProfileMenuItem icon="x-circle" title="Cancel Subscription" onPress={onCancelSubscription} />
             <ProfileMenuItem icon="shield" title="Privacy & Permissions" onPress={() => router.push('/profile/privacy-permissions')} isLast />
           </ProfileSection>
 
@@ -133,59 +141,11 @@ export default function ProfileScreen() {
 
       <InvitePartnerModal visible={isModalVisible} onClose={() => setIsModalVisible(false)} />
       
-      <ActionModal
+      <CancelPrompt
         visible={isCancelSubVisible}
         onClose={() => setIsCancelSubVisible(false)}
-        title={cancelStep === 1 ? "Cancel Subscription?" : "Before you go..."}
-        description={cancelStep === 1 
-          ? "Your premium access will continue until the end of your billing period. You can resubscribe anytime."
-          : "Here is what you will miss without LoniPlus:"}
-        primaryButtonText={cancelStep === 1 ? "Continue to Cancel" : "I Understand, Cancel"}
-        onPrimaryPress={() => {
-          if (cancelStep === 1) {
-            setCancelStep(2);
-          } else {
-            setIsCancelSubVisible(false);
-            setCancelStep(1);
-            router.push('/profile/cancel-subscription');
-          }
-        }}
-        isPrimaryLoading={isCanceling}
-        secondaryButtonText="Keep Subscription"
-        onSecondaryPress={() => { setIsCancelSubVisible(false); setCancelStep(1); }}
-        icon={
-          cancelStep === 1 ? (
-             <Image 
-                source={require('../../assets/images/iconn.png')} 
-                style={{ width: 120, height: 120 }} 
-                contentFit="contain" 
-              />
-          ) : (
-             <View className="w-24 h-24 bg-[#D62D88] rounded-[32px] items-center justify-center shadow-md shadow-pink-200">
-               <MaterialCommunityIcons name="robot-outline" size={56} color="#FFF" />
-             </View>
-          )
-        }
-      >
-        {cancelStep === 2 && (
-          <View className="w-full pl-2 pr-4">
-            {[
-              'Unlimited nurse calls',
-              'Unlimited emergency rides',
-              'Request your preferred nurse',
-              'Faster ride dispatch',
-              'Enhanced recovery plans'
-            ].map((feature, idx) => (
-              <View key={idx} className="flex-row items-center mb-4">
-                <View className="w-5 h-5 rounded-full items-center justify-center mr-3" style={{ backgroundColor: colors.divider }}>
-                  <Feather name="check" size={12} color={colors.textSecondary} />
-                </View>
-                <HelixaText className="text-[15px]" style={{ color: colors.textSecondary }}>{feature}</HelixaText>
-              </View>
-            ))}
-          </View>
-        )}
-      </ActionModal>
+        onContinue={() => { setIsCancelSubVisible(false); router.push('/profile/cancel-subscription'); }}
+      />
     </SafeAreaView>
   );
 }

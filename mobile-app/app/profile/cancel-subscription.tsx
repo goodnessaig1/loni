@@ -2,43 +2,65 @@ import React, { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, TextInput, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { HelixaText } from '../../components/HelixaText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
+import Toast from 'react-native-toast-message';
+import { CancelReason } from '../../api/subscription';
+import { useCancelSubscription, useResumeSubscription, useSubscription } from '../../hooks/useSubscription';
+import { longDate, planName } from '../../lib/format';
 
 const { width } = Dimensions.get('window');
 
-const REASONS = [
-  'Too expensive',
-  'Not using it enough',
-  'Found an alternative',
-  'Temporary break',
-  'Other'
+const REASONS: { id: CancelReason; label: string }[] = [
+  { id: 'too_expensive', label: 'Too expensive' },
+  { id: 'not_using_enough', label: 'Not using it enough' },
+  { id: 'found_alternative', label: 'Found an alternative' },
+  { id: 'temporary_break', label: 'Temporary break' },
+  { id: 'other', label: 'Other' },
 ];
 
 export default function CancelSubscriptionScreen() {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedReason, setSelectedReason] = useState<string | null>(null);
+  const [selectedReason, setSelectedReason] = useState<CancelReason | null>(null);
   const [otherReason, setOtherReason] = useState('');
-  const [isCanceling, setIsCanceling] = useState(false);
+  const { subscription: sub, hasAccess, isLoading } = useSubscription();
+  const cancel = useCancelSubscription();
+  const resume = useResumeSubscription();
+  const isCanceling = cancel.isPending;
+  const endDate = longDate(sub?.access_ends_at);
 
   const handleNext = () => {
     if (step === 1) {
       if (!selectedReason) return;
-      if (selectedReason === 'Other' && !otherReason.trim()) return;
+      if (selectedReason === 'other' && !otherReason.trim()) return;
       setStep(2);
-    } else if (step === 2) {
-      setIsCanceling(true);
-      // Simulate API call
-      setTimeout(() => {
-        setIsCanceling(false);
-        setStep(3);
-      }, 1500);
+    } else if (step === 2 && selectedReason) {
+      cancel.mutate(
+        { reason: selectedReason, note: selectedReason === 'other' ? otherReason.trim() : undefined },
+        {
+          onSuccess: () => setStep(3),
+          onError: (e: any) =>
+            Toast.show({ type: 'error', text1: 'Could not cancel', text2: e?.response?.data?.message || e?.message }),
+        },
+      );
     }
   };
+
+  const onReschedule = () =>
+    resume.mutate(undefined, {
+      onSuccess: () => router.replace('/(tabs)/upgrade'),
+      onError: (e: any) =>
+        Toast.show({ type: 'error', text1: 'Could not resume', text2: e?.response?.data?.message || e?.message }),
+    });
+
+  // Nothing to cancel: a free user who deep-linked here, or a subscription that already ended.
+  if (!isLoading && !hasAccess && step !== 3) {
+    return <Redirect href="/subscribe" />;
+  }
 
   const renderHeader = (title: string, showBack = true) => (
     <View className="flex-row items-center justify-center py-4 mb-4 relative">
@@ -81,21 +103,21 @@ export default function CancelSubscriptionScreen() {
             </HelixaText>
 
             <View className="flex flex-col gap-3 rounded-[12px] p-4 mb-8" style={{ backgroundColor: colors.surface }}>
-              {REASONS.map((reason, index) => (
+              {REASONS.map((reason) => (
                 <TouchableOpacity
-                  key={reason}
+                  key={reason.id}
                   className="flex-row items-center justify-between p-4 rounded-[14px] border"
-                  style={{ backgroundColor: colors.elevated, borderColor: selectedReason === reason ? '#D62D88' : 'transparent' }}
-                  onPress={() => setSelectedReason(reason)}
+                  style={{ backgroundColor: colors.elevated, borderColor: selectedReason === reason.id ? '#D62D88' : 'transparent' }}
+                  onPress={() => setSelectedReason(reason.id)}
                 >
-                  <HelixaText className="text-[15px]">{reason}</HelixaText>
+                  <HelixaText className="text-[15px]">{reason.label}</HelixaText>
                   <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: colors.surface }}>
                     <Feather name="arrow-right" size={16} color={colors.text} />
                   </View>
                 </TouchableOpacity>
               ))}
 
-              {selectedReason === 'Other' && (
+              {selectedReason === 'other' && (
                 <View className="mt-2 mb-2 px-2">
                   <TextInput
                     className="rounded-[16px] p-4 text-[15px] min-h-[100px] border"
@@ -119,7 +141,7 @@ export default function CancelSubscriptionScreen() {
               className="w-full py-4 rounded-full items-center mb-6"
               style={{ backgroundColor: selectedReason ? (isDark ? '#D62D88' : '#000') : (isDark ? '#3A3D44' : '#D1D5DB') }}
               onPress={handleNext}
-              disabled={!selectedReason || (selectedReason === 'Other' && !otherReason.trim())}
+              disabled={!selectedReason || (selectedReason === 'other' && !otherReason.trim())}
             >
               <HelixaText className="text-white text-[16px]" weight="bold">Next</HelixaText>
             </TouchableOpacity>
@@ -151,7 +173,7 @@ export default function CancelSubscriptionScreen() {
 
             <View className="mb-12">
               {[
-                'Your premium access continues until June 3, 2026',
+                `Your premium access continues until ${endDate}`,
                 'Emergency SOS and basic chat stay free',
                 'You can resubscribe anytime with one tap'
               ].map((item, idx) => (
@@ -210,7 +232,7 @@ export default function CancelSubscriptionScreen() {
               Subscription Cancelled
             </HelixaText>
             <HelixaText className="text-[15px] text-gray-500 text-center mb-10 leading-6 px-4">
-              Your premium access will continue until June 3, 2026. After that, your account will switch to the free plan.
+              Your premium access will continue until {endDate}. After that, your account will switch to the free plan.
             </HelixaText>
 
             <View style={{ height: 96, borderRadius: 24, marginBottom: 48, overflow: 'hidden', position: 'relative', backgroundColor: colors.surface }}>
@@ -221,21 +243,22 @@ export default function CancelSubscriptionScreen() {
                 contentPosition="right"
               />
               <View style={{ flex: 1, justifyContent: 'flex-start', paddingLeft: 24, zIndex: 10 }}>
-                <HelixaText className="text-[15px] mb-1 pt-7" weight="bold">LoniPlus Monthly</HelixaText>
-                <HelixaText className="text-[13px] text-gray-500">Ends June 3, 2026</HelixaText>
+                <HelixaText className="text-[15px] mb-1 pt-7" weight="bold">{planName(sub?.plan)}</HelixaText>
+                <HelixaText className="text-[13px] text-gray-500">Ends {endDate}</HelixaText>
               </View>
             </View>
 
             <TouchableOpacity 
               className="w-full bg-[#D62D88] py-4 rounded-full items-center mb-4"
-              onPress={() => router.replace('/(tabs)/profile')}
+              onPress={onReschedule}
+              disabled={resume.isPending}
             >
-              <HelixaText className="text-white text-[16px]" weight="bold">Reschedule Now</HelixaText>
+              <HelixaText className="text-white text-[16px]" weight="bold">{resume.isPending ? 'Resuming...' : 'Reschedule Now'}</HelixaText>
             </TouchableOpacity>
 
             <TouchableOpacity 
               className="w-full py-4 items-center mb-6"
-              onPress={() => router.replace('/(tabs)/index')}
+              onPress={() => router.replace('/(tabs)')}
             >
               <HelixaText className="text-gray-500 text-[16px]" weight="bold">Back to home</HelixaText>
             </TouchableOpacity>

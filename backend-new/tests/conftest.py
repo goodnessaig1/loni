@@ -14,6 +14,9 @@ from app.modules.users.models import User
 
 import app.modules.auth.models  # noqa: F401  (register every table on Base.metadata)
 import app.modules.calls.models  # noqa: F401
+import app.modules.care.models  # noqa: F401
+import app.modules.checkins.models  # noqa: F401
+import app.modules.subscriptions.models  # noqa: F401
 import app.modules.community.models  # noqa: F401
 import app.modules.driver_training.models  # noqa: F401
 import app.modules.health.models  # noqa: F401
@@ -86,3 +89,10 @@ async def client_for(session_factory):
     for c in clients:
         await c.aclose()
     fastapi_app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def as_user(client_for):
+    async def _as(user: User):
+        return await client_for(user)
+    return _as

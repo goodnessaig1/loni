@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../components/HelixaText';
 import Svg, { Path, G, Defs, Rect, ClipPath } from 'react-native-svg';
 import { useTheme } from '../context/ThemeContext';
+import { useCheckinPreferences } from '../hooks/useCheckins';
 
 const CustomSwitch = ({ value, onValueChange, disabled }: { value: boolean, onValueChange: (v: boolean) => void, disabled?: boolean }) => {
   const { isDark } = useTheme();
@@ -46,7 +47,9 @@ export default function NotificationSettingsScreen() {
   const { colors } = useTheme();
   const [emergencyAlerts, setEmergencyAlerts] = useState(true);
   const [recoveryReminders, setRecoveryReminders] = useState(false);
-  const [wellnessCheckins, setWellnessCheckins] = useState(true);
+  // Persisted on the server: it is the switch the daily check-in scheduler obeys.
+  const { prefs, update: updatePrefs } = useCheckinPreferences();
+  const wellnessCheckins = prefs?.enabled ?? true;
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }}>
@@ -123,12 +126,12 @@ export default function NotificationSettingsScreen() {
               </View>
               <View className="flex-1 pr-4">
                 <HelixaText className="text-[15px] mb-1" weight="bold">Wellness Check-ins</HelixaText>
-                <HelixaText className="text-[13px]" style={{ color: colors.textSecondary }}>Daily mood and symptom prompts</HelixaText>
+                <HelixaText className="text-[13px]" style={{ color: colors.textSecondary }}>A friendly hello from Loni every few days</HelixaText>
               </View>
             </View>
             <CustomSwitch
               value={wellnessCheckins}
-              onValueChange={setWellnessCheckins}
+              onValueChange={(enabled) => updatePrefs.mutate({ enabled })}
             />
           </View>
         </View>

@@ -12,6 +12,8 @@ class AccountStatusEnum(str, enum.Enum):
 class StatusEnum(str, enum.Enum):
     pregnant = 'pregnant'
     newMom = 'newMom'
+    ttc = 'ttc'            # trying to conceive
+    general = 'general'    # women's health in general (not pregnant, not postpartum)
 
 class GenderEnum(str, enum.Enum):
     Male = 'Male'

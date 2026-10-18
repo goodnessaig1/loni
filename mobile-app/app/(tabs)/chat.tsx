@@ -5,37 +5,25 @@ import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../../components/HelixaText';
 import { useRouter, Tabs } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../hooks/useAuth';
+import { chatTopicsFor } from '../../lib/chatTopics';
 
 const { width } = Dimensions.get('window');
 
-const SUPPORT_OPTIONS = [
-  {
-    id: 1,
-    title: 'Pregnancy Support ?',
-    image: require('../../assets/images/pregnancy-support.png'),
-  },
-  {
-    id: 2,
-    title: 'Recovery Support ?',
-    image: require('../../assets/images/recovery-support.png'),
-  },
-  {
-    id: 3,
-    title: 'Emotional Support ?',
-    image: require('../../assets/images/emotional-support.png'),
-  },
-  {
-    id: 4,
-    title: 'Emergency Guidance ?',
-    image: require('../../assets/images/emergency-support.png'),
-  },
-];
+const IMAGES = {
+  pregnancy: require('../../assets/images/pregnancy-support.png'),
+  recovery: require('../../assets/images/recovery-support.png'),
+  emotional: require('../../assets/images/emotional-support.png'),
+  emergency: require('../../assets/images/emergency-support.png'),
+} as const;
 
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect } from 'expo-router';
 
 export default function ChatScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const SUPPORT_OPTIONS = React.useMemo(() => chatTopicsFor(user?.status).map((t) => ({ ...t, image: IMAGES[t.image] })), [user?.status]);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const bounceValue = useRef(new Animated.Value(0)).current;

@@ -16,7 +16,10 @@ const SIZE_BY_WEEK: Record<number, string> = {
 
 export const babySize = (week: number): string => SIZE_BY_WEEK[Math.min(Math.max(week, 4), 40)];
 
-export const trimesterOf = (week: number): 1 | 2 | 3 => (week <= 13 ? 1 : week <= 27 ? 2 : 3);
+export const trimesterOf = (week: number): 1 | 2 | 3 => (week <= 12 ? 1 : week <= 27 ? 2 : 3);
+
+export const recoveryStageOf = (week: number): 'early' | 'active' | 'extended' =>
+  week <= 6 ? 'early' : week <= 12 ? 'active' : 'extended';
 
 const parseNumber = (raw?: string | null): number | null => {
   if (raw == null) return null;
@@ -35,6 +38,9 @@ export interface PregnancyProgress {
 /** Derives progress from the user profile; `null` when there is nothing to base it on. */
 export function getPregnancyProgress(user: User | null | undefined, now = Date.now()): PregnancyProgress | null {
   if (!user) return null;
+
+  // Loni is for every woman: someone who is not pregnant has no pregnancy progress to show.
+  if (user.status === 'general' || user.status === 'ttc') return null;
 
   if (user.status === 'newMom') {
     const week = parseNumber(user.babyAge);
@@ -81,9 +87,20 @@ const POSTPARTUM_TIPS: DailyTip[] = [
   { icon: 'phone', title: 'We are one call away', body: 'Worried about something? You can talk to a nurse by voice at any time.' },
 ];
 
+const GENERAL_TIPS: DailyTip[] = [
+  { icon: 'droplet', title: 'Water first', body: 'A glass of water when you wake up and one with each meal makes a real difference to energy and skin.' },
+  { icon: 'moon', title: 'Protect your sleep', body: 'A regular bedtime and screens off 30 minutes earlier can steady your mood and your cycle.' },
+  { icon: 'heart', title: 'Know your cycle', body: 'Noting when your period starts and how you feel helps you spot what is normal for you.' },
+  { icon: 'activity', title: 'Move in a way you enjoy', body: 'Walking, dancing or stretching for 20 minutes counts. Little and often beats rarely and hard.' },
+  { icon: 'smile', title: 'Check in with yourself', body: 'How are you really feeling today? Naming it is the first step. Loni is here to talk.' },
+  { icon: 'coffee', title: 'Eat the rainbow', body: 'Colourful vegetables, beans and fruit through the week support hormones, energy and iron.' },
+  { icon: 'shield', title: 'Look after your breasts and cervix', body: 'Check your breasts monthly and ask your clinician about screening that is right for your age.' },
+  { icon: 'phone', title: 'Questions you were too shy to ask', body: 'Periods, sex, contraception, mood. Ask Loni anything, privately, any time.' },
+];
+
 /** One tip per calendar day, the same all day and different tomorrow. */
-export function tipOfTheDay(kind: PregnancyProgress['kind'] | undefined, date = new Date()): DailyTip {
-  const tips = kind === 'postpartum' ? POSTPARTUM_TIPS : PREGNANCY_TIPS;
+export function tipOfTheDay(kind: PregnancyProgress['kind'] | 'general' | undefined, date = new Date()): DailyTip {
+  const tips = kind === 'postpartum' ? POSTPARTUM_TIPS : kind === 'pregnant' ? PREGNANCY_TIPS : GENERAL_TIPS;
   const dayNumber = Math.floor(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
   return tips[dayNumber % tips.length];
 }

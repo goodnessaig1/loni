@@ -14,14 +14,6 @@ pytestmark = pytest.mark.anyio
 CLOUD_URL = "https://res.cloudinary.com/{cloud}/image/upload/v1/loni/community/x.jpg"
 
 
-@pytest.fixture
-def as_user(session_factory, client_for):
-    async def _as(user: User):
-        c = await client_for(user)
-        return c
-    return _as
-
-
 async def _post(c, body="Hello mamas", **extra):
     r = await c.post("/api/v1/community/posts", json={"body": body, **extra})
     assert r.status_code == 201, r.text

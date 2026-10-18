@@ -8,7 +8,8 @@ import { babySize, trimesterOf, type PregnancyProgress } from '../../lib/pregnan
 
 interface PregnancyCardProps {
   progress: PregnancyProgress;
-  onPress: () => void;
+  /** Omit to render a plain (non-tappable) card, e.g. on the Journey screen. */
+  onPress?: () => void;
 }
 
 const PILL = {
@@ -40,7 +41,8 @@ export const PregnancyCard = ({ progress, onPress }: PregnancyCardProps) => {
     <TouchableOpacity
       activeOpacity={0.85}
       onPress={onPress}
-      accessibilityRole="button"
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'summary'}
       accessibilityLabel={`${stage}. ${title}. ${footer}`}
       style={styles.card}
     >
@@ -64,11 +66,13 @@ export const PregnancyCard = ({ progress, onPress }: PregnancyCardProps) => {
         </View>
       </View>
 
-      <View style={styles.tab}>
-        <View style={styles.arrow}>
-          <Feather name="arrow-right" size={20} color="#FFFFFF" />
+      {onPress && (
+        <View style={styles.tab}>
+          <View style={styles.arrow}>
+            <Feather name="arrow-right" size={20} color="#FFFFFF" />
+          </View>
         </View>
-      </View>
+      )}
     </TouchableOpacity>
   );
 };

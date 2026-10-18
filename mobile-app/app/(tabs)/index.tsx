@@ -15,6 +15,10 @@ import { CommunityBubbleIcon } from '../../components/community/CommunityIcons';
 import { useTheme } from '../../context/ThemeContext';
 import { PregnancyCard } from '../../components/home/PregnancyCard';
 import { TodaysTip } from '../../components/home/TodaysTip';
+import { PlusBanner } from '../../components/home/PlusBanner';
+import { PremiumSections } from '../../components/home/PremiumSections';
+import { useSubscription } from '../../hooks/useSubscription';
+import { useNotificationFeed } from '../../hooks/useNotificationFeed';
 import { getPregnancyProgress, tipOfTheDay } from '../../lib/pregnancy';
 
 export default function HomeTab() {
@@ -36,6 +40,8 @@ export default function HomeTab() {
   if (hour < 12) greeting = 'Morning';
   else if (hour < 18) greeting = 'Afternoon';
 
+  const { hasAccess, isLoading: subLoading } = useSubscription();
+  const { unread } = useNotificationFeed();
   const progress = React.useMemo(() => getPregnancyProgress(user), [user]);
   const tip = React.useMemo(() => tipOfTheDay(progress?.kind), [progress?.kind]);
 
@@ -52,7 +58,7 @@ export default function HomeTab() {
           {/* Notification Bell */}
           <TouchableOpacity onPress={() => router.push('/notifications')} style={{ width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
             <Feather name="bell" size={24} color={colors.text} />
-            <View style={{ position: 'absolute', top: 13, right: 14, width: 10, height: 10, backgroundColor: '#D62D88', borderRadius: 5 }} />
+            {unread > 0 && <View style={{ position: 'absolute', top: 13, right: 14, width: 10, height: 10, backgroundColor: '#D62D88', borderRadius: 5 }} />}
           </TouchableOpacity>
 
           {/* Arrival Pill */}
@@ -83,7 +89,7 @@ export default function HomeTab() {
 
         {progress && (
           <View style={{ marginBottom: 28 }}>
-            <PregnancyCard progress={progress} onPress={() => router.push('/pregnancy-status')} />
+            <PregnancyCard progress={progress} onPress={() => router.push(progress.kind === 'pregnant' ? '/journey' : '/recovery')} />
           </View>
         )}
 
@@ -164,6 +170,13 @@ export default function HomeTab() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Free mothers are offered the trial; members get their care tools right here. */}
+        {!subLoading && (hasAccess ? <PremiumSections /> : (
+          <View style={{ marginTop: 24 }}>
+            <PlusBanner onPress={() => router.push('/subscribe')} />
+          </View>
+        ))}
 
       </ScrollView>
       

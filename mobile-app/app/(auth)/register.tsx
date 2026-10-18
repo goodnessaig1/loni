@@ -25,7 +25,7 @@ const validationSchema = Yup.object().shape({
   name: Yup.string().required('Name is required'),
   email: Yup.string().email('Invalid email').required('Email is required'),
   password: Yup.string().min(8, 'Password must be at least 8 chars').required('Password is required'),
-  status: Yup.string().oneOf(['pregnant', 'newMom']).required('Please select your current status'),
+  status: Yup.string().oneOf(['pregnant', 'newMom', 'ttc', 'general']).required('Please select your current status'),
   trimester: Yup.string().when('status', {
     is: (status: string) => status === 'pregnant' || status === 'newMom',
     then: (schema) => schema.required('Please select your current stage'),
@@ -192,6 +192,46 @@ export default function RegisterScreen() {
                       </View>
                     </View>
                     <HelixaText style={styles.statusSubtitle}>0-8 weeks postpartum</HelixaText>
+                  </Pressable>
+                </View>
+
+                <View style={[styles.statusRow, { marginTop: 12 }]}>
+                  {/* Not pregnant: women's health in general */}
+                  <Pressable
+                    style={[styles.statusBox, values.status === 'general' && styles.statusBoxSelected]}
+                    onPress={() => {
+                      setFieldValue('status', 'general');
+                      setFieldValue('trimester', '');
+                      setFieldValue('pregnancyWeek', '');
+                      setFieldValue('babyAge', '');
+                    }}
+                  >
+                    <View style={styles.statusHeader}>
+                      <HelixaText style={styles.statusTitle} weight="bold">Not pregnant</HelixaText>
+                      <View style={[styles.radioEmpty, values.status === 'general' && styles.radioSelected]}>
+                        {values.status === 'general' && <View style={styles.radioInner} />}
+                      </View>
+                    </View>
+                    <HelixaText style={styles.statusSubtitle}>Here for my health</HelixaText>
+                  </Pressable>
+
+                  {/* Trying to conceive */}
+                  <Pressable
+                    style={[styles.statusBox, values.status === 'ttc' && styles.statusBoxSelected]}
+                    onPress={() => {
+                      setFieldValue('status', 'ttc');
+                      setFieldValue('trimester', '');
+                      setFieldValue('pregnancyWeek', '');
+                      setFieldValue('babyAge', '');
+                    }}
+                  >
+                    <View style={styles.statusHeader}>
+                      <HelixaText style={styles.statusTitle} weight="bold">Trying</HelixaText>
+                      <View style={[styles.radioEmpty, values.status === 'ttc' && styles.radioSelected]}>
+                        {values.status === 'ttc' && <View style={styles.radioInner} />}
+                      </View>
+                    </View>
+                    <HelixaText style={styles.statusSubtitle}>Trying to conceive</HelixaText>
                   </Pressable>
                 </View>
                 {touched.status && errors.status && <Text style={styles.errorText}>{errors.status}</Text>}

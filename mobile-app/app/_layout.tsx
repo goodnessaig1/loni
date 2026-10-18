@@ -14,6 +14,8 @@ import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { EmergencyContactsProvider } from '../context/EmergencyContactsContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { CallModals } from '../components/CallModals';
+import { useSubscriptionSync } from '../hooks/useSubscription';
+import { useSyncTimezone } from '../hooks/useCheckins';
 
 import '../global.css';
 
@@ -22,6 +24,8 @@ import Toast from 'react-native-toast-message';
 /** Inside the providers so it can read the theme: the stack's background must follow it, or page transitions flash white in dark mode. */
 function ThemedShell() {
   const { colors } = useTheme();
+  useSubscriptionSync();
+  useSyncTimezone();
   return (
     <>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
