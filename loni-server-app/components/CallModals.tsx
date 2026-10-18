@@ -14,6 +14,7 @@ import { startCallForegroundService, stopCallForegroundService } from '../lib/ca
 import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
 import { router } from 'expo-router';
 import { callSoundsEnabled } from '../lib/localPrefs';
+import { cdnImage } from '../lib/cdnImage';
 
 const LOG = '[Call/Nurse]';
 const CONNECT_TIMEOUT_MS = 20000;
@@ -207,7 +208,7 @@ const ActiveCallUI = () => {
     <View style={styles.container}>
       <StatusBar style='light' />
       {remoteParticipant?.profile_picture ? (
-        <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.bgImage} contentFit="cover" />
+        <Image source={{ uri: cdnImage(remoteParticipant.profile_picture, 400) }} style={styles.bgImage} contentFit="cover" />
       ) : (
         <View style={[styles.bgImage, { backgroundColor: '#2b2a29' }]} />
       )}
@@ -461,7 +462,7 @@ export const CallModals = () => {
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <View style={styles.incomingAvatarPlaceholder}>
                 {remoteParticipant?.profile_picture ? (
-                  <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.incomingAvatar} contentFit="cover" />
+                  <Image source={{ uri: cdnImage(remoteParticipant.profile_picture, 400) }} style={styles.incomingAvatar} contentFit="cover" />
                 ) : (
                   <Text style={styles.incomingAvatarInitial}>{(remoteParticipant?.name || 'M')[0]}</Text>
                 )}

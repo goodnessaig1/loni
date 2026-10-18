@@ -75,6 +75,7 @@ export async function connectCallSocket(): Promise<void> {
 
   socket.onopen = () => {
     reconnectAttempts = 0;
+    require('../lib/connectivity').markOnline();
     console.log('[CallSocket] connected');
     // Anything that happened to a live call while we were disconnected.
     require('../lib/callSync').reconcileCall();

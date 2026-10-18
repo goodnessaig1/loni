@@ -104,7 +104,7 @@ backend-new/
   app/utils/             user_enrichment.py (stage/week/trimester), partner_content.py (week-by-week partner copy), generateId.py
   app/scripts/           seed_admin.py, seed_aptitude_questions.py, migrate_contacts*.py
   db/migrations/         Alembic (versions/ has 19 revisions; head b3d5f7a9c102)
-  tests/                 481 tests, fakes.py (fake Mongo), triage_cases.py (safety gold set)
+  tests/                 485 tests, fakes.py (fake Mongo), triage_cases.py (safety gold set)
 ```
 Docs: `/docs` (Swagger), `/redoc`, OpenAPI at `/api/v1/openapi.json`.
 
@@ -115,7 +115,7 @@ pip install -r requirements.txt && pip install -r tests/requirements-test.txt
 # create .env (see 5.3), then:
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
-python -m pytest tests -q           # 481 pass
+python -m pytest tests -q           # 485 pass
 ```
 Default `DATABASE_URL` in the local `.env` is local Postgres (`localhost/loni`); a Neon URL is kept commented. **Never run migrations against a shared DB by accident.**
 
@@ -358,7 +358,7 @@ React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. De
 - The mother app's `Recovery Plan` screen (`recovery/index.tsx`) uses a hardcoded local task list that is **not persisted or stage-aware** (the LONI Plus care plan is the real, server-backed version).
 
 **Engineering**
-- Three LAN IPs are hardcoded (mother app, server app, `livekit.yaml`) plus a fallback LiveKit URL in `mobile-app/hooks/useLiveKit.ts`. Use env/EAS config for real builds.
+- Both apps read `EXPO_PUBLIC_API_URL` (falls back to the LAN address in `api/client.ts`, which `scripts/update-lan-ip.sh` rewrites). `livekit.yaml` `node_ip` and the fallback LiveKit URL in `mobile-app/hooks/useLiveKit.ts` still need per-environment values.
 - The mother app and server app **duplicate** a lot of code (call store/hooks/modals, notification context, audio/CallKeep libs). Bugs have had to be fixed twice; consider a shared package.
 - Native call UI (CallKeep) is behind a kill switch after unexplained crashes; see `CALL_SYSTEM_AUDIT.md` for how to resume debugging.
 - The FCM Firebase setup requires the native config files and a service-account JSON on the server.
@@ -378,6 +378,8 @@ React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. De
 ---
 
 - **Figma pass (2026-10-18):** ride status card with all states + inline calls; mother↔driver calls (backend `kind`/`ride_id`); answer authorization on calls; contact fan-out respects connected status + location permission; ride progress signal; share-trip / arrived-safely notifications; shared Settings/Support/Change Password/Legal screens + `account` module; nurse call summary, real stats/ratings, approval screen; driver Trip Overview, role-aware Edit Profile, active-trip restore; partner Pregnancy Updates, Stop getting alerts, richer alert detail, live dashboard pin, partner push routing; secure partner setup (password applied only after the emailed code); date-dependent check-in tests fixed.
+
+- **Client connectivity (2026-10-18):** push tokens are keyed by token (one account per phone) and removed on sign-out (`POST /notifications/devices/unregister`, `lib/pushRegistration.ts`); token rotation re-registers; requests time out (20 s, uploads 60 s) with friendly messages; an expired login signs out once and returns to sign-in; React Query refetches on app foreground and pauses/resumes with connectivity (`lib/connectivity.ts` + `OfflineBanner`); Cloudinary images are requested at display size (`lib/cdnImage.ts`); the random pravatar.cc avatar fallback is replaced by a local default.
 
 ## 16. Glossary
 

@@ -21,6 +21,7 @@ import { useSyncTimezone } from '../hooks/useCheckins';
 import '../global.css';
 
 import Toast from 'react-native-toast-message';
+import { OfflineBanner } from '../components/OfflineBanner';
 
 /** Inside the providers so it can read the theme: the stack's background must follow it, or page transitions flash white in dark mode. */
 function ThemedShell() {
@@ -36,6 +37,7 @@ function ThemedShell() {
       </Stack>
       <RideTrackerHost />
       <CallModals />
+      <OfflineBanner />
       <StatusBar style="auto" />
       <Toast />
     </>

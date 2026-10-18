@@ -13,6 +13,8 @@ def _match(doc, query):
                     return False
                 if op == "$in" and val not in arg:
                     return False
+                if op == "$ne" and val == arg:
+                    return False
         elif val != cond:
             return False
     return True
@@ -45,11 +47,19 @@ class FakeCollection:
     async def insert_one(self, doc):
         self.docs.append(dict(doc))
 
-    async def update_one(self, query, update):
+    async def update_one(self, query, update, upsert=False):
         matched = [d for d in self.docs if _match(d, query)][:1]
         for d in matched:
             d.update(update.get("$set", {}))
+        if not matched and upsert:
+            self.docs.append({**query, **update.get("$setOnInsert", {}), **update.get("$set", {})})
         return SimpleNamespace(matched_count=len(matched), modified_count=len(matched))
+
+    async def delete_many(self, query):
+        keep = [d for d in self.docs if not _match(d, query)]
+        n = len(self.docs) - len(keep)
+        self.docs = keep
+        return SimpleNamespace(deleted_count=n)
 
     def find(self, query=None):
         return FakeCursor(d for d in self.docs if _match(d, query or {}))

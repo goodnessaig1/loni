@@ -195,28 +195,27 @@ class NotificationService:
     @staticmethod
     async def register_device(user_id: str, device_id: str, device_type: str, token: str):
         """
-        Register a device token for a user.
+        Register a push token for a user. A token identifies one app install, so it belongs to exactly
+        one account: registering it moves it to this user (whoever signed in last on the phone gets the
+        pushes). Keyed by token, not device_id - Android's build id is shared by every phone on the
+        same OS build, so it can't tell two phones apart.
         """
         collection = mongo_db.db["devices"]
-        
-        existing = await collection.find_one({"device_id": device_id, "user_id": user_id})
-        if existing:
-            # Update token if it changed
-            if existing.get("token") != token:
-                await collection.update_one(
-                    {"_id": existing["_id"]},
-                    {"$set": {"token": token, "updated_at": datetime.utcnow()}}
-                )
-        else:
-            new_device = {
-                "user_id": user_id,
-                "device_id": device_id,
-                "device_type": device_type,
-                "token": token,
-                "created_at": datetime.utcnow(),
-                "updated_at": datetime.utcnow()
-            }
-            await collection.insert_one(new_device)
+        now = datetime.utcnow()
+        # Registrations from before tokens were unique may list this token under other accounts too.
+        await collection.delete_many({"token": token, "user_id": {"$ne": user_id}})
+        await collection.update_one(
+            {"token": token},
+            {"$set": {"user_id": user_id, "device_id": device_id, "device_type": device_type, "updated_at": now},
+             "$setOnInsert": {"created_at": now}},
+            upsert=True,
+        )
+
+    @staticmethod
+    async def unregister_device(user_id: str, token: str) -> int:
+        """Signing out: this phone must stop receiving this account's pushes (calls, alerts)."""
+        result = await mongo_db.db["devices"].delete_many({"token": token, "user_id": user_id})
+        return result.deleted_count
 
     @staticmethod
     async def get_user_devices(user_id: str):

@@ -12,6 +12,7 @@ import { formatCount } from '../../lib/formatCount';
 import { relativeTime } from '../../lib/relativeTime';
 import { useToggleLike } from '../../hooks/useCommunity';
 import { useTheme } from '../../context/ThemeContext';
+import { cdnImage } from '../../lib/cdnImage';
 
 const LIKED = '#E8483B';
 
@@ -77,7 +78,7 @@ function PostCardBase({ post, onDelete }: Props) {
 
       {!!post.image_url && (
         <Image
-          source={{ uri: post.image_url }}
+          source={{ uri: cdnImage(post.image_url, 400) }}
           style={{ width: '100%', aspectRatio: 1.9, marginTop: 16, backgroundColor: colors.placeholder }}
           contentFit="cover"
           transition={200}

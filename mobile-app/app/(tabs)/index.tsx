@@ -18,6 +18,7 @@ import { PremiumSections } from '../../components/home/PremiumSections';
 import { useSubscription } from '../../hooks/useSubscription';
 import { useNotificationFeed } from '../../hooks/useNotificationFeed';
 import { getPregnancyProgress, tipOfTheDay } from '../../lib/pregnancy';
+import { cdnImage } from '../../lib/cdnImage';
 
 export default function HomeTab() {
   const { user } = useAuth();
@@ -66,7 +67,7 @@ export default function HomeTab() {
           {/* Avatar */}
           <TouchableOpacity onPress={() => { }}>
             <Image
-              source={{ uri: user?.profilePicture || 'https://i.pravatar.cc/150' }}
+              source={user?.profilePicture ? { uri: cdnImage(user.profilePicture, 52) } : require('../../assets/images/default-avatar.png')}
               style={{ width: 52, height: 52, borderRadius: 26 }}
               contentFit="cover"
             />

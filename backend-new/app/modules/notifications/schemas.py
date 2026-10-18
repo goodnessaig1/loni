@@ -7,6 +7,10 @@ class DeviceCreate(BaseModel):
     device_type: str
     token: str
 
+class DeviceUnregister(BaseModel):
+    # the FCM/APNs token, plus the iOS VoIP token when the app has one
+    tokens: List[str]
+
 class DeviceResponse(BaseModel):
     success: bool
     message: str

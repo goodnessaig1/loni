@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, StyleProp, ViewStyle, ImageStyle } from 'react-native';
+import { cdnImage } from '../lib/cdnImage';
 
 interface AvatarProps {
   uri?: string | null;
@@ -31,7 +32,7 @@ export function Avatar({ uri, name, style, className }: AvatarProps) {
     <View style={[styles.container, style]} className={className}>
       {hasValidUri ? (
         <Image
-          source={{ uri: uri.trim() }}
+          source={{ uri: cdnImage(uri, width) }}
           style={{ width, height, borderRadius }}
           resizeMode="cover"
         />

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.modules.notifications.schemas import DeviceCreate, DeviceResponse, PushNotificationTest, DeviceListResponse, DeviceInfo
+from app.modules.notifications.schemas import DeviceCreate, DeviceUnregister, DeviceResponse, PushNotificationTest, DeviceListResponse, DeviceInfo
 from app.modules.notifications.service import NotificationService
 from app.api.deps import get_current_user
 from app.modules.users.models import User
@@ -23,6 +23,17 @@ async def register_device(
     )
     
     return DeviceResponse(success=True, message="Device registered successfully")
+
+@router.post("/devices/unregister", response_model=DeviceResponse)
+async def unregister_device(
+    device_in: DeviceUnregister,
+    current_user: User = Depends(get_current_user)
+):
+    """Called on sign-out with this phone's push token(s), so pushes for this account stop here."""
+    removed = 0
+    for token in device_in.tokens:
+        removed += await NotificationService.unregister_device(str(current_user.id), token)
+    return DeviceResponse(success=True, message=f"Removed {removed} device registration(s)")
 
 @router.post("/test", response_model=DeviceResponse)
 async def test_push_notification(

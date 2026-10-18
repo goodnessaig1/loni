@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { setActiveRoom, toggleMicrophone as toggleActiveMicrophone } from '../lib/activeRoom';
 import { useRideStore } from '../store/rideStore';
+import { cdnImage } from '../lib/cdnImage';
 
 const RIDE_LIVE = ['SEARCHING', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
 
@@ -233,7 +234,7 @@ const ActiveCallUI = () => {
     <View style={styles.container}>
       <StatusBar style='light' />
       {remoteParticipant?.profile_picture ? (
-        <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.bgImage} contentFit="cover" />
+        <Image source={{ uri: cdnImage(remoteParticipant.profile_picture, 400) }} style={styles.bgImage} contentFit="cover" />
       ) : (
         <RNImage source={require('../assets/images/nurse-img.png')} style={styles.bgImage} resizeMode="cover" />
       )}
@@ -576,7 +577,7 @@ export const CallModals = () => {
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <View style={styles.incomingAvatarPlaceholder}>
                 {remoteParticipant?.profile_picture ? (
-                  <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.incomingAvatar} contentFit="cover" />
+                  <Image source={{ uri: cdnImage(remoteParticipant.profile_picture, 400) }} style={styles.incomingAvatar} contentFit="cover" />
                 ) : (
                   <Text style={styles.incomingAvatarInitial}>{(remoteParticipant?.name || 'N')[0]}</Text>
                 )}

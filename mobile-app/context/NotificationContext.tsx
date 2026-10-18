@@ -3,6 +3,7 @@ import Toast from 'react-native-toast-message';
 import { openFromPush, PushData } from '../lib/checkinLinks';
 import { queryClient } from '../lib/queryClient';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
+import { registerPushToken } from '../lib/pushRegistration';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { AuthContext } from './AuthContext';
@@ -126,14 +127,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         setPushToken(token);
 
         try {
-          const deviceId = Platform.OS === 'android' ? Device.osBuildId : Device.modelId || 'ios_device';
-
-          await apiClient.post('/notifications/devices', {
-            device_id: deviceId || 'unknown_device',
-            device_type: Platform.OS,
-            token: token
-          });
-
+          await registerPushToken(token);
           console.log('[Push] Successfully registered device with backend.');
         } catch (error) {
           console.error('[Push] Failed to register device with backend:', error);
@@ -142,6 +136,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }
 
     initPush();
+
+    // Firebase rotates tokens from time to time; without this, pushes stop until the app is reopened.
+    if (!user) return;
+    const Notifications = require('expo-notifications');
+    const sub = Notifications.addPushTokenListener(({ data }: { data: string }) => {
+      if (typeof data !== 'string' || !data) return;
+      setPushToken(data);
+      registerPushToken(data).catch((e) => console.error('[Push] Re-register after token change failed', e));
+    });
+    return () => sub.remove();
   }, [user]);
 
   useEffect(() => {

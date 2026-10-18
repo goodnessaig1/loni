@@ -17,6 +17,7 @@ import { queryClient } from '../lib/queryClient';
 import '../global.css';
 
 import Toast from 'react-native-toast-message';
+import { OfflineBanner } from '../components/OfflineBanner';
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -46,6 +47,7 @@ export default function RootLayout() {
               <Stack.Screen name="partner" />
             </Stack>
             <CallModals />
+      <OfflineBanner />
             <StatusBar style="auto" />
             <Toast />
           </EmergencyContactsProvider>

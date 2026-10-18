@@ -78,6 +78,7 @@ export async function connectCallSocket(): Promise<void> {
 
   socket.onopen = () => {
     reconnectAttempts = 0;
+    require('../lib/connectivity').markOnline();
     // Anything that happened to a call or a ringing request while we were disconnected.
     require('../lib/callSync').reconcileCall();
     // A partner may have missed her sharing/stage changes or new updates while offline.
