@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Index
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -24,6 +24,7 @@ class NotificationLog(Base):
     a row here alongside calling NotificationService.notify_user.
     """
     __tablename__ = 'notification_logs'
+    __table_args__ = (Index('ix_notification_logs_user_type', 'user_id', 'type'),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(String(12), ForeignKey('users.id'), index=True, nullable=False)

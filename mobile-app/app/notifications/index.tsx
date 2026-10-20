@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -6,108 +6,101 @@ import { useRouter } from 'expo-router';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { PhoneIcon, RecoveryPlanIcon, RideIcon, SupportPartnerIcon } from '../../components/NotificationIcons';
+import { useMarkNotificationsRead, useNotificationFeed, AppNotification } from '../../hooks/useNotificationFeed';
+import { openFromPush } from '../../lib/checkinLinks';
+import { relativeTime } from '../../lib/relativeTime';
+import { Reveal, RevealList } from '../../components/motion';
 
-type NotificationType = 'nurse_call' | 'recovery_plan' | 'ride' | 'support_partner';
+import { useTheme } from '../../context/ThemeContext';
+type IconKind = 'checkin' | 'ride' | 'comment' | 'partner' | 'recovery' | 'call' | 'default';
 
-interface NotificationItem {
-  id: string;
-  type: NotificationType;
-  title: string;
-  subtitle: string;
-  time: string;
-}
+const kindOf = (type: string): IconKind => {
+  if (type === 'checkin') return 'checkin';
+  if (type.startsWith('ride')) return 'ride';
+  if (type.startsWith('community')) return 'comment';
+  if (type.includes('partner') || type.includes('support')) return 'partner';
+  if (type.includes('recovery')) return 'recovery';
+  if (type.includes('call') || type.includes('nurse')) return 'call';
+  return 'default';
+};
 
-const NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: '1',
-    type: 'nurse_call',
-    title: 'Nurse Call',
-    subtitle: 'Spoke with Nurse Amy - 15 min',
-    time: '5 mins ago'
-  },
-  {
-    id: '2',
-    type: 'recovery_plan',
-    title: 'Recovery Plan Completed',
-    subtitle: 'All tasks completed for May 6',
-    time: '5 mins ago'
-  },
-  {
-    id: '3',
-    type: 'ride',
-    title: 'Emergency Ride',
-    subtitle: 'To Memorial Hospital - Driver: John',
-    time: '5 mins ago'
-  },
-  {
-    id: '4',
-    type: 'ride',
-    title: 'Driver arriving soon',
-    subtitle: 'Your ride is almost there. Please keep your phone nearby.',
-    time: '5 mins ago'
-  },
-  {
-    id: '5',
-    type: 'ride',
-    title: 'You arrived safely',
-    subtitle: 'Your emergency trip has been completed successfully.',
-    time: '5 mins ago'
-  },
-  {
-    id: '6',
-    type: 'recovery_plan',
-    title: "You completed today's check-in 💜",
-    subtitle: 'Small steps matter. Keep going.',
-    time: '5 mins ago'
-  },
-  {
-    id: '7',
-    type: 'support_partner',
-    title: 'Support partner connected',
-    subtitle: 'David is now part of your support circle.',
-    time: '5 mins ago'
-  }
-];
+const RECENT_HOURS = 48;
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<'Recent' | 'Earlier'>('Recent');
+  const { notifications, unread, isLoading, isError, refetch } = useNotificationFeed();
+  const markRead = useMarkNotificationsRead();
 
-  const getIcon = (type: NotificationType) => {
-    switch (type) {
-      case 'nurse_call':
-        return <PhoneIcon size={20} color="#18181B" />;
-      case 'recovery_plan':
-        return <RecoveryPlanIcon size={20} color="#18181B" />;
+  // Opening the screen is what "read" means; the dot on the Recent tab and the home bell clear afterwards.
+  useEffect(() => {
+    if (unread > 0) {
+      const t = setTimeout(() => markRead.mutate(), 1500);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unread]);
+
+  const { recent, earlier } = useMemo(() => {
+    const cutoff = Date.now() - RECENT_HOURS * 3600_000;
+    const isRecent = (n: AppNotification) => !n.created_at || new Date(n.created_at).getTime() >= cutoff;
+    return { recent: notifications.filter(isRecent), earlier: notifications.filter((n) => !isRecent(n)) };
+  }, [notifications]);
+
+  const getIcon = (type: string) => {
+    switch (kindOf(type)) {
+      case 'call':
+        return <PhoneIcon size={20} color={colors.text} />;
+      case 'recovery':
+        return <RecoveryPlanIcon size={20} color={colors.text} />;
       case 'ride':
-        return <RideIcon size={20} color="#18181B" />;
-      case 'support_partner':
-        return <SupportPartnerIcon size={20} color="#18181B" />;
+        return <RideIcon size={20} color={colors.text} />;
+      case 'partner':
+        return <SupportPartnerIcon size={20} color={colors.text} />;
+      case 'checkin':
+        return <Feather name="heart" size={20} color="#D62D88" />;
+      case 'comment':
+        return <Feather name="message-circle" size={20} color={colors.text} />;
       default:
-        return null;
+        return <Feather name="bell" size={20} color={colors.text} />;
     }
   };
 
+  const onPressItem = (n: AppNotification) => {
+    if (n.type === 'checkin') openFromPush({ type: 'checkin', session_id: n.data?.session_id, checkin_id: n.data?.checkin_id });
+    else if (n.type.startsWith('community')) router.push('/(tabs)/community');
+    else if (n.type.startsWith('partner_')) router.push('/profile/emergency-contacts' as any);
+  };
+
+  const items = activeTab === 'Recent' ? recent : earlier;
+
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={['top']}>
+    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top']}>
       {/* Header */}
+      <Reveal index={0}>
       <View className="px-5 pt-2.5 mb-5">
         <TouchableOpacity 
-          className="w-12 h-12 rounded-full border border-gray-200 justify-center items-center" 
+          className="w-12 h-12 rounded-full border justify-center items-center" 
+          style={{ borderColor: colors.border }}
           onPress={() => router.back()}
         >
-          <Feather name="arrow-left" size={24} color="#18181B" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
+      </Reveal>
 
       <ScrollView contentContainerClassName="px-5 pb-10" showsVerticalScrollIndicator={false}>
+        <Reveal index={1}>
         <CalText className="text-[28px] text-[#D62D88] mb-2">Notifications</CalText>
-        <HelixaText className="text-base text-gray-500 leading-6 mb-6">
+        <HelixaText className="text-base leading-6 mb-6" style={{ color: colors.textSecondary }}>
           Stay updated on your support, recovery, and emergency activity.
         </HelixaText>
+        </Reveal>
 
         {/* Custom Tabs */}
-        <View className="flex-row bg-[#F4F7F2] rounded-xl p-1 mb-8 border border-gray-100">
+        <Reveal index={2}>
+        <View className="flex-row rounded-xl p-1 mb-8 border" style={{ backgroundColor: colors.surface, borderColor: colors.divider }}>
           <TouchableOpacity 
             className="flex-1" 
             onPress={() => setActiveTab('Recent')}
@@ -115,15 +108,15 @@ export default function NotificationsScreen() {
           >
             <View 
               className="flex-1 flex-row py-3 justify-center items-center rounded-lg"
-              style={activeTab === 'Recent' ? { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
+              style={activeTab === 'Recent' ? { backgroundColor: colors.elevated, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
             >
               <HelixaText 
                 weight={activeTab === 'Recent' ? 'bold' : 'regular'} 
-                style={{ fontSize: 14, color: activeTab === 'Recent' ? '#111827' : '#6B7280' }}
+                style={{ fontSize: 14, color: activeTab === 'Recent' ? colors.text : colors.textSecondary }}
               >
                 Recent
               </HelixaText>
-              {activeTab === 'Recent' && <View className="w-1.5 h-1.5 rounded-full bg-red-500 ml-1.5 -mt-2" />}
+              {unread > 0 && <View className="w-1.5 h-1.5 rounded-full bg-red-500 ml-1.5 -mt-2" />}
             </View>
           </TouchableOpacity>
           
@@ -134,37 +127,48 @@ export default function NotificationsScreen() {
           >
             <View 
               className="flex-1 flex-row py-3 justify-center items-center rounded-lg"
-              style={activeTab === 'Earlier' ? { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
+              style={activeTab === 'Earlier' ? { backgroundColor: colors.elevated, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 } : {}}
             >
               <HelixaText 
                 weight={activeTab === 'Earlier' ? 'bold' : 'regular'} 
-                style={{ fontSize: 14, color: activeTab === 'Earlier' ? '#111827' : '#6B7280' }}
+                style={{ fontSize: 14, color: activeTab === 'Earlier' ? colors.text : colors.textSecondary }}
               >
                 Earlier
               </HelixaText>
             </View>
           </TouchableOpacity>
         </View>
+        </Reveal>
 
         {/* Notifications List */}
         <View className="flex-1">
-          {activeTab === 'Recent' ? (
-            NOTIFICATIONS.map((item) => (
-              <View key={item.id} className="flex-row items-start mb-6">
-                <View className="w-12 h-12 rounded-full bg-[#F4F7F2] justify-center items-center mr-4">
+          {isLoading ? (
+            <View className="pt-10 items-center"><HelixaText className="text-sm" style={{ color: colors.textMuted }}>Loading...</HelixaText></View>
+          ) : isError ? (
+            <TouchableOpacity className="pt-10 items-center" onPress={() => refetch()}>
+              <HelixaText className="text-sm" style={{ color: colors.textMuted }}>Couldn&apos;t load notifications. Tap to retry.</HelixaText>
+            </TouchableOpacity>
+          ) : items.length === 0 ? (
+            <View className="pt-10 items-center">
+              <HelixaText className="text-sm" style={{ color: colors.textMuted }}>
+                {activeTab === 'Recent' ? "You're all caught up" : 'No earlier notifications'}
+              </HelixaText>
+            </View>
+          ) : (
+            items.map((item, i) => (
+              <RevealList key={item.id} index={i}>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => onPressItem(item)} className="flex-row items-start mb-6">
+                <View className="w-12 h-12 rounded-full justify-center items-center mr-4" style={{ backgroundColor: colors.surface }}>
                   {getIcon(item.type)}
                 </View>
                 <View className="flex-1 pt-1">
-                  <HelixaText weight="bold" className="text-base text-gray-900 mb-1">{item.title}</HelixaText>
-                  <HelixaText className="text-sm text-gray-500 leading-5 mb-1.5">{item.subtitle}</HelixaText>
-                  <HelixaText className="text-xs text-gray-400">{item.time}</HelixaText>
+                  <HelixaText weight={item.read ? 'regular' : 'bold'} className="text-base mb-1">{item.title}</HelixaText>
+                  <HelixaText className="text-sm leading-5 mb-1.5" style={{ color: colors.textSecondary }}>{item.body}</HelixaText>
+                  <HelixaText className="text-xs" style={{ color: colors.textMuted }}>{relativeTime(item.created_at)}</HelixaText>
                 </View>
-              </View>
+              </TouchableOpacity>
+              </RevealList>
             ))
-          ) : (
-            <View className="pt-10 items-center">
-              <HelixaText className="text-sm text-gray-400">No earlier notifications</HelixaText>
-            </View>
           )}
         </View>
       </ScrollView>

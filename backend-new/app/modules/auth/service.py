@@ -128,14 +128,17 @@ async def resend_otp(db: AsyncSession, email: str, type: str):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
+    # A resend keeps any pending change that waits on this code (e.g. a partner's new password).
+    prev = (await db.execute(select(Otp.payload).where(Otp.email == email, Otp.type == type))).scalars().first()
     await db.execute(delete(Otp).where(Otp.email == email, Otp.type == type))
-    
+
     otp_code = str(random.randint(1000, 9999))
     new_otp = Otp(
         email=email,
         otp=otp_code,
         type=type,
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10)
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+        payload=prev,
     )
     db.add(new_otp)
     await db.commit()

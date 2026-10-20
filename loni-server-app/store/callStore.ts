@@ -27,6 +27,8 @@ export type CallStatus =
   | 'FAILED'
   | 'TIMEOUT';
 
+export type CallKind = 'nurse' | 'ride';
+
 export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'unknown';
 
 export interface ParticipantInfo {
@@ -61,7 +63,10 @@ interface CallState {
   // connects, independent of whether the other side ever joined.
   connectedAt: number | null;
   // Array of multiple incoming requests
-  incomingRequests: Array<{ callId: number; roomName: string; remote: ParticipantInfo | null }>;
+  incomingRequests: Array<{ callId: number; roomName: string; remote: ParticipantInfo | null; kind?: CallKind }>;
+  /** 'nurse' = a mother asking a nurse; 'ride' = the mother and her driver during an emergency ride. */
+  kind: CallKind;
+  rideId: number | null;
 
   // Monotonic guard against a re-delivered/duplicate/out-of-order push or
   // WS message re-opening a call that has already moved on locally
@@ -75,9 +80,9 @@ interface CallState {
   isOutgoing: boolean;
   callerName: string | null;
 
-  setIncomingCall: (callId: number, roomName: string, remote: ParticipantInfo | null) => void;
+  setIncomingCall: (callId: number, roomName: string, remote: ParticipantInfo | null, meta?: { kind?: CallKind; rideId?: number | null }) => void;
   removeIncomingCall: (callId: number) => void;
-  setOutgoingCall: (callId: number, roomName: string) => void;
+  setOutgoingCall: (callId: number, roomName: string, meta?: { kind?: CallKind; rideId?: number | null }, remote?: ParticipantInfo | null) => void;
   setAccepted: (payload: { roomToken?: string; livekitUrl?: string; remote?: ParticipantInfo | null }) => void;
   setConnecting: (payload: { callId?: number; roomToken?: string; livekitUrl?: string; remote?: ParticipantInfo | null }) => void;
   setConnected: (connectedAtMs?: number) => void;
@@ -99,6 +104,8 @@ const initial = {
   connectionQuality: 'unknown' as const,
   connectedAt: null,
   incomingRequests: [],
+  kind: 'nurse' as CallKind,
+  rideId: null,
   lastEventCallId: null,
   lastEventStatus: null,
   isActive: false,
@@ -115,15 +122,24 @@ export const useCallStore = create<CallState>((set, get) => ({
     return current !== null && current !== callId;
   },
 
-  setIncomingCall: (callId, roomName, remote) => set((state) => {
+  setIncomingCall: (callId, roomName, remote, meta) => set((state) => {
     // Avoid duplicates in the array
     const existing = state.incomingRequests.find((r) => r.callId === callId);
     const newRequests = existing
       ? state.incomingRequests
-      : [...state.incomingRequests, { callId, roomName, remote }];
-      
+      : [...state.incomingRequests, { callId, roomName, remote, kind: meta?.kind ?? 'nurse' }];
+    const isFirst = state.callId == null;
+
+    // Already on (or placing) a call: just queue the request - never touch the live call's state,
+    // or <LiveKitRoom> would unmount and drop it.
+    if (state.isActive || state.isOutgoing || ['ACCEPTED', 'CONNECTING', 'CONNECTED', 'RECONNECTING'].includes(state.status)) {
+      return { incomingRequests: newRequests };
+    }
+
     return {
       status: 'INCOMING',
+      kind: isFirst ? (meta?.kind ?? 'nurse') : state.kind,
+      rideId: isFirst ? (meta?.rideId ?? null) : state.rideId,
       isIncoming: true,
       isOutgoing: false,
       isActive: false,
@@ -159,6 +175,7 @@ export const useCallStore = create<CallState>((set, get) => ({
           roomName: next.roomName,
           remoteParticipant: next.remote,
           callerName: next.remote?.name ?? null,
+          kind: next.kind ?? 'nurse',
         };
       } else {
         return {
@@ -171,12 +188,16 @@ export const useCallStore = create<CallState>((set, get) => ({
     return { incomingRequests: remaining };
   }),
 
-  setOutgoingCall: (callId, roomName) => set({
+  setOutgoingCall: (callId, roomName, meta, remote) => set({
     status: 'RINGING',
     isOutgoing: true,
     isIncoming: false,
     callId,
     roomName,
+    kind: meta?.kind ?? 'nurse',
+    rideId: meta?.rideId ?? null,
+    remoteParticipant: remote ?? null,
+    callerName: remote?.name ?? null,
     lastEventCallId: callId,
     lastEventStatus: 'RINGING',
   }),
@@ -219,8 +240,23 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   setRemoteParticipant: (info) => set({ remoteParticipant: info, callerName: info.name }),
 
-  endCall: (status = 'ENDED') => set({
-    ...initial,
-    lastEventStatus: status,
+  // Ends the call this screen is tracking. Other requests that are still ringing stay in the list
+  // (and the newest becomes the shown one) - they belong to other mothers.
+  endCall: (status = 'ENDED') => set((s) => {
+    const remaining = s.incomingRequests.filter((r) => r.callId !== s.callId);
+    if (!remaining.length) return { ...initial, lastEventStatus: status };
+    const next = remaining[remaining.length - 1];
+    return {
+      ...initial,
+      status: 'INCOMING' as CallStatus,
+      isIncoming: true,
+      callId: next.callId,
+      roomName: next.roomName,
+      remoteParticipant: next.remote,
+      callerName: next.remote?.name ?? null,
+      kind: next.kind ?? 'nurse',
+      incomingRequests: remaining,
+      lastEventStatus: status,
+    };
   }),
 }));

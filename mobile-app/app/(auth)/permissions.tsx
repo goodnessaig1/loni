@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Pressable,
@@ -11,6 +11,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
+import { PressableScale, Reveal } from '../../components/motion';
 import {
   PermissionStatus,
   getNotificationPermissionStatus,
@@ -35,6 +38,8 @@ import {
  * unrelated to voice calling and are left as they were.
  */
 export default function PermissionsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [locationGranted, setLocationGranted] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<PermissionStatus>('undetermined');
   const [micStatus, setMicStatus] = useState<PermissionStatus>('undetermined');
@@ -71,8 +76,9 @@ export default function PermissionsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Reveal index={0}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Feather name="chevron-left" size={28} color="black" />
+          <Feather name="chevron-left" size={28} color={colors.text} />
         </Pressable>
 
         <View style={styles.header}>
@@ -84,13 +90,15 @@ export default function PermissionsScreen() {
             These permissions help us provide the best care and support
           </HelixaText>
         </View>
+        </Reveal>
 
         <View style={styles.cardsContainer}>
           {/* Notifications */}
+          <Reveal index={1}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
-                <Feather name="bell" size={20} color="#4B5563" />
+                <Feather name="bell" size={20} color={colors.textSecondary} />
               </View>
               <View style={styles.cardTextContent}>
                 <View style={styles.cardTitleRow}>
@@ -121,12 +129,14 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
 
           {/* Microphone */}
+          <Reveal index={2}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
-                <Feather name="mic" size={20} color="#4B5563" />
+                <Feather name="mic" size={20} color={colors.textSecondary} />
               </View>
               <View style={styles.cardTextContent}>
                 <View style={styles.cardTitleRow}>
@@ -157,12 +167,14 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
 
           {/* Location Access */}
+          <Reveal index={3}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
-                <Feather name="map-pin" size={20} color="#4B5563" />
+                <Feather name="map-pin" size={20} color={colors.textSecondary} />
               </View>
               <View style={styles.cardTextContent}>
                 <View style={styles.cardTitleRow}>
@@ -191,12 +203,14 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
 
           {/* Emergency Contacts */}
+          <Reveal index={4}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <View style={styles.cardIcon}>
-                <Feather name="users" size={20} color="#4B5563" />
+                <Feather name="users" size={20} color={colors.textSecondary} />
               </View>
               <View style={styles.cardTextContent}>
                 <View style={styles.cardTitleRow}>
@@ -222,24 +236,27 @@ export default function PermissionsScreen() {
               )}
             </Pressable>
           </View>
+          </Reveal>
         </View>
 
-        <Pressable
+        <Reveal index={5}>
+        <PressableScale
           style={[styles.continueButton, canContinue ? styles.continueButtonActive : styles.continueButtonDisabled]}
           disabled={!canContinue}
           onPress={() => router.push('/(auth)/emergency-contacts')}
         >
           <HelixaText style={styles.continueButtonText} weight="bold">Continue</HelixaText>
-        </Pressable>
+        </PressableScale>
+        </Reveal>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -260,7 +277,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#ECFDF5', // Light green
+    backgroundColor: c.successSoft, // Light green
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -268,13 +285,13 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 26,
     lineHeight: 32,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
     textAlign: 'center',
   },
   subtext: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 20,
     lineHeight: 22,
@@ -285,10 +302,10 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: '#E9EAEB',
+    borderColor: c.border,
     borderRadius: 16,
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -298,9 +315,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: c.bgSoft,
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -316,10 +333,10 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    color: '#111827',
+    color: c.text,
   },
   requiredBadge: {
-    backgroundColor: '#FDF2F8', // Light pink
+    backgroundColor: c.primarySoft, // Light pink
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
@@ -330,7 +347,7 @@ const styles = StyleSheet.create({
   },
   cardDescription: {
     fontSize: 13,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 18,
   },
   grantButton: {
@@ -339,16 +356,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E9EAEB',
-    backgroundColor: '#FFFFFF',
+    borderColor: c.border,
+    backgroundColor: c.bgSoft,
   },
   grantedButton: {
-    borderColor: '#FDF2F8',
-    backgroundColor: '#FFFFFF',
+    borderColor: c.primarySoft,
+    backgroundColor: c.bgSoft,
   },
   grantText: {
     fontSize: 14,
-    color: '#111827',
+    color: c.text,
   },
   grantedText: {
     fontSize: 14,
@@ -363,7 +380,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D62D88',
   },
   continueButtonDisabled: {
-    backgroundColor: '#F9C2D9',
+    backgroundColor: c.primaryDisabled,
   },
   continueButtonText: {
     color: '#FFFFFF',

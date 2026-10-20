@@ -3,6 +3,10 @@ import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-nat
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../HelixaText';
+import { cdnImage } from '../../lib/cdnImage';
+
+// Shown until she adds a photo (it used to load a random stranger's picture from pravatar.cc).
+const DEFAULT_AVATAR = require('../../assets/images/default-avatar.png');
 
 type ProfileHeaderProps = {
   firstName: string;
@@ -23,7 +27,7 @@ export const ProfileHeader = ({ firstName, trimester, profilePicture, onPressAva
       >
         <View style={styles.imageWrapper}>
           <Image 
-            source={{ uri: profilePicture || 'https://i.pravatar.cc/150' }} 
+            source={profilePicture ? { uri: cdnImage(profilePicture, 120) } : DEFAULT_AVATAR} 
             style={styles.avatar} 
             contentFit="cover"
           />

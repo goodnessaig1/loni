@@ -1,7 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
-  Pressable,
   StyleSheet,
   ScrollView,
 } from 'react-native';
@@ -11,12 +10,18 @@ import { Feather } from '@expo/vector-icons';
 import LottieView from 'lottie-react-native';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
+import { PressableScale, Reveal } from '../../components/motion';
 
 export default function SuccessScreen() {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
+        <Reveal index={0}>
         <View style={styles.header}>
           <View style={styles.iconContainer}>
             <LottieView
@@ -31,11 +36,13 @@ export default function SuccessScreen() {
             You now have free access to LONI's maternal support services
           </HelixaText>
         </View>
+        </Reveal>
 
+        <Reveal index={1}>
         <View style={styles.cardsContainer}>
           {/* Talk to a Nurse */}
           <View style={styles.card}>
-            <View style={[styles.cardIconBox, { backgroundColor: '#ECFDF5' }]}>
+            <View style={[styles.cardIconBox, { backgroundColor: colors.successSoft }]}>
               <Feather name="phone-call" size={20} color="#10B981" />
             </View>
             <View style={styles.cardTextContent}>
@@ -48,7 +55,7 @@ export default function SuccessScreen() {
 
           {/* Emergency Rides */}
           <View style={styles.card}>
-            <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8' }]}>
+            <View style={[styles.cardIconBox, { backgroundColor: colors.primarySoft }]}>
               <Feather name="truck" size={20} color="#F43F5E" />
             </View>
             <View style={styles.cardTextContent}>
@@ -61,7 +68,7 @@ export default function SuccessScreen() {
 
           {/* Recovery Plans */}
           <View style={styles.card}>
-            <View style={[styles.cardIconBox, { backgroundColor: '#F5F3FF' }]}>
+            <View style={[styles.cardIconBox, { backgroundColor: isDark ? '#221A3A' : '#F5F3FF' }]}>
               <Feather name="clipboard" size={20} color="#8B5CF6" />
             </View>
             <View style={styles.cardTextContent}>
@@ -72,29 +79,32 @@ export default function SuccessScreen() {
             </View>
           </View>
         </View>
+        </Reveal>
 
+        <Reveal index={2} style={{ marginTop: 'auto' }}>
         <View style={styles.footer}>
-          <Pressable
+          <PressableScale
             style={styles.startButton}
             onPress={() => router.replace('/(auth)/onboarding')}
           >
             <HelixaText style={styles.startButtonText} weight="bold">Get Started</HelixaText>
-          </Pressable>
+          </PressableScale>
 
           <HelixaText style={styles.footerText}>
             You can upgrade to <HelixaText style={styles.upgradeHighlight} weight="bold">LoniPlus</HelixaText> anytime for unlimited access
           </HelixaText>
         </View>
+        </Reveal>
 
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF', // Light gray background in success state usually or white
+    backgroundColor: c.bg, // Light gray background in success state usually or white
   },
   scrollContent: {
     paddingHorizontal: 24,
@@ -118,22 +128,22 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 12,
     textAlign: 'center',
   },
   subtext: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     textAlign: 'center',
     paddingHorizontal: 16,
     lineHeight: 22,
   },
   cardsContainer: {
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: c.border,
     borderRadius: 16,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: c.bgSoft,
     marginBottom: 40,
     padding: 12,
     gap: 12,
@@ -143,9 +153,9 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E5E5',
+    borderColor: c.border,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF'
+    backgroundColor: c.bgSoft
   },
   cardIconBox: {
     width: 44,
@@ -160,12 +170,12 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    color: '#111827',
+    color: c.text,
     marginBottom: 4,
   },
   cardDescription: {
     fontSize: 13,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   footer: {
     marginTop: 'auto',
@@ -185,7 +195,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#9CA3AF',
+    color: c.textMuted,
     textAlign: 'center',
   },
   upgradeHighlight: {

@@ -10,6 +10,7 @@ import { Avatar } from '../../components/Avatar';
 import { MapView, Marker, MAPS_AVAILABLE, PROVIDER_GOOGLE } from '../../components/MapsCompat';
 import { usePartnerDashboard } from '../../hooks/usePartnerDashboard';
 import { relativeTimeWithClock } from '../../lib/relativeTime';
+import { Reveal } from '../../components/motion';
 
 const ALERT_STATUS_LABEL: Record<string, string> = {
   SEARCHING: 'Looking for a driver nearby',
@@ -94,11 +95,16 @@ export default function SharedLocationScreen() {
       <View style={styles.sheet}>
         <WaveCap />
         <SafeAreaView edges={['bottom']} style={styles.sheetContent}>
+          <Reveal index={0}>
           <CalText style={styles.sheetHeading}>Her shared location</CalText>
+          </Reveal>
+          <Reveal index={1}>
           <HelixaText style={styles.sheetSubtext}>
             {inviterName} is in an emergency ride - here's where she is right now.
           </HelixaText>
+          </Reveal>
 
+          <Reveal index={2}>
           <View style={styles.rows}>
             <View style={styles.row}>
               <Avatar uri={data?.inviter.profile_picture || null} name={inviterName} style={styles.rowAvatar} />
@@ -124,14 +130,18 @@ export default function SharedLocationScreen() {
               </View>
             </View>
           </View>
+          </Reveal>
 
+          <Reveal index={3}>
           <View style={styles.disclaimer}>
             <Feather name="alert-circle" size={14} color="#FFFFFF" style={styles.disclaimerIcon} />
             <HelixaText style={styles.disclaimerText}>
               You see her current shared location only, not her history, routes, or movement.
             </HelixaText>
           </View>
+          </Reveal>
 
+          <Reveal index={4}>
           <Pressable
             style={[styles.openMapsButton, !loc && styles.openMapsButtonDisabled]}
             disabled={!loc}
@@ -140,6 +150,7 @@ export default function SharedLocationScreen() {
             <HelixaText style={styles.openMapsText} weight="black">Open Maps</HelixaText>
             <Feather name="navigation" size={20} color="#FFFFFF" />
           </Pressable>
+          </Reveal>
         </SafeAreaView>
       </View>
     </View>

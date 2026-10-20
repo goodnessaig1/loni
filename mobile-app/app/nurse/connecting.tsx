@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
+import Toast from 'react-native-toast-message';
 import { useCall } from '../../hooks/useCall';
 
 /**
@@ -25,8 +26,13 @@ export default function ConnectingNurseScreen() {
   useEffect(() => {
     if (triggered.current) return;
     triggered.current = true;
-    requestCall(undefined).catch((e) => {
-      console.error('[Call/Mother] Failed to request call', e);
+    requestCall().catch((e: any) => {
+      // e.g. 409 "No nurse is available right now" - say so instead of failing silently.
+      Toast.show({
+        type: 'info',
+        text1: e?.response?.data?.message || 'Could not reach a nurse',
+        text2: e?.response?.status === 409 ? undefined : 'Please check your connection and try again.',
+      });
     });
     // Return immediately - CallModals shows the actual "Calling..." UI as
     // soon as the store's `isOutgoing` flag flips true, whether or not

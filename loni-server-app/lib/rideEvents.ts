@@ -8,6 +8,7 @@
  * and checks the store before acting.
  */
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 import { apiClient } from '../api/client';
 import { useRideStore, RideOffer, Ride } from '../store/rideStore';
 
@@ -122,6 +123,8 @@ export function applyServerRideEvent(type: string, raw: any) {
       if (store.ride?.id === rideId) {
         store.clear('CANCELLED');
         router.replace('/(driver)');
+        // Say why the trip vanished (WS and FCM both deliver this; clear() above makes the second a no-op).
+        Alert.alert('Ride cancelled', 'The mother cancelled this ride. You are available for new requests.');
       }
       return;
     }

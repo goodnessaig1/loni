@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -6,9 +6,19 @@ import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../components/HelixaText';
 import { useAuth } from '../hooks/useAuth';
 import { Image } from 'expo-image';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
+import { ActionModal } from '../components/ActionModal';
+import { StageChange, useUpdateStage } from '../hooks/useStage';
+import { recoveryStageOf, trimesterOf } from '../lib/pregnancy';
+import { useTheme } from '../context/ThemeContext';
+import type { Palette } from '../lib/theme';
+import { PressableScale, Reveal } from '../components/motion';
 
 export default function PregnancyStatusScreen() {
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles({ ...colors, activeCard: isDark ? '#F78BC6' : '#FCE8F3' }), [colors, isDark]);
 
   // Parse current week from string like "5 weeks" or "18 weeks"
   let currentWeek = 0;
@@ -35,7 +45,9 @@ export default function PregnancyStatusScreen() {
     dueDateStr = dueDate.toISOString().split('T')[0];
   }
 
-  const isPregnant = user?.status !== 'newMom'; // Default to pregnant if undefined
+  // Loni is for every woman: she may be pregnant, postpartum, trying to conceive, or here for her general health.
+  const isGeneral = user?.status === 'general' || user?.status === 'ttc';
+  const isPregnant = !isGeneral && user?.status !== 'newMom'; // default to pregnant if undefined
 
   // For newMom, currentWeek is babyAge
   let currentPostpartumWeek = 0;
@@ -45,30 +57,70 @@ export default function PregnancyStatusScreen() {
   }
 
   const currentTrimester = user?.trimester || 'Unknown';
+  const activeTrimester = trimesterOf(currentWeek);
+  const activeRecovery = recoveryStageOf(currentPostpartumWeek);
+
+  // A tap only *proposes* a change; nothing happens until it is confirmed in the sheet.
+  const [pending, setPending] = useState<StageChange | null>(null);
+  const updateStage = useUpdateStage();
+
+  const propose = (change: StageChange) => {
+    const same =
+      (change.trimester && isPregnant && change.trimester === activeTrimester) ||
+      (change.recovery_stage && !isPregnant && change.recovery_stage === activeRecovery) ||
+      (change.status === 'general' && isGeneral) ||
+      (change.status === 'pregnant' && isPregnant) ||
+      (change.status === 'newMom' && !isPregnant && !isGeneral);
+    if (!same) setPending(change);
+  };
+
+  const confirm = () => {
+    if (!pending) return;
+    updateStage.mutate(pending, {
+      onSuccess: () => setPending(null),
+      onError: (e: any) => {
+        setPending(null);
+        Toast.show({ type: 'error', text1: 'Could not update your stage', text2: e?.response?.data?.message || e?.message });
+      },
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Background SVG */}
       <View style={StyleSheet.absoluteFill}>
         <Image
-          source={require('../assets/images/pregnancy-bg.svg')}
+          source={isDark ? require('../assets/images/pregnancy-bg-dark.svg') : require('../assets/images/pregnancy-bg.svg')}
           style={styles.bgImage}
           contentFit="cover"
         />
       </View>
 
       {/* Header */}
+      <Reveal index={0}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#000" />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </Pressable>
         <HelixaText style={styles.headerTitle} weight="bold">Pregnancy Status</HelixaText>
         <View style={styles.placeholder} />
       </View>
+      </Reveal>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Stage Section */}
-        {isPregnant ? (
+        <Reveal index={1}>
+        {isGeneral ? (
+          <View style={styles.stageSection}>
+            <HelixaText style={styles.stageLabel}>Your journey</HelixaText>
+            <HelixaText style={styles.stageTitle} weight="bold">{user?.status === 'ttc' ? 'Trying to conceive' : 'Women\'s health'}</HelixaText>
+            <HelixaText style={styles.stageSubtitle}>
+              {user?.status === 'ttc'
+                ? 'Loni is here for your cycle, your questions and the ups and downs.'
+                : 'Loni is here for your cycle, your body and your wellbeing.'}
+            </HelixaText>
+          </View>
+        ) : isPregnant ? (
           <View style={styles.stageSection}>
             <HelixaText style={styles.stageLabel}>Current Stage</HelixaText>
             <HelixaText style={styles.stageTitle} weight="bold">{currentTrimester}</HelixaText>
@@ -100,39 +152,66 @@ export default function PregnancyStatusScreen() {
             </View>
           </View>
         )}
+        </Reveal>
 
         {/* Toggle Pill */}
+        <Reveal index={2}>
         <View style={styles.toggleContainer}>
-          <View style={[styles.toggleButton, isPregnant && styles.toggleActive]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: isPregnant }}
+            onPress={() => propose({ status: 'pregnant' })}
+            style={[styles.toggleButton, isPregnant && styles.toggleActive]}
+          >
             <HelixaText style={isPregnant ? styles.toggleTextActive : styles.toggleTextInactive} weight={isPregnant ? "bold" : "regular"}>Pregnancy</HelixaText>
-          </View>
-          <View style={[styles.toggleButton, !isPregnant && styles.toggleActive]}>
-            <HelixaText style={!isPregnant ? styles.toggleTextActive : styles.toggleTextInactive} weight={!isPregnant ? "bold" : "regular"}>Postpartum</HelixaText>
-          </View>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: !isPregnant && !isGeneral }}
+            onPress={() => propose({ status: 'newMom' })}
+            style={[styles.toggleButton, !isPregnant && !isGeneral && styles.toggleActive]}
+          >
+            <HelixaText style={!isPregnant && !isGeneral ? styles.toggleTextActive : styles.toggleTextInactive} weight={!isPregnant && !isGeneral ? "bold" : "regular"}>Postpartum</HelixaText>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: isGeneral }}
+            onPress={() => propose({ status: 'general' })}
+            style={[styles.toggleButton, isGeneral && styles.toggleActive]}
+          >
+            <HelixaText style={isGeneral ? styles.toggleTextActive : styles.toggleTextInactive} weight={isGeneral ? "bold" : "regular"}>Not pregnant</HelixaText>
+          </Pressable>
         </View>
+        </Reveal>
 
         {/* Stage List */}
+        <Reveal index={3}>
         <View style={styles.trimestersSection}>
+          {!isGeneral && (
           <HelixaText style={styles.sectionTitle} weight="bold">
             {isPregnant ? "Current Trimester" : "Select Recovery Stage"}
           </HelixaText>
+          )}
 
-          {isPregnant ? (
+          {isGeneral ? null : isPregnant ? (
             <>
               <TrimesterCard
                 title="First Trimester"
                 weeks="Weeks 1 - 12"
-                isActive={currentTrimester.startsWith('1st')}
+                isActive={activeTrimester === 1}
+                onPress={() => propose({ trimester: 1 })}
               />
               <TrimesterCard
                 title="Second Trimester"
                 weeks="Weeks 13 - 27"
-                isActive={currentTrimester.startsWith('2nd')}
+                isActive={activeTrimester === 2}
+                onPress={() => propose({ trimester: 2 })}
               />
               <TrimesterCard
                 title="Third Trimester"
                 weeks="Weeks 28 - 40"
-                isActive={currentTrimester.startsWith('3rd')}
+                isActive={activeTrimester === 3}
+                onPress={() => propose({ trimester: 3 })}
               />
             </>
           ) : (
@@ -140,41 +219,77 @@ export default function PregnancyStatusScreen() {
               <TrimesterCard
                 title="Early Recovery"
                 weeks="Weeks 1 - 6"
-                isActive={currentTrimester === 'Immediate' || currentTrimester === 'Early'}
+                isActive={activeRecovery === 'early'}
+                onPress={() => propose({ recovery_stage: 'early' })}
               />
               <TrimesterCard
                 title="Active Recovery"
                 weeks="Weeks 7 - 12"
-                isActive={currentTrimester === 'Subacute'}
+                isActive={activeRecovery === 'active'}
+                onPress={() => propose({ recovery_stage: 'active' })}
               />
               <TrimesterCard
                 title="Extended Recovery"
                 weeks="Weeks 13+"
-                isActive={currentTrimester === 'Ongoing'}
+                isActive={activeRecovery === 'extended'}
+                onPress={() => propose({ recovery_stage: 'extended' })}
               />
             </>
           )}
         </View>
+        </Reveal>
 
+        <Reveal index={4}>
         <HelixaText style={styles.footerText}>
           Your stage helps us personalize your care. You can update this anytime, we are always here for you.
         </HelixaText>
+        </Reveal>
 
       </ScrollView>
+
+      <ActionModal
+        visible={!!pending}
+        onClose={() => !updateStage.isPending && setPending(null)}
+        title={pending?.status ? (pending.status === 'newMom' ? 'Switch to Postpartum?' : pending.status === 'general' ? 'Switch to Women\'s Health?' : 'Switch to Pregnancy?') : 'Update Your Stage?'}
+        description={
+          pending?.status
+            ? (pending.status === 'general' ? 'Loni will focus on your general health, cycle and wellbeing.' : 'Your care plan will adjust to support your new journey.')
+            : 'We will update your personalized care plan accordingly.'
+        }
+        icon={
+          <View style={{ width: 96, height: 96, borderRadius: 32, backgroundColor: '#D62D88', alignItems: 'center', justifyContent: 'center' }}>
+            <MaterialCommunityIcons name="robot-outline" size={56} color="#FFF" />
+          </View>
+        }
+        primaryButtonText="Confirm"
+        onPrimaryPress={confirm}
+        isPrimaryLoading={updateStage.isPending}
+        secondaryButtonText="Cancel"
+        onSecondaryPress={() => setPending(null)}
+      />
     </SafeAreaView>
   );
 }
 
-function TrimesterCard({ title, weeks, isActive }: { title: string, weeks: string, isActive: boolean }) {
+function TrimesterCard({ title, weeks, isActive, onPress }: { title: string, weeks: string, isActive: boolean, onPress: () => void }) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => makeStyles({ ...colors, activeCard: isDark ? '#F78BC6' : '#FCE8F3' }), [colors, isDark]);
+  // The highlighted row is a bright pink in dark mode, so its text must stay dark there.
+  const onActive = isActive && isDark ? { color: '#1B1B1F' } : undefined;
   return (
-    <View style={[styles.card, isActive && styles.cardActive]}>
+    <PressableScale
+      accessibilityRole="radio"
+      accessibilityState={{ selected: isActive }}
+      onPress={onPress}
+      style={[styles.card, isActive && styles.cardActive]}
+    >
       <View style={styles.cardLeft}>
         <View style={styles.iconCircle}>
           <Feather name="smile" size={20} color="#D62D88" />
         </View>
         <View>
-          <HelixaText style={styles.cardTitle} weight="bold">{title}</HelixaText>
-          <HelixaText style={styles.cardSubtitle}>{weeks}</HelixaText>
+          <HelixaText style={[styles.cardTitle, onActive]} weight="bold">{title}</HelixaText>
+          <HelixaText style={[styles.cardSubtitle, onActive && { color: '#4B4B52' }]}>{weeks}</HelixaText>
         </View>
       </View>
       {isActive && (
@@ -182,14 +297,14 @@ function TrimesterCard({ title, weeks, isActive }: { title: string, weeks: strin
           <Feather name="check" size={14} color="#FFF" />
         </View>
       )}
-    </View>
+    </PressableScale>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette & { activeCard: string }) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   bgImage: {
     width: '100%',
@@ -208,14 +323,14 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   headerTitle: {
     fontSize: 18,
-    color: '#000000',
+    color: c.text,
   },
   placeholder: {
     width: 40,
@@ -231,23 +346,23 @@ const styles = StyleSheet.create({
   },
   stageLabel: {
     fontSize: 14,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginBottom: 4,
   },
   stageTitle: {
     fontSize: 28,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   stageSubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginBottom: 24,
   },
   progressContainer: {
     width: '100%',
     height: 48,
-    backgroundColor: '#FCE8F3', // Light pink background
+    backgroundColor: c.primarySoft, // Light pink background
     borderRadius: 24,
     flexDirection: 'row',
     alignItems: 'center',
@@ -273,7 +388,7 @@ const styles = StyleSheet.create({
   dueDateText: {
     marginTop: 16,
     fontSize: 14,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   postpartumCard: {
     marginTop: 24,
@@ -305,12 +420,12 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: c.surface,
     borderRadius: 24,
     padding: 4,
     alignSelf: 'center',
     marginBottom: 40,
-    width: '80%',
+    width: '100%',
   },
   toggleButton: {
     flex: 1,
@@ -319,7 +434,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   toggleActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.elevated,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -327,11 +442,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   toggleTextActive: {
-    color: '#000000',
+    color: c.text,
     fontSize: 14,
   },
   toggleTextInactive: {
-    color: '#9CA3AF',
+    color: c.textMuted,
     fontSize: 14,
   },
   trimestersSection: {
@@ -339,20 +454,20 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    color: '#000000',
+    color: c.text,
     marginBottom: 16,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F3F3F3',
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
   },
   cardActive: {
-    backgroundColor: '#FCE8F3',
+    backgroundColor: c.activeCard,
   },
   cardLeft: {
     flexDirection: 'row',
@@ -363,18 +478,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.elevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardTitle: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     marginBottom: 2,
   },
   cardSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   checkCircle: {
     width: 24,
@@ -387,7 +502,7 @@ const styles = StyleSheet.create({
   footerText: {
     textAlign: 'center',
     fontSize: 13,
-    color: '#9CA3AF',
+    color: c.textMuted,
     lineHeight: 20,
     paddingHorizontal: 20,
   }

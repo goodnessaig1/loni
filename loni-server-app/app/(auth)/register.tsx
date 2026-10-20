@@ -18,6 +18,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useRegister } from '../../hooks/useAuth';
 
 const validationSchema = Yup.object().shape({
@@ -76,124 +77,130 @@ export default function RegisterScreen() {
                 <Feather name="chevron-left" size={28} color="black" />
               </Pressable>
 
-              <CalText style={styles.heading}>Create Account</CalText>
-              <HelixaText style={styles.subtext}>Join LONI Server and start making a difference.</HelixaText>
+              <Reveal index={0}>
+                <CalText style={styles.heading}>Create Account</CalText>
+                <HelixaText style={styles.subtext}>Join LONI Server and start making a difference.</HelixaText>
+              </Reveal>
 
-              {/* Full Name */}
-              <View style={styles.inputContainer}>
-                <HelixaText style={styles.inputLabel} weight="bold">Full Name</HelixaText>
-                <TextInput 
-                  placeholder="Sarah Chen" 
-                  style={[styles.input, touched.name && errors.name && styles.inputError]} 
-                  onChangeText={handleChange('name')}
-                  onBlur={handleBlur('name')}
-                  value={values.name}
-                  placeholderTextColor="#9CA3AF"
-                />
-                {touched.name && errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
-              </View>
-
-              {/* Email */}
-              <View style={styles.inputContainer}>
-                <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
-                <TextInput 
-                  placeholder="Sarahchen@example.com" 
-                  style={[styles.input, touched.email && errors.email && styles.inputError]} 
-                  keyboardType="email-address" 
-                  autoCapitalize="none"
-                  onChangeText={handleChange('email')}
-                  onBlur={handleBlur('email')}
-                  value={values.email}
-                  placeholderTextColor="#9CA3AF"
-                />
-                {touched.email && errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-              </View>
-
-              {/* Phone Number */}
-              <View style={styles.inputContainer}>
-                <HelixaText style={styles.inputLabel} weight="bold">Phone Number</HelixaText>
-                <TextInput 
-                  placeholder="+1 (555) 234 - 5678" 
-                  style={[styles.input, touched.phone && errors.phone && styles.inputError]} 
-                  keyboardType="phone-pad"
-                  onChangeText={handleChange('phone')}
-                  onBlur={handleBlur('phone')}
-                  value={values.phone}
-                  placeholderTextColor="#9CA3AF"
-                />
-                {touched.phone && errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
-              </View>
-
-              {/* Password */}
-              <View style={styles.inputContainer}>
-                <HelixaText style={styles.inputLabel} weight="bold">Password</HelixaText>
-                <View style={styles.passwordContainer}>
+              <Reveal index={1}>
+                {/* Full Name */}
+                <View style={styles.inputContainer}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Full Name</HelixaText>
                   <TextInput 
-                    placeholder="Min. 8 characters" 
-                    style={[styles.input, styles.passwordInput, touched.password && errors.password && styles.inputError]} 
-                    secureTextEntry={!showPassword} 
-                    onChangeText={handleChange('password')}
-                    onBlur={handleBlur('password')}
-                    value={values.password}
+                    placeholder="Sarah Chen" 
+                    style={[styles.input, touched.name && errors.name && styles.inputError]} 
+                    onChangeText={handleChange('name')}
+                    onBlur={handleBlur('name')}
+                    value={values.name}
                     placeholderTextColor="#9CA3AF"
                   />
-                  <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
-                    <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color="#6B7280" />
-                  </TouchableOpacity>
+                  {touched.name && errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
                 </View>
-                {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-              </View>
 
-              {/* Confirm Password */}
-              <View style={styles.inputContainer}>
-                <HelixaText style={styles.inputLabel} weight="bold">Confirm Password</HelixaText>
-                <View style={styles.passwordContainer}>
+                {/* Email */}
+                <View style={styles.inputContainer}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
                   <TextInput 
-                    placeholder="Re-enter password" 
-                    style={[styles.input, styles.passwordInput, touched.confirmPassword && errors.confirmPassword && styles.inputError]} 
-                    secureTextEntry={!showConfirmPassword} 
-                    onChangeText={handleChange('confirmPassword')}
-                    onBlur={handleBlur('confirmPassword')}
-                    value={values.confirmPassword}
+                    placeholder="Sarahchen@example.com" 
+                    style={[styles.input, touched.email && errors.email && styles.inputError]} 
+                    keyboardType="email-address" 
+                    autoCapitalize="none"
+                    onChangeText={handleChange('email')}
+                    onBlur={handleBlur('email')}
+                    value={values.email}
                     placeholderTextColor="#9CA3AF"
                   />
-                  <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                    <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color="#6B7280" />
-                  </TouchableOpacity>
+                  {touched.email && errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
                 </View>
-                {touched.confirmPassword && errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-              </View>
 
-              {/* Terms Checkbox */}
-              <View style={styles.checkboxContainer}>
-                <TouchableOpacity 
-                  style={styles.checkbox} 
-                  onPress={() => setFieldValue('agreedToTerms', !values.agreedToTerms)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[styles.radioEmpty, values.agreedToTerms && styles.radioSelected]}>
-                    {values.agreedToTerms && <View style={styles.radioInner} />}
+                {/* Phone Number */}
+                <View style={styles.inputContainer}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Phone Number</HelixaText>
+                  <TextInput 
+                    placeholder="+1 (555) 234 - 5678" 
+                    style={[styles.input, touched.phone && errors.phone && styles.inputError]} 
+                    keyboardType="phone-pad"
+                    onChangeText={handleChange('phone')}
+                    onBlur={handleBlur('phone')}
+                    value={values.phone}
+                    placeholderTextColor="#9CA3AF"
+                  />
+                  {touched.phone && errors.phone && <Text style={styles.errorText}>{errors.phone}</Text>}
+                </View>
+
+                {/* Password */}
+                <View style={styles.inputContainer}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Password</HelixaText>
+                  <View style={styles.passwordContainer}>
+                    <TextInput 
+                      placeholder="Min. 8 characters" 
+                      style={[styles.input, styles.passwordInput, touched.password && errors.password && styles.inputError]} 
+                      secureTextEntry={!showPassword} 
+                      onChangeText={handleChange('password')}
+                      onBlur={handleBlur('password')}
+                      value={values.password}
+                      placeholderTextColor="#9CA3AF"
+                    />
+                    <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowPassword(!showPassword)}>
+                      <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color="#6B7280" />
+                    </TouchableOpacity>
                   </View>
-                  <HelixaText style={styles.checkboxText}>
-                    I agree to the <HelixaText style={styles.pinkLink} onPress={() => {}}>Terms of Service</HelixaText> and <HelixaText style={styles.pinkLink} onPress={() => {}}>Privacy Policy</HelixaText>
+                  {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+                </View>
+
+                {/* Confirm Password */}
+                <View style={styles.inputContainer}>
+                  <HelixaText style={styles.inputLabel} weight="bold">Confirm Password</HelixaText>
+                  <View style={styles.passwordContainer}>
+                    <TextInput 
+                      placeholder="Re-enter password" 
+                      style={[styles.input, styles.passwordInput, touched.confirmPassword && errors.confirmPassword && styles.inputError]} 
+                      secureTextEntry={!showConfirmPassword} 
+                      onChangeText={handleChange('confirmPassword')}
+                      onBlur={handleBlur('confirmPassword')}
+                      value={values.confirmPassword}
+                      placeholderTextColor="#9CA3AF"
+                    />
+                    <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                      <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color="#6B7280" />
+                    </TouchableOpacity>
+                  </View>
+                  {touched.confirmPassword && errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+                </View>
+              </Reveal>
+
+              <Reveal index={2}>
+                {/* Terms Checkbox */}
+                <View style={styles.checkboxContainer}>
+                  <TouchableOpacity 
+                    style={styles.checkbox} 
+                    onPress={() => setFieldValue('agreedToTerms', !values.agreedToTerms)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.radioEmpty, values.agreedToTerms && styles.radioSelected]}>
+                      {values.agreedToTerms && <View style={styles.radioInner} />}
+                    </View>
+                    <HelixaText style={styles.checkboxText}>
+                      I agree to the <HelixaText style={styles.pinkLink} onPress={() => {}}>Terms of Service</HelixaText> and <HelixaText style={styles.pinkLink} onPress={() => {}}>Privacy Policy</HelixaText>
+                    </HelixaText>
+                  </TouchableOpacity>
+                  {touched.agreedToTerms && errors.agreedToTerms && <Text style={styles.errorText}>{errors.agreedToTerms as string}</Text>}
+                </View>
+
+                <Button 
+                  title="Create Account"
+                  onPress={handleSubmit as any}
+                  isLoading={isSubmitting}
+                  disabled={!(isValid && dirty)}
+                  style={{ marginTop: 10 }}
+                />
+
+                <Pressable style={styles.switchModeContainer} onPress={() => router.replace('/(auth)/login')}>
+                  <HelixaText style={styles.switchModeText}>
+                    Already have an account? <HelixaText style={styles.switchModeHighlight} weight="bold">Sign in</HelixaText>
                   </HelixaText>
-                </TouchableOpacity>
-                {touched.agreedToTerms && errors.agreedToTerms && <Text style={styles.errorText}>{errors.agreedToTerms as string}</Text>}
-              </View>
-
-              <Button 
-                title="Create Account"
-                onPress={handleSubmit as any}
-                isLoading={isSubmitting}
-                disabled={!(isValid && dirty)}
-                style={{ marginTop: 10 }}
-              />
-
-              <Pressable style={styles.switchModeContainer} onPress={() => router.replace('/(auth)/login')}>
-                <HelixaText style={styles.switchModeText}>
-                  Already have an account? <HelixaText style={styles.switchModeHighlight} weight="bold">Sign in</HelixaText>
-                </HelixaText>
-              </Pressable>
+                </Pressable>
+              </Reveal>
 
             </ScrollView>
           </KeyboardAvoidingView>

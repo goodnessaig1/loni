@@ -13,6 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal, RevealList, PressableScale } from '../../components/motion';
 import { useAptitudeQuestions, useSubmitAptitude } from '../../hooks/useDriverTraining';
 
 const PAGE_SIZE = 5;
@@ -84,16 +85,18 @@ export default function AptitudeTestScreen() {
         </View>
       ) : (
         <>
-          <View style={styles.progressBarWrap}>
-            <View style={styles.progressTrack}>
-              <View
-                style={[styles.progressFill, { width: `${(answeredCount / questions.length) * 100}%` }]}
-              />
+          <Reveal index={0}>
+            <View style={styles.progressBarWrap}>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[styles.progressFill, { width: `${(answeredCount / questions.length) * 100}%` }]}
+                />
+              </View>
+              <HelixaText style={styles.progressText}>
+                {answeredCount}/{questions.length} answered
+              </HelixaText>
             </View>
-            <HelixaText style={styles.progressText}>
-              {answeredCount}/{questions.length} answered
-            </HelixaText>
-          </View>
+          </Reveal>
 
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -102,54 +105,58 @@ export default function AptitudeTestScreen() {
             {pageQuestions.map((q, idx) => {
               const number = page * PAGE_SIZE + idx + 1;
               return (
-                <View key={q.id} style={styles.questionCard}>
-                  <HelixaText style={styles.questionText}>
-                    <HelixaText style={styles.qNumber} weight="bold">{`Q${number}.  `}</HelixaText>
-                    {q.question}
-                  </HelixaText>
-                  {q.options.map((option, optIdx) => {
-                    const selected = answers[q.id] === optIdx;
-                    return (
-                      <Pressable
-                        key={optIdx}
-                        style={[styles.option, selected && styles.optionSelected]}
-                        onPress={() => select(q.id, optIdx)}
-                      >
-                        <HelixaText style={[styles.optionText, selected && styles.optionTextSelected]}>
-                          {option}
-                        </HelixaText>
-                        {selected && <Feather name="check" size={18} color="#D62D88" />}
-                      </Pressable>
-                    );
-                  })}
-                </View>
+                <RevealList key={q.id} index={idx + 1}>
+                  <View style={styles.questionCard}>
+                    <HelixaText style={styles.questionText}>
+                      <HelixaText style={styles.qNumber} weight="bold">{`Q${number}.  `}</HelixaText>
+                      {q.question}
+                    </HelixaText>
+                    {q.options.map((option, optIdx) => {
+                      const selected = answers[q.id] === optIdx;
+                      return (
+                        <PressableScale
+                          key={optIdx}
+                          style={[styles.option, selected && styles.optionSelected]}
+                          onPress={() => select(q.id, optIdx)}
+                        >
+                          <HelixaText style={[styles.optionText, selected && styles.optionTextSelected]}>
+                            {option}
+                          </HelixaText>
+                          {selected && <Feather name="check" size={18} color="#D62D88" />}
+                        </PressableScale>
+                      );
+                    })}
+                  </View>
+                </RevealList>
               );
             })}
           </ScrollView>
 
-          <View style={styles.footer}>
-            {page > 0 && (
-              <Pressable style={styles.secondaryButton} onPress={() => setPage((p) => p - 1)}>
-                <Feather name="arrow-left" size={16} color="#111827" />
-                <HelixaText style={styles.secondaryText}>Previous</HelixaText>
-              </Pressable>
-            )}
-            {isLastPage ? (
-              <Button
-                title="Submit Test"
-                onPress={handleSubmit}
-                disabled={!allAnswered || isPending}
-                isLoading={isPending}
-                style={styles.primaryFlex}
-              />
-            ) : (
-              <Button
-                title="Next"
-                onPress={() => setPage((p) => p + 1)}
-                style={styles.primaryFlex}
-              />
-            )}
-          </View>
+          <Reveal index={2}>
+            <View style={styles.footer}>
+              {page > 0 && (
+                <PressableScale style={styles.secondaryButton} onPress={() => setPage((p) => p - 1)}>
+                  <Feather name="arrow-left" size={16} color="#111827" />
+                  <HelixaText style={styles.secondaryText}>Previous</HelixaText>
+                </PressableScale>
+              )}
+              {isLastPage ? (
+                <Button
+                  title="Submit Test"
+                  onPress={handleSubmit}
+                  disabled={!allAnswered || isPending}
+                  isLoading={isPending}
+                  style={styles.primaryFlex}
+                />
+              ) : (
+                <Button
+                  title="Next"
+                  onPress={() => setPage((p) => p + 1)}
+                  style={styles.primaryFlex}
+                />
+              )}
+            </View>
+          </Reveal>
         </>
       )}
     </SafeAreaView>

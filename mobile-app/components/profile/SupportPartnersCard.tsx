@@ -3,18 +3,20 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../HelixaText';
+import { useTheme } from '../../context/ThemeContext';
 
 export const SupportPartnersCard = ({ onPress }: { onPress?: () => void }) => {
+  const { colors, isDark } = useTheme();
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface }]} onPress={onPress}>
       <Image 
-        source={require('../../assets/images/support.png')} 
+        source={isDark ? require('../../assets/images/support-dark.png') : require('../../assets/images/support.png')} 
         style={styles.bgImage}
         contentFit="cover"
       />
       <View style={styles.content}>
-        <Feather name="users" size={20} color="#000" style={styles.icon} />
-        <HelixaText weight="bold" style={styles.text}>Add Support Partners</HelixaText>
+        <Feather name="users" size={20} color={colors.text} style={styles.icon} />
+        <HelixaText weight="bold" style={[styles.text, { color: colors.text }]}>Add Support Partners</HelixaText>
       </View>
     </TouchableOpacity>
   );
@@ -27,7 +29,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     overflow: 'hidden',
     position: 'relative',
-    backgroundColor: '#F9FAFB',
   },
   bgImage: {
     position: 'absolute',

@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Pressable, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Reveal, PressableScale } from '../../components/motion';
 import { usePartnerConnection } from '../../hooks/usePartnerConnection';
 
 export default function ConnectedScreen() {
@@ -14,27 +15,31 @@ export default function ConnectedScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Image
-            source={{ uri: 'https://ik.imagekit.io/eqh0cjetc/amazon-image/support-emjoi.svg' }}
-            style={styles.icon}
-            contentFit="contain"
-          />
-          <CalText style={styles.heading}>You're connected</CalText>
-          <HelixaText style={styles.subtext}>
-            {connection?.inviter_name
-              ? `You're now part of ${connection.inviter_name}'s LONI support system.`
-              : "You're now part of her LONI support system."}
-          </HelixaText>
-        </View>
+        <Reveal index={0}>
+          <View style={styles.header}>
+            <Image
+              source={{ uri: 'https://ik.imagekit.io/eqh0cjetc/amazon-image/support-emjoi.svg' }}
+              style={styles.icon}
+              contentFit="contain"
+            />
+            <CalText style={styles.heading}>You're connected</CalText>
+            <HelixaText style={styles.subtext}>
+              {connection?.inviter_name
+                ? `You're now part of ${connection.inviter_name}'s LONI support system.`
+                : "You're now part of her LONI support system."}
+            </HelixaText>
+          </View>
+        </Reveal>
 
-        <Pressable
-          style={styles.doneButton}
-          onPress={() => router.replace('/(auth)/whats-shared')}
-        >
-          <HelixaText style={styles.doneButtonText} weight="bold">Done</HelixaText>
-          <Feather name="arrow-right" size={18} color="#FFFFFF" />
-        </Pressable>
+        <Reveal index={1}>
+          <PressableScale
+            style={styles.doneButton}
+            onPress={() => router.replace('/(auth)/whats-shared')}
+          >
+            <HelixaText style={styles.doneButtonText} weight="bold">Done</HelixaText>
+            <Feather name="arrow-right" size={18} color="#FFFFFF" />
+          </PressableScale>
+        </Reveal>
       </View>
     </SafeAreaView>
   );

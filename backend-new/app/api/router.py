@@ -11,6 +11,11 @@ from app.modules.calls.ws_router import router as calls_ws_router
 from app.modules.driver_training.router import router as driver_training_router
 from app.modules.driver_training.admin_router import router as driver_training_admin_router
 from app.modules.rides.router import router as rides_router
+from app.modules.community.router import router as community_router
+from app.modules.subscriptions.router import router as subscriptions_router
+from app.modules.care.router import router as care_router
+from app.modules.checkins.router import router as checkins_router
+from app.modules.account.router import router as account_router
 
 api_router = APIRouter()
 
@@ -25,6 +30,11 @@ api_router.include_router(calls_ws_router, prefix="/calls", tags=["calls-ws"])
 api_router.include_router(webhooks_router, prefix="/livekit", tags=["webhooks"])
 api_router.include_router(driver_training_router, prefix="/driver-training", tags=["driver-training"])
 api_router.include_router(rides_router, prefix="/rides", tags=["rides"])
+api_router.include_router(community_router, prefix="/community", tags=["community"])
+api_router.include_router(subscriptions_router, prefix="/subscriptions", tags=["subscriptions"])
+api_router.include_router(care_router, prefix="/care", tags=["care"])
+api_router.include_router(checkins_router, prefix="/checkins", tags=["checkins"])
+api_router.include_router(account_router, prefix="/account", tags=["account"])
 api_router.include_router(
     driver_training_admin_router, prefix="/admin/aptitude", tags=["admin-aptitude"]
 )

@@ -8,6 +8,7 @@ import {
   PressableProps
 } from 'react-native';
 import { HelixaText } from './HelixaText';
+import { useTheme } from '../context/ThemeContext';
 
 interface ButtonProps extends PressableProps {
   title: string;
@@ -23,12 +24,13 @@ export function Button({
   ...props 
 }: ButtonProps) {
   const isDisabled = disabled || isLoading;
+  const { isDark } = useTheme();
 
   return (
     <Pressable 
       style={[
         styles.button,
-        isDisabled ? styles.buttonDisabled : styles.buttonActive,
+        isDisabled ? [styles.buttonDisabled, isDark && styles.buttonDisabledDark] : styles.buttonActive,
         style
       ]}
       disabled={isDisabled}
@@ -58,6 +60,9 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: '#F9C2D9',
+  },
+  buttonDisabledDark: {
+    backgroundColor: '#5A1F42',
   },
   buttonText: {
     color: '#FFFFFF',

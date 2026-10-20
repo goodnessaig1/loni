@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Pressable,
@@ -17,6 +17,9 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { useAddPhone } from '../../hooks/useAuth';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const PhoneSchema = Yup.object().shape({
   phone: Yup.string()
@@ -29,6 +32,8 @@ const PhoneSchema = Yup.object().shape({
 });
 
 export default function PhoneScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mutateAsync: addPhone } = useAddPhone();
 
   const handlePhoneSubmit = async (values: any, { setSubmitting, setFieldError }: any) => {
@@ -47,14 +52,16 @@ export default function PhoneScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={28} color="black" />
+            <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Your Phone Number</CalText>
           <HelixaText style={styles.subtext}>
             We'll send you a verification code to confirm your number
           </HelixaText>
+          </Reveal>
 
           <Formik
             initialValues={{ phone: '' }}
@@ -63,6 +70,7 @@ export default function PhoneScreen() {
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isValid, dirty, isSubmitting }) => (
               <>
+                <Reveal index={1}>
                 <View style={styles.inputContainer}>
                   <HelixaText style={styles.inputLabel} weight="bold">Your phone number</HelixaText>
 
@@ -92,13 +100,16 @@ export default function PhoneScreen() {
                     <HelixaText style={styles.errorText}>{errors.phone}</HelixaText>
                   )}
                 </View>
+                </Reveal>
 
+                <Reveal index={2}>
                 <Button
                   title="Send Verification Code"
                   onPress={handleSubmit as any}
                   isLoading={isSubmitting}
                   disabled={!(isValid && dirty)}
                 />
+                </Reveal>
               </>
             )}
           </Formik>
@@ -109,10 +120,10 @@ export default function PhoneScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -131,12 +142,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   subtext: {
     fontSize: 16,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 24,
     marginBottom: 32,
   },
@@ -145,16 +156,16 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   phoneInputWrapper: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   countryPicker: {
     flexDirection: 'row',
@@ -182,19 +193,19 @@ const styles = StyleSheet.create({
   },
   countryCode: {
     fontSize: 16,
-    color: '#111827',
+    color: c.text,
   },
   divider: {
     width: 1,
     height: '60%',
-    backgroundColor: '#E5E7EB',
+    backgroundColor: c.divider,
   },
   phoneInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
   },
   continueButton: {
@@ -206,7 +217,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D62D88',
   },
   continueButtonDisabled: {
-    backgroundColor: '#F9C2D9',
+    backgroundColor: c.primaryDisabled,
     opacity: 0.8,
   },
   continueButtonText: {

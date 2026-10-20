@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -11,7 +11,9 @@ import { Avatar } from '../../components/Avatar';
 import { SupportIcon } from '../../components/icons/SupportIcon';
 import { useAuth, useUploadProfilePicture } from '../../hooks/useAuth';
 import { usePartnerConnection } from '../../hooks/usePartnerConnection';
+import { partnerApi } from '../../api/partner';
 import { relativeTime } from '../../lib/relativeTime';
+import { PressableScale, Reveal } from '../../components/motion';
 
 function ShareRow({ title, description, shared }: { title: string; description: string; shared: boolean }) {
   return (
@@ -37,7 +39,26 @@ function ShareRow({ title, description, shared }: { title: string; description: 
 }
 
 export default function PartnerProfile() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logoutUser } = useAuth();
+  const [leaving, setLeaving] = React.useState(false);
+
+  const confirmLeave = () =>
+    Alert.alert('Stop getting alerts?', `You will no longer receive ${connection?.inviter_name ?? 'her'}'s updates or emergency alerts.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Stop alerts', style: 'destructive', onPress: async () => {
+          setLeaving(true);
+          try {
+            await partnerApi.leaveConnection();
+            Toast.show({ type: 'success', text1: 'Done', text2: 'You will no longer receive her alerts.' });
+            await logoutUser();
+          } catch (e: any) {
+            setLeaving(false);
+            Toast.show({ type: 'error', text1: 'Could not remove the connection', text2: e?.response?.data?.message });
+          }
+        },
+      },
+    ]);
   const { data: connection } = usePartnerConnection();
   const uploadMutation = useUploadProfilePicture();
 
@@ -79,15 +100,20 @@ export default function PartnerProfile() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Reveal index={0}>
         <CalText style={styles.heading}>Your account</CalText>
+        </Reveal>
 
+        <Reveal index={1}>
         <View style={styles.avatarWrap}>
           <Avatar uri={user?.profilePicture || null} name={user?.name || 'You'} style={styles.avatar} />
           <Pressable style={styles.cameraButton} onPress={handlePickImage}>
             <Feather name="camera" size={14} color="#FFFFFF" />
           </Pressable>
         </View>
+        </Reveal>
 
+        <Reveal index={2}>
         <View style={styles.nameRow}>
           <HelixaText weight="black" style={styles.name}>{user?.name || 'Partner'}</HelixaText>
           <Pressable style={styles.supportButton} onPress={() => router.push('/partner/support' as any)}>
@@ -95,12 +121,18 @@ export default function PartnerProfile() {
             <HelixaText style={styles.supportText} weight="black">Support</HelixaText>
           </Pressable>
         </View>
+        </Reveal>
 
+        <Reveal index={3}>
         <View style={styles.section}>
           <HelixaText style={styles.sectionLabel} weight="bold">Partner account</HelixaText>
           <View style={styles.infoRow}>
             <HelixaText style={styles.infoLabel}>Email</HelixaText>
             <HelixaText weight="black" style={styles.infoValue}>{user?.email || '—'}</HelixaText>
+          </View>
+          <View style={styles.infoRow}>
+            <HelixaText style={styles.infoLabel}>Phone</HelixaText>
+            <HelixaText weight="black" style={styles.infoValue}>{user?.phone || '—'}</HelixaText>
           </View>
           <View style={styles.infoRow}>
             <HelixaText style={styles.infoLabel}>Role</HelixaText>
@@ -118,8 +150,10 @@ export default function PartnerProfile() {
             </View>
           </View>
         </View>
+        </Reveal>
 
         {connection && (
+          <Reveal index={4}>
           <View style={styles.section}>
             <HelixaText style={styles.sectionLabel} weight="bold">Connection with {inviterName}</HelixaText>
             <View style={styles.infoRow}>
@@ -166,7 +200,18 @@ export default function PartnerProfile() {
                 </HelixaText>
               </View>
             </View>
+
+            <PressableScale style={styles.leaveCard} onPress={confirmLeave} disabled={leaving}>
+              <Feather name="bell-off" size={18} color="#FA3532" />
+              <View style={{ flex: 1 }}>
+                <HelixaText weight="black" style={styles.leaveTitle}>{leaving ? 'Removing…' : 'Stop getting alerts'}</HelixaText>
+                <HelixaText style={styles.warningBody}>
+                  You'll stop receiving {inviterName}'s updates and emergency alerts, and this partner account will be closed. She can invite you again.
+                </HelixaText>
+              </View>
+            </PressableScale>
           </View>
+          </Reveal>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -175,6 +220,11 @@ export default function PartnerProfile() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
+  leaveCard: {
+    flexDirection: 'row', gap: 12, alignItems: 'flex-start', marginTop: 18,
+    backgroundColor: 'rgba(250,53,50,0.06)', borderRadius: 14, padding: 16,
+  },
+  leaveTitle: { fontSize: 14, color: '#FA3532', marginBottom: 4 },
   scroll: { paddingHorizontal: 21, paddingTop: 8, paddingBottom: 140 },
   heading: { fontSize: 20, color: '#000000', textAlign: 'center', marginBottom: 32 },
   avatarWrap: { alignSelf: 'center', marginBottom: 24 },

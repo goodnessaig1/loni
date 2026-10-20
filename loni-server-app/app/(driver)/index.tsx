@@ -15,6 +15,7 @@ import { ridesApi } from '../../api/rides';
 import { useAvailableRides, useDriverStats, useRideHistory } from '../../hooks/useRides';
 import { useRideStore } from '../../store/rideStore';
 import { startForegroundLocation, stopDriverLocation } from '../../lib/driverLocation';
+import { PressableScale, Reveal, RevealList } from '../../components/motion';
 
 const PINK = '#D62D88';
 const ORANGE = '#FFA722';
@@ -46,6 +47,7 @@ export default function DriverDashboard() {
   const offers = useRideStore((s) => s.offers);
   const setOffers = useRideStore((s) => s.setOffers);
   const activeRide = useRideStore((s) => s.ride);
+  const setRide = useRideStore((s) => s.setRide);
 
   // Seed online state from the server the first time stats land.
   useEffect(() => {
@@ -62,6 +64,15 @@ export default function DriverDashboard() {
       stats.refetch();
       history.refetch();
       if (isOnline) available.refetch();
+      // Match the server: bring back a trip still in progress (after a restart the store is empty),
+      // and drop one that ended or was reassigned while the app was in the background.
+      ridesApi.active()
+        .then((r) => {
+          const local = useRideStore.getState().ride;
+          if (r && r.driver_id) setRide(r);
+          else if (local && !['COMPLETED', 'IDLE'].includes(local.status)) useRideStore.getState().clear('IDLE');
+        })
+        .catch(() => {});
     }, [isOnline]), // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -140,6 +151,7 @@ export default function DriverDashboard() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Header */}
+        <Reveal index={0}>
         <View style={styles.headerRow}>
           <View style={styles.identity}>
             <View style={styles.avatarRing}>
@@ -156,27 +168,33 @@ export default function DriverDashboard() {
               </View>
             </View>
           </View>
-          <Pressable style={styles.bellBtn}>
+          <Pressable style={styles.bellBtn} onPress={() => router.push('/notifications' as any)}>
             <Feather name="bell" size={20} color="#111" />
           </Pressable>
         </View>
+        </Reveal>
 
         {/* Greeting */}
+        <Reveal index={1}>
         <HelixaText weight="bold" style={styles.greeting}>
           <HelixaText weight="bold" style={{ color: '#31001A' }}>Hi, </HelixaText>
           <HelixaText weight="bold" style={{ color: '#898989' }}>Ready for emergency requests?</HelixaText>
         </HelixaText>
+        </Reveal>
 
         {/* Resume active trip */}
         {activeRide && !['COMPLETED', 'CANCELLED', 'IDLE'].includes(activeRide.status) && (
-          <Pressable style={styles.resumeBanner} onPress={() => router.push(`/driver/trip/${activeRide.id}` as any)}>
+          <Reveal index={2}>
+          <PressableScale style={styles.resumeBanner} onPress={() => router.push(`/driver/trip/${activeRide.id}` as any)}>
             <MaterialCommunityIcons name="car-connected" size={18} color="#FFF" />
             <HelixaText weight="bold" style={styles.resumeText}>Resume active trip</HelixaText>
             <Feather name="chevron-right" size={20} color="#FFF" />
-          </Pressable>
+          </PressableScale>
+          </Reveal>
         )}
 
         {/* "Ready to drive" card — pink when online, greyscale when offline */}
+        <Reveal index={3}>
         <View style={[styles.pinkCard, { backgroundColor: th.card }]}>
           <Image
             source={require('../../assets/images/hero.png')}
@@ -202,10 +220,12 @@ export default function DriverDashboard() {
 
           <DragToggle value={isOnline} onToggle={handleToggle} disabled={toggling} colors={th.drag} />
         </View>
+        </Reveal>
 
         {/* Nearest request banner */}
         {isOnline && nearest && (
-          <Pressable
+          <Reveal index={4}>
+          <PressableScale
             style={styles.orangeBanner}
             onPress={() => router.push(`/driver/request/${nearest.ride_id}` as any)}>
             <View style={styles.orangeBannerInner}>
@@ -215,10 +235,12 @@ export default function DriverDashboard() {
               </HelixaText>
             </View>
             <Feather name="chevrons-right" size={22} color="rgba(255,255,255,0.9)" />
-          </Pressable>
+          </PressableScale>
+          </Reveal>
         )}
 
         {/* Stats grid */}
+        <Reveal index={5}>
         <View style={styles.statsGrid}>
           <View style={[styles.statTile, styles.tlTL]}>
             <View>
@@ -249,8 +271,10 @@ export default function DriverDashboard() {
             <View style={styles.statIcon}><MaterialCommunityIcons name="check-circle" size={18} color="#111" /></View>
           </View>
         </View>
+        </Reveal>
 
         {/* Available Emergency Requests */}
+        <Reveal index={6}>
         <View style={styles.sectionHeader}>
           <View>
             <HelixaText weight="bold" style={styles.sectionTitle}>Available Emergency Requests</HelixaText>
@@ -259,6 +283,7 @@ export default function DriverDashboard() {
             </HelixaText>
           </View>
         </View>
+        </Reveal>
 
         {available.isLoading && isOnline ? (
           <ActivityIndicator color={PINK} style={{ marginVertical: 16 }} />
@@ -268,9 +293,9 @@ export default function DriverDashboard() {
           </HelixaText>
         ) : (
           <View style={{ gap: 11 }}>
-            {offers.map((o) => (
-              <Pressable
-                key={o.ride_id}
+            {offers.map((o, i) => (
+              <RevealList key={o.ride_id} index={i}>
+              <PressableScale
                 style={styles.requestCard}
                 onPress={() => router.push(`/driver/request/${o.ride_id}` as any)}>
                 <View style={styles.requestBar} />
@@ -294,19 +319,22 @@ export default function DriverDashboard() {
                   <HelixaText weight="bold" style={styles.viewText}>View</HelixaText>
                   <Feather name="chevron-right" size={18} color={GREEN} />
                 </View>
-              </Pressable>
+              </PressableScale>
+              </RevealList>
             ))}
           </View>
         )}
 
         {/* Recent Activity */}
+        <Reveal index={7}>
         <View style={[styles.sectionHeader, { marginTop: 28 }]}>
           <HelixaText weight="bold" style={styles.sectionTitle}>Recent Activity</HelixaText>
         </View>
+        </Reveal>
         <View style={{ gap: 11 }}>
           {(history.data ?? []).slice(0, 6).map((h, i) => (
-            <Pressable
-              key={h.id}
+            <RevealList key={h.id} index={i}>
+            <PressableScale
               style={[styles.activityCard, { backgroundColor: ['#FDF1F4', '#F7F1FB', '#FFF7EA'][i % 3] }]}
               onPress={() => router.push(`/driver/trip/${h.id}` as any)}>
               <View style={[styles.activityIcon, { backgroundColor: ['#F68AA8', '#D591E9', ORANGE][i % 3] }]}>
@@ -319,7 +347,8 @@ export default function DriverDashboard() {
                 </HelixaText>
               </View>
               <Feather name="chevron-right" size={20} color="#9CA3AF" />
-            </Pressable>
+            </PressableScale>
+            </RevealList>
           ))}
           {(!history.data || history.data.length === 0) && (
             <HelixaText style={styles.emptyText}>No trips yet.</HelixaText>

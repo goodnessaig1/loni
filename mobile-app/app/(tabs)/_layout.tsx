@@ -1,7 +1,9 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { HelixaText } from '../../components/HelixaText';
+import { useTheme } from '../../context/ThemeContext';
+import { useSubscription } from '../../hooks/useSubscription';
 
 const HomeIcon = ({ color }: { color: string }) => (
   <Svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -32,15 +34,20 @@ const ProfileIcon = ({ color }: { color: string }) => (
 );
 
 export default function TabsLayout() {
+  const { colors } = useTheme();
+  const router = useRouter();
+  const { hasAccess } = useSubscription();
   return (
-    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Tabs
         screenOptions={{
           headerShown: false,
+          // Tab content slides gently instead of snapping when switching tabs.
+          animation: 'shift',
           tabBarActiveTintColor: '#FFFFFF',
           tabBarInactiveTintColor: '#6B6B6B',
           tabBarStyle: {
-            backgroundColor: '#000000',
+            backgroundColor: colors.nav,
             position: 'absolute',
             bottom: 40,
             marginHorizontal: 20,
@@ -85,6 +92,15 @@ export default function TabsLayout() {
         />
         <Tabs.Screen
           name="upgrade"
+          // Members manage their plan in this tab; everyone else gets the full-screen offer instead.
+          listeners={{
+            tabPress: (e) => {
+              if (!hasAccess) {
+                e.preventDefault();
+                router.push('/subscribe');
+              }
+            },
+          }}
           options={{
             title: 'Upgrade',
             tabBarIcon: ({ color }) => <UpgradeIcon color={color} />,
@@ -103,6 +119,8 @@ export default function TabsLayout() {
             ),
           }}
         />
+        {/* Reached from the home screen's "My Community" button; it keeps the tab bar but has no tab of its own. */}
+        <Tabs.Screen name="community" options={{ href: null }} />
       </Tabs>
     </View>
   );

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { apiClient } from '../api/client';
 import { displayIncomingCall } from './callKeepService';
 import { applyServerCallEvent } from './callEvents';
+import { registerPushToken } from './pushRegistration';
 
 /**
  * PushKit VoIP token registration + incoming-push handling (iOS only).
@@ -56,12 +57,7 @@ export function setupVoipPush(): void {
     // utils/notifications.ts, so the backend can choose the VoIP path
     // specifically for incoming_call and the regular path for everything
     // else (see NotificationService.notify_user's routing logic).
-    apiClient
-      .post('/notifications/devices', {
-        device_id: 'ios_voip',
-        device_type: 'ios_voip',
-        token,
-      })
+    registerPushToken(token, 'ios_voip', 'ios_voip')
       .then(() => console.log('[VoIP] Registered VoIP push token with backend'))
       .catch((e) => console.error('[VoIP] Failed to register VoIP token', e));
   });

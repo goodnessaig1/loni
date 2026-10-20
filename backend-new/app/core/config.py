@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     # Email/Brevo
     BREVO_API_KEY: Optional[str] = None
     BREVO_SENDER_EMAIL: str = "goodness6337@gmail.com"
+
+    # Support contact shown in the apps and where in-app support messages are forwarded.
+    # PLACEHOLDERS: set the real values in .env before release.
+    SUPPORT_EMAIL: str = "support@lonimum.com"
+    SUPPORT_PHONE: str = "+234 000 000 0000"
+    SUPPORT_HOURS: str = "Mon-Sat, 8am - 8pm WAT"
     
     # Cloudinary
     CLOUDINARY_CLOUD_NAME: Optional[str] = None
@@ -82,10 +88,45 @@ class Settings(BaseSettings):
     APTITUDE_MAX_ATTEMPTS: int = 3
     APTITUDE_PASS_SCORE: int = 8
 
+    # ---- AI provider (app/modules/ai_chat/providers.py) --------------------------------------
+    # gemini (default) | openai | abacus | ollama
+    AI_PROVIDER: str = ""
+    AI_MODEL: str = ""                       # optional override of the chosen provider's model
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-3.8-flash"
+    # Small, fast model for the urgency classifier (must answer well inside its 4 s timeout; ~1 s measured).
+    GEMINI_FAST_MODEL: str = "gemini-3.5-flash-lite"
+    # Gemini "thinking": low | medium | high (minimal only on some models), or empty for the model default.
+    # Low keeps chat replies fast. If a model rejects the level, calls retry without it (providers.py).
+    GEMINI_REASONING_EFFORT: str = "low"
     OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
     ABACUS_API_KEY: str = ""
-    AI_ENVIRONMENT: str = "production" # "production" or "local"
+    ABACUS_MODEL: str = "deepseek-v4-flash"
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
+    OLLAMA_MODEL: str = "qwen3:8b"
+    # Legacy switch, used only when AI_PROVIDER is empty: production=abacus, openai, local=ollama.
+    AI_ENVIRONMENT: str = ""
+    # Number the app dials for "Call emergency services". Nigeria's national emergency number is 112, but it
+    # must be confirmed and set per deployment, never assumed by the AI.
+    EMERGENCY_PHONE: str = "112"
+    # A second, narrow model call that can only RAISE the urgency found by the keyword rules (never lower it).
+    AI_TRIAGE_CLASSIFIER: bool = True
+
+    # --- Proactive wellness check-ins ("hello" from Loni) ---
+    # OFF by default so a dev/staging database with real device tokens never messages anyone by accident.
+    CHECKINS_ENABLED: bool = False
+    CHECKIN_TICK_SECONDS: int = 900            # how often the scheduler looks for mothers who are due
+    CHECKIN_DEFAULT_TZ: str = "Africa/Lagos"   # until the app reports the phone's timezone
+    CHECKIN_DEFAULT_HOUR: int = 9              # local hour she is first eligible
+    CHECKIN_END_HOUR: int = 20                 # never send at or after this local hour (quiet hours)
+    CHECKIN_MAX_PER_DAY: int = 2               # hard cap on all proactive messages per local day
+
+    # --- Live look-up of hospital hours / phone numbers for the AI ---
+    # Uses Google Places (GOOGLE_MAPS_API_KEY, already used for rides). WEB_SEARCH_API_KEY (Tavily) is an optional fallback
+    # for places Google does not list. With neither key the AI says it cannot check, instead of guessing.
+    FACILITY_LOOKUP_ENABLED: bool = True
+    WEB_SEARCH_API_KEY: Optional[str] = None
 
     # --- Emergency ride dispatch (drivers) ---
     # Server-side Google Maps key used for Directions, Places (nearest
@@ -108,6 +149,28 @@ class Settings(BaseSettings):
     # driver is within radius the request still goes to the nearest online
     # driver(s), so NO_DRIVERS means nobody is online at all.
     RIDE_OFFER_TIMEOUT_SECONDS: int = 120
+
+    # ---- Scale (see CONTEXT.md "Scaling") ---------------------------------------------------
+    # Required as soon as more than one API process runs: live events (calls, rides, partner
+    # updates) are relayed between processes over Redis pub/sub. Unset = single process only.
+    REDIS_URL: Optional[str] = None
+    # Postgres connections per API process (pool + overflow). Keep processes x total under the DB's limit.
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 10
+    # An open "talk to a nurse" call rings at most this many free nurses (least recently busy first).
+    CALL_RING_MAX_NURSES: int = 25
+    # A ride is offered to at most this many of the nearest drivers per dispatch round.
+    RIDE_MAX_OFFERS_PER_ROUND: int = 15
+    # Dev only: offer rides to drivers anywhere (emulators sit far apart). Production keeps the radius.
+    RIDE_DISPATCH_ANYWHERE: bool = False
+    # Driver GPS heartbeats are streamed live every time but written to the DB at most this often
+    # (or sooner if the driver moved more than DRIVER_LOCATION_PERSIST_METERS).
+    DRIVER_LOCATION_PERSIST_SECONDS: int = 15
+    DRIVER_LOCATION_PERSIST_METERS: int = 50
+    # Safety-net sweep for call/ride timeouts that survive restarts and deploys.
+    TIMEOUT_SWEEP_SECONDS: int = 15
+    RATE_LIMITS_ENABLED: bool = True
     
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

@@ -555,3 +555,37 @@ def _send_account_approved_email_sync(to_email: str, name: str, user_type: str):
 async def send_account_approved_email(to_email: str, name: str, user_type: str):
     await asyncio.to_thread(_send_account_approved_email_sync, to_email, name, user_type)
 
+
+
+def _send_plain_email_sync(to_email: str, subject: str, html_content: str, reply_to: str | None = None):
+    """A simple branded-less email (used to forward in-app support messages to the support inbox)."""
+    if not settings.BREVO_API_KEY:
+        print(f"BREVO_API_KEY is not set. Skipping email to {to_email}: {subject}")
+        return
+    payload = {
+        "sender": {"name": "Loni App", "email": settings.BREVO_SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content,
+    }
+    if reply_to:
+        payload["replyTo"] = {"email": reply_to}
+    req = urllib.request.Request(
+        'https://api.brevo.com/v3/smtp/email',
+        data=json.dumps(payload).encode('utf-8'),
+        headers={'api-key': settings.BREVO_API_KEY, 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    import ssl
+    ctx = ssl.create_default_context()
+    try:
+        import certifi
+        ctx.load_verify_locations(cafile=certifi.where())
+    except ImportError:
+        pass
+    with urllib.request.urlopen(req, context=ctx, timeout=15) as response:
+        response.read()
+
+
+async def send_plain_email(to_email: str, subject: str, html_content: str, reply_to: str | None = None):
+    await asyncio.to_thread(_send_plain_email_sync, to_email, subject, html_content, reply_to)

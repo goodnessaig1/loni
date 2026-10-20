@@ -7,8 +7,14 @@ import { HelixaText } from '../../components/HelixaText';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LumaIcon } from '../../components/icons/LumaIcon';
+import { SafetyActions } from '../../components/chat/SafetyActions';
+import { QuickReplies } from '../../components/chat/QuickReplies';
+import { chatTopicsFor } from '../../lib/chatTopics';
 import { useAIChat } from '../../hooks/useAIChat';
 import Markdown from 'react-native-markdown-display';
+import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../hooks/useAuth';
+import { RevealList } from '../../components/motion';
 
 // --- Helper Components ---
 
@@ -118,6 +124,9 @@ const TypingIndicator = () => {
 
 export default function ConversationScreen() {
   const router = useRouter();
+  const { user } = useAuth();
+  const firstName = user?.name?.trim().split(/\s+/)[0];
+  const { colors, isDark } = useTheme();
   const { optionTitle, existingSessionId } = useLocalSearchParams<{ optionTitle: string, existingSessionId: string }>();
   const flatListRef = useRef<FlatList>(null);
   
@@ -202,29 +211,38 @@ export default function ConversationScreen() {
   const renderMessage = ({ item: msg, index }: { item: any, index: number }) => {
     if (msg.role === 'user') {
       return (
-        <View key={msg.id || index} className="flex-row justify-end mb-8">
+        <RevealList key={msg.id || index} index={index}>
+        <View className="flex-row justify-end mb-8">
           <View className="bg-[#C82A81] rounded-[24px] rounded-br-none px-5 py-4 shadow-sm max-w-[80%] flex-row items-end">
             <HelixaText className="text-[15px] leading-6 text-white">
               {msg.content}
             </HelixaText>
           </View>
         </View>
+        </RevealList>
       );
     } else {
       // Assistant Message
       return (
-        <View key={msg.id || index} className="flex-row items-end mb-8">
-          <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full bg-white items-center justify-center shadow-sm">
+        <RevealList key={msg.id || index} index={index}>
+        <View className="flex-row items-end mb-8">
+          <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full items-center justify-center shadow-sm" style={{ backgroundColor: colors.elevated }}>
             <LumaIcon size={24} />
           </View>
-          <View className="bg-white rounded-[24px] rounded-bl-none px-5 py-4 shadow-sm max-w-[80%]">
+          <View
+            className="rounded-[24px] rounded-bl-none px-5 py-4 shadow-sm max-w-[80%]"
+            style={{
+              backgroundColor: colors.elevated,
+              ...(msg.meta?.urgency === 'emergency' ? { borderWidth: 1.5, borderColor: '#DC2626' } : msg.meta?.urgency === 'urgent' ? { borderWidth: 1.5, borderColor: '#D97706' } : null),
+            }}
+          >
             {msg.isStreaming && !msg.content ? (
               <TypingIndicator />
             ) : (
               <Markdown 
                 style={{
                   body: {
-                    color: 'black',
+                    color: colors.text,
                     fontSize: 15,
                     lineHeight: 24,
                     fontFamily: 'Inter-Regular',
@@ -237,8 +255,13 @@ export default function ConversationScreen() {
                 {msg.content}
               </Markdown>
             )}
+            {!msg.isStreaming || msg.content ? <SafetyActions meta={msg.meta} /> : null}
+            {index === 0 && !isLoading && msg.meta?.suggestions?.length ? (
+              <QuickReplies suggestions={msg.meta.suggestions} onReply={(text) => sendMessage(text)} onNurse={() => router.push('/nurse/connecting')} />
+            ) : null}
           </View>
         </View>
+        </RevealList>
       );
     }
   };
@@ -249,7 +272,7 @@ export default function ConversationScreen() {
 
   return (
     <LinearGradient
-      colors={['#FFC2E3', '#FFEFF8']}
+      colors={isDark ? ['#3A1530', '#0A0D13'] : ['#FFC2E3', '#FFEFF8']}
       locations={[0.1082, 0.7028]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
@@ -264,9 +287,10 @@ export default function ConversationScreen() {
           <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
             <TouchableOpacity 
               onPress={() => handleBackToHome()}
-              className="w-12 h-12 rounded-full bg-white items-center justify-center shadow-sm"
+              className="w-12 h-12 rounded-full items-center justify-center shadow-sm"
+              style={{ backgroundColor: colors.elevated }}
             >
-              <Feather name="arrow-left" size={24} color="black" />
+              <Feather name="arrow-left" size={24} color={colors.text} />
             </TouchableOpacity>
             
             <HelixaText className="text-[20px]" weight="bold" numberOfLines={1} style={{ maxWidth: '60%' }}>
@@ -275,9 +299,10 @@ export default function ConversationScreen() {
             
             <TouchableOpacity 
               onPress={() => setIsDropdownVisible(true)}
-              className="w-12 h-12 rounded-full bg-white items-center justify-center shadow-sm"
+              className="w-12 h-12 rounded-full items-center justify-center shadow-sm"
+              style={{ backgroundColor: colors.elevated }}
             >
-              <Feather name="more-horizontal" size={24} color="black" />
+              <Feather name="more-horizontal" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
@@ -293,11 +318,11 @@ export default function ConversationScreen() {
                 resizeMode="contain" 
               />
               <HelixaText className="text-[24px] text-center mt-6 mb-12" weight="regular" style={{ lineHeight: 32 }}>
-                Hey there, What are you{'\n'}looking for today?
+                Hey {firstName || 'there'}, What are you{'\n'}looking for today?
               </HelixaText>
               
               <View className="flex-row flex-wrap justify-between w-full">
-                {['Pregnancy Support ?', 'Recovery Support ?', 'Emotional Support ?', 'Emergency Guidance ?'].map((option, idx) => (
+                {chatTopicsFor(user?.status).map((t) => t.title).map((option, idx) => (
                   <TouchableOpacity 
                     key={idx}
                     onPress={async () => {
@@ -309,8 +334,8 @@ export default function ConversationScreen() {
                         sendMessage(`I need some help or information regarding: ${option}`, activeSessionId);
                       }
                     }}
-                    className="bg-white rounded-[16px] py-4 px-2 mb-3 items-center justify-center shadow-sm"
-                    style={{ width: '48%' }}
+                    className="rounded-[16px] py-4 px-2 mb-3 items-center justify-center shadow-sm"
+                    style={{ width: '48%', backgroundColor: colors.elevated }}
                   >
                     <HelixaText className="text-[13px] text-center" weight="regular">
                       {option}
@@ -349,20 +374,20 @@ export default function ConversationScreen() {
           {/* Scroll to Bottom Button */}
           {showScrollToBottom && (
             <TouchableOpacity
-              className="absolute right-6 bg-white/90 rounded-full w-10 h-10 items-center justify-center shadow-md z-50"
-              style={{ bottom: 130 }}
+              className="absolute right-6 rounded-full w-10 h-10 items-center justify-center shadow-md z-50"
+              style={{ bottom: 130, backgroundColor: colors.elevated }}
               onPress={() => {
                 flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
                 setShowScrollToBottom(false);
               }}
             >
-              <Feather name="arrow-down" size={20} color="black" />
+              <Feather name="arrow-down" size={20} color={colors.text} />
             </TouchableOpacity>
           )}
 
           {/* Input Area */}
           <View className="px-6 py-4 pb-8">
-            <View className="flex-row items-center bg-black rounded-full pl-6 pr-2 py-2 min-h-[64px]">
+            <View className="flex-row items-center rounded-full pl-6 pr-2 py-2 min-h-[64px]" style={{ backgroundColor: isDark ? colors.nav : '#000' }}>
               <TextInput
                 className="flex-1 text-white text-[15px] py-3"
                 placeholder="Tell Luma How You Feel..."
@@ -396,11 +421,12 @@ export default function ConversationScreen() {
             >
               <TouchableOpacity 
                 activeOpacity={1}
-                className="absolute top-20 right-6 bg-white rounded-3xl w-72 shadow-lg"
+                className="absolute top-20 right-6 rounded-3xl w-72 shadow-lg"
+                style={{ backgroundColor: colors.card }}
               >
                 <View className="px-4 py-2 mt-4">
-                  <HelixaText className="text-[#1F2937] text-[15px] font-bold mt-2">Options</HelixaText>
-                  <View className="h-[1px] bg-gray-100 my-3" />
+                  <HelixaText className="text-[15px] font-bold mt-2">Options</HelixaText>
+                  <View className="h-[1px] my-3" style={{ backgroundColor: colors.divider }} />
                   
                   <TouchableOpacity 
                     className="py-3 mb-2 flex-row items-center justify-between"
@@ -409,8 +435,8 @@ export default function ConversationScreen() {
                       router.push('/chat/history');
                     }}
                   >
-                    <HelixaText className="text-[#1F2937] text-[16px] mr-1" weight="bold">View Chat History</HelixaText>
-                    <Feather name="clock" size={20} color="#1F2937" />
+                    <HelixaText className="text-[16px] mr-1" weight="bold">View Chat History</HelixaText>
+                    <Feather name="clock" size={20} color={colors.text} />
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>

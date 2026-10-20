@@ -74,9 +74,9 @@ update "livekit/livekit.yaml" \
   "s#node_ip: [0-9.]+#node_ip: ${NEW_IP}#"
 
 update "mobile-app/api/client.ts" \
-  "s#^export const API_URL = 'http://[0-9.]+:#export const API_URL = 'http://${NEW_IP}:#"
+  "s#^const LAN_API_URL = 'http://[0-9.]+:#const LAN_API_URL = 'http://${NEW_IP}:#"
 update "loni-server-app/api/client.ts" \
-  "s#^export const API_URL = 'http://[0-9.]+:#export const API_URL = 'http://${NEW_IP}:#"
+  "s#^const LAN_API_URL = 'http://[0-9.]+:#const LAN_API_URL = 'http://${NEW_IP}:#"
 
 # Hygiene only: EXPO_PUBLIC_LIVEKIT_URL is currently dead code (nothing in
 # the active call flow reads it - the backend supplies the real LiveKit

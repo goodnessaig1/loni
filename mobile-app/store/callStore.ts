@@ -29,6 +29,14 @@ export type CallStatus =
 
 export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'unknown';
 
+/** 'nurse' = talking to a LONI nurse; 'ride' = talking to the driver of her emergency ride. */
+export type CallKind = 'nurse' | 'ride';
+
+export interface CallMeta {
+  kind?: CallKind;
+  rideId?: number | null;
+}
+
 export interface ParticipantInfo {
   id: string;
   name: string;
@@ -71,9 +79,14 @@ interface CallState {
   isIncoming: boolean;
   isOutgoing: boolean;
   callerName: string | null;
+  kind: CallKind;
+  rideId: number | null;
+  /** Mirrors the local LiveKit mic so UI outside the room (the ride card) can show it. */
+  micMuted: boolean;
 
-  setIncomingCall: (callId: number, roomName: string, remote: ParticipantInfo | null) => void;
-  setOutgoingCall: (callId: number, roomName: string) => void;
+  setIncomingCall: (callId: number, roomName: string, remote: ParticipantInfo | null, meta?: CallMeta) => void;
+  setOutgoingCall: (callId: number, roomName: string, meta?: CallMeta, remote?: ParticipantInfo | null) => void;
+  setMicMuted: (muted: boolean) => void;
   setAccepted: (payload: { roomToken?: string; livekitUrl?: string; remote?: ParticipantInfo | null }) => void;
   setConnecting: (payload: { callId?: number; roomToken?: string; livekitUrl?: string; remote?: ParticipantInfo | null }) => void;
   setConnected: (connectedAtMs?: number) => void;
@@ -100,6 +113,9 @@ const initial = {
   isIncoming: false,
   isOutgoing: false,
   callerName: null,
+  kind: 'nurse' as CallKind,
+  rideId: null,
+  micMuted: false,
 };
 
 export const useCallStore = create<CallState>((set, get) => ({
@@ -112,8 +128,11 @@ export const useCallStore = create<CallState>((set, get) => ({
     return current !== null && current !== callId;
   },
 
-  setIncomingCall: (callId, roomName, remote) => set({
+  setIncomingCall: (callId, roomName, remote, meta) => set({
     status: 'INCOMING',
+    kind: meta?.kind ?? 'nurse',
+    rideId: meta?.rideId ?? null,
+    micMuted: false,
     isIncoming: true,
     isOutgoing: false,
     isActive: false,
@@ -125,12 +144,17 @@ export const useCallStore = create<CallState>((set, get) => ({
     lastEventStatus: 'INCOMING',
   }),
 
-  setOutgoingCall: (callId, roomName) => set({
+  setOutgoingCall: (callId, roomName, meta, remote) => set({
     status: 'RINGING',
     isOutgoing: true,
     isIncoming: false,
     callId,
     roomName,
+    kind: meta?.kind ?? 'nurse',
+    rideId: meta?.rideId ?? null,
+    micMuted: false,
+    remoteParticipant: remote ?? null,
+    callerName: remote?.name ?? null,
     lastEventCallId: callId,
     lastEventStatus: 'RINGING',
   }),
@@ -170,6 +194,8 @@ export const useCallStore = create<CallState>((set, get) => ({
   setReconnecting: () => set({ status: 'RECONNECTING', lastEventStatus: 'RECONNECTING' }),
 
   setConnectionQuality: (q) => set({ connectionQuality: q }),
+
+  setMicMuted: (muted) => set({ micMuted: muted }),
 
   setRemoteParticipant: (info) => set({ remoteParticipant: info, callerName: info.name }),
 

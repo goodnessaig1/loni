@@ -10,6 +10,7 @@ Same shape as app/modules/calls/services/call_service.py:
 """
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -24,7 +25,7 @@ from app.core.ws_manager import manager as ws_manager
 from app.modules.notifications.service import NotificationService
 from app.modules.notifications.models import NotificationLog
 from app.modules.users.models import (
-    User, UserTypeEnum, DriverProfile, EmergencyContact,
+    User, UserTypeEnum, DriverProfile, EmergencyContact, EmergencyContactStatus,
 )
 from app.utils.user_enrichment import enrich_user_data
 from app.modules.rides.models import (
@@ -56,8 +57,19 @@ async def _emit(user_id: str, event_type: str, title: str, body: str, data: dict
     )
 
 
+# (rider_id, needs_location) -> (expires_at, contacts); see _fanout_to_contacts.
+_CONTACT_CACHE: dict = {}
+
+
+def forget_contacts(rider_id: str) -> None:
+    """Her sharing or partners changed: next location ping re-reads them."""
+    for key in [k for k in _CONTACT_CACHE if k[0] == rider_id]:
+        _CONTACT_CACHE.pop(key, None)
+
+
 async def _fanout_to_contacts(db: AsyncSession, ride: Ride, event_type: str, title: str, body: str,
-                               data: dict, *, ws_only: bool = False, log: bool = False) -> None:
+                               data: dict, *, ws_only: bool = False, log: bool = False,
+                               needs_location: bool = False, force: bool = False) -> None:
     """
     Mirror a ride event to every connected emergency contact (the partner
     app), so a mother in an emergency ride is tracked live by whoever she
@@ -71,14 +83,27 @@ async def _fanout_to_contacts(db: AsyncSession, ride: Ride, event_type: str, tit
     persists a NotificationLog row (for events worth keeping in the
     partner's Notification Centre, not just live state).
     """
-    if not ride.notify_contacts:
+    if not (ride.notify_contacts or force):
         return
-    contacts = (await db.execute(
-        select(EmergencyContact).where(
-            EmergencyContact.user_id == ride.rider_id,
-            EmergencyContact.emergency.is_(True),
-        )
-    )).scalars().all()
+    # Only partners who finished setting up their account, and only what she chose to share with each:
+    # emergency alerts always need `emergency`; anything that reveals where she is also needs `location`.
+    conds = [
+        EmergencyContact.user_id == ride.rider_id,
+        EmergencyContact.status == EmergencyContactStatus.connected,
+        EmergencyContact.emergency.is_(True),
+    ]
+    if needs_location:
+        conds.append(EmergencyContact.location.is_(True))
+    cache_key = (ride.rider_id, needs_location)
+    cached = _CONTACT_CACHE.get(cache_key) if ws_only else None
+    if cached and cached[0] > time.monotonic():
+        contacts = cached[1]
+    else:
+        contacts = (await db.execute(select(EmergencyContact).where(*conds))).scalars().all()
+        if ws_only:
+            # Location heartbeats arrive every few seconds per driver; re-read her contacts at most
+            # every 30 s instead of on every ping.
+            _CONTACT_CACHE[cache_key] = (time.monotonic() + 30, contacts)
     for c in contacts:
         if ws_only:
             try:
@@ -179,6 +204,34 @@ def _ride_payload(ride: Ride, *, rider: Optional[User] = None,
     if next_route:
         out["next_route"] = next_route.model_dump()
     return out
+
+
+# Close enough to tell her to get ready / that she is nearly at the hospital.
+NEAR_PICKUP_METERS = 800
+NEAR_DROPOFF_METERS = 1500
+# Urban driving speed used when no route timing is known (Lagos traffic, ~25 km/h).
+FALLBACK_SPEED_MPS = 7.0
+
+
+def ride_progress(ride: Ride, lat: float, lng: float) -> dict:
+    """Where the driver is relative to the current goal: the pickup before the trip starts, the
+    hospital once it has. Straight-line distance scaled by the trip's own road/time ratio when known."""
+    if ride.status == RideStatusEnum.IN_PROGRESS:
+        phase, goal, near = "to_dropoff", (ride.dropoff_lat, ride.dropoff_lng), NEAR_DROPOFF_METERS
+    elif ride.status == RideStatusEnum.DRIVER_ARRIVED:
+        return {"phase": "at_pickup", "remaining_meters": 0, "eta_seconds": 0, "near": True}
+    else:
+        phase, goal, near = "to_pickup", (ride.pickup_lat, ride.pickup_lng), NEAR_PICKUP_METERS
+    remaining = haversine_meters(lat, lng, goal[0], goal[1])
+    speed = FALLBACK_SPEED_MPS
+    if ride.distance_meters and ride.duration_seconds:
+        speed = max(2.0, ride.distance_meters / ride.duration_seconds)
+    return {
+        "phase": phase,
+        "remaining_meters": int(remaining),
+        "eta_seconds": int(remaining * 1.3 / speed),
+        "near": remaining <= near,
+    }
 
 
 # --------------------------------------------------------------------------
@@ -291,6 +344,17 @@ class RideService:
     @staticmethod
     async def _candidate_drivers(db: AsyncSession, ride: Ride, radius_km: float,
                                  exclude: set[str]) -> list[tuple[User, DriverProfile, Optional[int]]]:
+        # Only drivers inside a lat/lng box around the pickup are loaded (index-friendly), not every
+        # online driver in the country; exact distance is then computed for those few.
+        import math
+        box_km = settings.RIDE_SEARCH_RADIUS_MAX_KM
+        dlat = box_km / 111.0
+        dlng = box_km / (111.0 * max(math.cos(math.radians(ride.pickup_lat)), 0.01))
+        near = and_(
+            DriverProfile.current_lat.between(ride.pickup_lat - dlat, ride.pickup_lat + dlat),
+            DriverProfile.current_lng.between(ride.pickup_lng - dlng, ride.pickup_lng + dlng),
+        )
+        where_loc = [] if settings.RIDE_DISPATCH_ANYWHERE else [or_(DriverProfile.current_lat.is_(None), near)]
         res = await db.execute(
             select(User, DriverProfile)
             .join(DriverProfile, DriverProfile.user_id == User.id)
@@ -300,6 +364,7 @@ class RideService:
                 User.is_online.is_(True),
                 DriverProfile.is_available.is_(True),
                 DriverProfile.active_ride_id.is_(None),
+                *where_loc,
             )
         )
         eligible: list[tuple[User, DriverProfile, Optional[int]]] = []
@@ -326,7 +391,7 @@ class RideService:
         # is genuinely nobody online.
         chosen = within if within else eligible
         chosen.sort(key=lambda t: (t[2] is None, t[2] or 0))
-        return chosen
+        return chosen[: settings.RIDE_MAX_OFFERS_PER_ROUND]
 
     @staticmethod
     async def _dispatch(db: AsyncSession, ride: Ride, radius_km: float) -> int:
@@ -395,19 +460,58 @@ class RideService:
             return
         ride.status = RideStatusEnum.NO_DRIVERS
         db.add(RideEvent(ride_id=ride.id, event_type="RideNoDrivers"))
+        await RideService._withdraw_offers(db, ride, "ride_taken")
         await db.commit()
+        data = {"ride_id": str(ride.id), "id": ride.id, "status": ride.status.value}
         await _emit(
             ride.rider_id, "ride_no_drivers", "No drivers available",
-            "We couldn't reach a driver right now. Please try again or call a nurse.",
-            {"ride_id": str(ride.id), "id": ride.id, "status": ride.status.value},
+            "We couldn't reach a driver right now. Please try again or call a nurse.", data,
         )
+        await _fanout_to_contacts(db, ride, "ride_no_drivers", "No driver found",
+                                  "No driver could be found for her emergency ride.", data, log=True)
+
+    @staticmethod
+    async def _withdraw_offers(db: AsyncSession, ride: Ride, event: str, *, older_than: Optional[datetime] = None,
+                               keep: Optional[str] = None) -> list[str]:
+        """Expire open offers for this ride (all, or only those older than `older_than`) and tell
+        those drivers so the request leaves their screen. Caller commits. Returns the drivers told."""
+        q = select(RideOffer).where(RideOffer.ride_id == ride.id, RideOffer.status == RideOfferStatusEnum.OFFERED)
+        told = []
+        now = datetime.now(timezone.utc)
+        for o in (await db.execute(q)).scalars().all():
+            if o.driver_id == keep:
+                continue
+            offered = o.offered_at.replace(tzinfo=timezone.utc) if o.offered_at and o.offered_at.tzinfo is None else o.offered_at
+            if older_than is not None and offered and offered > older_than:
+                continue
+            o.status = RideOfferStatusEnum.EXPIRED
+            o.responded_at = o.responded_at or now
+            told.append(o.driver_id)
+        payload = {"ride_id": str(ride.id), "id": ride.id, "status": ride.status.value}
+        title = "Ride cancelled" if event == "ride_cancelled" else "Request closed"
+        body = "The mother cancelled the request." if event == "ride_cancelled" else "This request is no longer available."
+        for d in told:
+            asyncio.create_task(_emit(d, event, title, body, payload))
+        return told
+
+    @staticmethod
+    async def _pending_offers(db: AsyncSession, ride_id: int) -> int:
+        return (await db.execute(
+            select(func.count(RideOffer.id)).where(
+                RideOffer.ride_id == ride_id, RideOffer.status == RideOfferStatusEnum.OFFERED,
+            )
+        )).scalar() or 0
+
+    # Rounds of waiting for a driver before telling her nobody is available (each RIDE_OFFER_TIMEOUT_SECONDS).
+    DISPATCH_ROUNDS = 3
 
     @staticmethod
     async def _offer_timeout_watchdog(ride_id: int):
-        # Two rounds: after the first timeout we re-offer (drivers who were
-        # already offered stay offered, plus any new ones). Only after the
-        # second timeout with still nobody eligible do we give up.
-        for round_no in range(2):
+        """Keeps a search moving: each round, offers nobody answered expire (and leave those drivers'
+        screens), drivers who came online since are offered it within the wider radius, and when nobody
+        is left to wait on - or the last round passes - she is told no driver could be found.
+        Without this a ride whose drivers simply ignored the request stayed SEARCHING forever."""
+        for round_no in range(RideService.DISPATCH_ROUNDS):
             await asyncio.sleep(settings.RIDE_OFFER_TIMEOUT_SECONDS)
             async with AsyncSessionLocal() as db:
                 res = await db.execute(select(Ride).where(Ride.id == ride_id).with_for_update())
@@ -415,18 +519,13 @@ class RideService:
                 if not ride or ride.status != RideStatusEnum.SEARCHING:
                     return  # accepted / cancelled - done
 
-                # Any drivers offered and not yet resolved? keep waiting on them.
-                pending = (await db.execute(
-                    select(func.count(RideOffer.id)).where(
-                        RideOffer.ride_id == ride_id,
-                        RideOffer.status == RideOfferStatusEnum.OFFERED,
-                    )
-                )).scalar() or 0
+                cutoff = datetime.now(timezone.utc) - timedelta(seconds=settings.RIDE_OFFER_TIMEOUT_SECONDS - 1)
+                await RideService._withdraw_offers(db, ride, "ride_taken", older_than=cutoff)
+                await db.commit()
 
-                # Re-dispatch to pick up anyone who came online since.
-                new_offered = await RideService._dispatch(db, ride, settings.RIDE_SEARCH_RADIUS_MAX_KM)
-
-                if pending == 0 and new_offered == 0 and round_no == 1:
+                last = round_no == RideService.DISPATCH_ROUNDS - 1
+                new_offered = 0 if last else await RideService._dispatch(db, ride, settings.RIDE_SEARCH_RADIUS_MAX_KM)
+                if last or (new_offered == 0 and await RideService._pending_offers(db, ride_id) == 0):
                     await RideService._mark_no_drivers(db, ride_id)
                     return
 
@@ -501,6 +600,8 @@ class RideService:
         driver = await _load_user(db, driver_id)
         if not driver or driver.user_type != UserTypeEnum.driver:
             raise HTTPException(status_code=403, detail="Only drivers can accept rides")
+        if driver.account_status != "active":
+            raise HTTPException(status_code=403, detail="Your driver account isn't approved yet")
         profile = driver.driver_profile
         if not profile or profile.active_ride_id:
             raise HTTPException(status_code=409, detail="Finish your current trip first")
@@ -538,6 +639,10 @@ class RideService:
             ride.rider_id, "ride_accepted", "Driver on the way",
             f"{driver.name} accepted your request and is heading to you.", payload,
         )
+        await _fanout_to_contacts(
+            db, ride, "ride_accepted", "A driver is on the way",
+            f"{driver.name} is heading to {rider.name if rider else 'her'}.", payload,
+        )
         # Tell the other offered drivers to clear the request.
         for o in offers:
             if o.driver_id != driver_id:
@@ -558,6 +663,13 @@ class RideService:
             offer.status = RideOfferStatusEnum.DECLINED
             offer.responded_at = datetime.now(timezone.utc)
             await db.commit()
+            # Everyone offered said no: look wider straight away rather than waiting out the round.
+            ride = (await db.execute(select(Ride).where(Ride.id == ride_id).with_for_update())).scalar_one_or_none()
+            if ride and ride.status == RideStatusEnum.SEARCHING and await RideService._pending_offers(db, ride_id) == 0:
+                if await RideService._dispatch(db, ride, settings.RIDE_SEARCH_RADIUS_MAX_KM) == 0:
+                    await RideService._mark_no_drivers(db, ride_id)
+                else:
+                    await db.commit()
 
     # ---- trip lifecycle --------------------------------------------
     @staticmethod
@@ -669,6 +781,9 @@ class RideService:
         if ride.status == RideStatusEnum.IN_PROGRESS:
             raise HTTPException(status_code=409, detail="A trip in progress can't be cancelled")
 
+        if user_id == ride.driver_id:
+            return await RideService._driver_withdraws(db, ride, reason)
+
         ride.status = RideStatusEnum.CANCELLED
         ride.cancelled_at = datetime.now(timezone.utc)
         ride.cancelled_by = user_id
@@ -682,10 +797,8 @@ class RideService:
             if drv and drv.driver_profile and drv.driver_profile.active_ride_id == ride.id:
                 drv.driver_profile.active_ride_id = None
                 drv.driver_profile.is_available = True
-        # expire outstanding offers
-        for o in (await db.execute(select(RideOffer).where(RideOffer.ride_id == ride.id))).scalars().all():
-            if o.status == RideOfferStatusEnum.OFFERED:
-                o.status = RideOfferStatusEnum.EXPIRED
+        # Drivers still looking at the request: take it off their screens.
+        await RideService._withdraw_offers(db, ride, "ride_cancelled")
         await db.commit()
         await db.refresh(ride)
 
@@ -700,6 +813,40 @@ class RideService:
         )
         return payload
 
+    @staticmethod
+    async def _driver_withdraws(db: AsyncSession, ride: Ride, reason: Optional[str]) -> dict:
+        """The assigned driver can't make it. She is in an emergency, so instead of cancelling her
+        ride it goes back to searching (without that driver) and she is told what is happening."""
+        driver_id = ride.driver_id
+        drv = await _load_user(db, driver_id)
+        if drv and drv.driver_profile and drv.driver_profile.active_ride_id == ride.id:
+            drv.driver_profile.active_ride_id = None
+            drv.driver_profile.is_available = True
+        for o in (await db.execute(select(RideOffer).where(
+            RideOffer.ride_id == ride.id, RideOffer.driver_id == driver_id,
+        ))).scalars().all():
+            o.status = RideOfferStatusEnum.DECLINED
+        ride.driver_id = None
+        ride.status = RideStatusEnum.SEARCHING
+        ride.assigned_at = None
+        ride.arrived_at = None
+        db.add(RideEvent(ride_id=ride.id, event_type="DriverWithdrew", payload={"driver_id": driver_id, "reason": reason}))
+        await db.commit()
+        await db.refresh(ride)
+
+        payload = _ride_payload(ride)
+        await _emit(ride.rider_id, "ride_driver_cancelled", "Finding you another driver",
+                    "Your driver couldn't make it. We're finding you another one now.", payload)
+        await _fanout_to_contacts(db, ride, "ride_driver_cancelled", "Finding another driver",
+                                  "Her driver couldn't make it; LONI is finding another one.", payload)
+        offered = await RideService._dispatch(db, ride, settings.RIDE_SEARCH_RADIUS_MAX_KM)
+        if offered == 0:
+            await RideService._mark_no_drivers(db, ride.id)
+        else:
+            asyncio.create_task(RideService._offer_timeout_watchdog(ride.id))
+        await db.refresh(ride)
+        return _ride_payload(ride)
+
     # ---- driver location heartbeat --------------------------------
     @staticmethod
     async def update_driver_location(db: AsyncSession, driver: User,
@@ -707,11 +854,23 @@ class RideService:
         profile = driver.driver_profile
         if not profile:
             raise HTTPException(status_code=403, detail="Not a driver")
-        profile.current_lat = lat
-        profile.current_lng = lng
-        profile.heading = heading
-        profile.location_updated_at = datetime.now(timezone.utc)
-        await db.commit()
+        # Every ping is streamed live below; the DB copy (used for dispatch and page loads) is only
+        # rewritten every DRIVER_LOCATION_PERSIST_SECONDS or after a real move - with thousands of
+        # drivers pinging every few seconds, writing each one would swamp Postgres.
+        now = datetime.now(timezone.utc)
+        last = profile.location_updated_at
+        if last is not None and last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        moved = (haversine_meters(profile.current_lat, profile.current_lng, lat, lng)
+                 if profile.current_lat is not None else None)
+        if (last is None or moved is None
+                or (now - last).total_seconds() >= settings.DRIVER_LOCATION_PERSIST_SECONDS
+                or moved >= settings.DRIVER_LOCATION_PERSIST_METERS):
+            profile.current_lat = lat
+            profile.current_lng = lng
+            profile.heading = heading
+            profile.location_updated_at = now
+            await db.commit()
 
         if not profile.active_ride_id:
             return
@@ -720,15 +879,49 @@ class RideService:
             location_data = {
                 "ride_id": str(ride.id),
                 "id": ride.id,
+                "status": ride.status.value,
                 "lat": lat, "lng": lng, "heading": heading,
                 "ts": datetime.now(timezone.utc).isoformat(),
+                **ride_progress(ride, lat, lng),
             }
             # WS only - high frequency, no FCM.
             try:
                 await ws_manager.send_to_user(ride.rider_id, "ride_driver_location", location_data)
             except Exception as e:
                 logger.warning("driver location WS emit failed: %s", e)
-            await _fanout_to_contacts(db, ride, "ride_driver_location", "", "", location_data, ws_only=True)
+            await _fanout_to_contacts(db, ride, "ride_driver_location", "", "", location_data,
+                                      ws_only=True, needs_location=True)
+
+    # ---- the mother tells her support circle -----------------------
+    @staticmethod
+    async def notify_contacts(db: AsyncSession, ride_id: int, rider_id: str, kind: str) -> int:
+        """'share' = share the live trip with her connected partners (turns contact updates on for the
+        rest of the ride); 'arrived' = tell them she arrived safely. Returns how many were told."""
+        res = await db.execute(select(Ride).where(Ride.id == ride_id).with_for_update())
+        ride = res.scalar_one_or_none()
+        if not ride or ride.rider_id != rider_id:
+            raise HTTPException(status_code=404, detail="Ride not found")
+        rider = await _load_user(db, rider_id)
+        name = rider.name if rider else "She"
+        if kind == "share":
+            if ride.status in TERMINAL_STATUSES:
+                raise HTTPException(status_code=409, detail="This ride has ended")
+            ride.notify_contacts = True
+            db.add(RideEvent(ride_id=ride.id, event_type="TripShared"))
+            await db.commit()
+            event, title, body = "ride_contact_alert", "Live trip shared", f"{name} shared her emergency ride with you."
+        elif kind == "arrived":
+            if ride.status != RideStatusEnum.COMPLETED:
+                raise HTTPException(status_code=409, detail="The trip has not ended yet")
+            event, title, body = "ride_arrived_safely", "Arrived safely", f"{name} has arrived safely at {ride.dropoff_name or 'the hospital'}."
+        else:
+            raise HTTPException(status_code=400, detail="Unknown notification")
+        conds = [EmergencyContact.user_id == rider_id, EmergencyContact.status == EmergencyContactStatus.connected,
+                 EmergencyContact.emergency.is_(True)]
+        count = len((await db.execute(select(EmergencyContact.id).where(*conds))).scalars().all())
+        data = {**_ride_payload(ride), "rider_name": name}
+        await _fanout_to_contacts(db, ride, event, title, body, data, log=True, force=True)
+        return count
 
     # ---- rating / history / stats --------------------------------
     @staticmethod
@@ -784,10 +977,20 @@ class RideService:
             select(EmergencyContact.id).where(
                 EmergencyContact.user_id == rider_id,
                 EmergencyContact.contact_user_id == viewer_id,
+                EmergencyContact.status == EmergencyContactStatus.connected,
                 EmergencyContact.emergency.is_(True),
             )
         )
         return res.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def partner_sees_location(db: AsyncSession, rider_id: str, viewer_id: str) -> bool:
+        res = await db.execute(
+            select(EmergencyContact.location).where(
+                EmergencyContact.user_id == rider_id, EmergencyContact.contact_user_id == viewer_id,
+            )
+        )
+        return bool(res.scalar_one_or_none())
 
     @staticmethod
     async def active_ride(db: AsyncSession, user_id: str) -> Optional[Ride]:

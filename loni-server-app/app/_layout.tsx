@@ -17,6 +17,7 @@ import { queryClient } from '../lib/queryClient';
 import '../global.css';
 
 import Toast from 'react-native-toast-message';
+import { OfflineBanner } from '../components/OfflineBanner';
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -36,7 +37,7 @@ export default function RootLayout() {
       <AuthProvider>
         <NotificationProvider>
           <EmergencyContactsProvider>
-            <Stack screenOptions={{ headerShown: false }}>
+            <Stack screenOptions={{ headerShown: false, animation: 'ios_from_right', gestureEnabled: true }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
@@ -46,6 +47,7 @@ export default function RootLayout() {
               <Stack.Screen name="partner" />
             </Stack>
             <CallModals />
+      <OfflineBanner />
             <StatusBar style="auto" />
             <Toast />
           </EmergencyContactsProvider>

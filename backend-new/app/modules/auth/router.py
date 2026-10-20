@@ -1,4 +1,8 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import update
+from app.modules.auth.models import Otp
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -104,29 +108,48 @@ async def setup_partner(data: SetupPartnerRequest, db: AsyncSession = Depends(ge
             detail="This endpoint is only for invited partners."
         )
         
-    # Update password and phone
-    user.password = get_password_hash(data.password)
-    user.phone = data.phone
-    user.is_email_verified = True # Since they clicked the link from their email
-    db.add(user)
-    await db.commit()
-    
-    # Send phone verification OTP to their email
+    if user.is_phone_verified:
+        # Setup is one-time; afterwards the account is changed only by logging in or resetting the password.
+        raise HTTPException(status_code=409, detail="This account is already set up. Log in, or reset your password.")
+
+    # Nothing changes until the code emailed to the invited address is entered (verify-partner-setup),
+    # so knowing someone's email is not enough to set their password.
     await resend_otp(db, data.email, "phone_verification")
-    
-    return {"success": True, "message": "Account setup. OTP sent to email."}
+    pending = json.dumps({
+        "password_hash": get_password_hash(data.password),
+        "phone": data.phone,
+        "name": (data.name or "").strip() or None,
+    })
+    await db.execute(update(Otp).where(Otp.email == data.email, Otp.type == "phone_verification").values(payload=pending))
+    await db.commit()
+
+    return {"success": True, "message": "Check your email for the code to finish setting up."}
 
 @router.post("/verify-partner-setup", response_model=StandardResponse)
 async def verify_partner_setup(data: VerifyPartnerSetupRequest, db: AsyncSession = Depends(get_db)):
+    pending_raw = (await db.execute(select(Otp.payload).where(
+        Otp.email == data.email, Otp.otp == data.otp, Otp.type == "phone_verification",
+    ))).scalars().first()
+
     # Verify OTP
     await verify_otp(db, data.email, data.otp, "phone_verification")
-    
+
     # Fetch partner
     result = await db.execute(select(User).where(User.email == data.email))
     partner = result.scalar_one_or_none()
-    
+
     if not partner or partner.user_type != "partner":
         raise HTTPException(status_code=400, detail="Invalid partner user")
+
+    # Apply what was submitted at setup, now that the email owner has confirmed it.
+    if pending_raw:
+        pending = json.loads(pending_raw)
+        partner.password = pending["password_hash"]
+        partner.phone = pending.get("phone") or partner.phone
+        if pending.get("name"):
+            partner.name = pending["name"]
+        partner.is_email_verified = True
+        db.add(partner)
         
     # Find emergency contact relationship
     contact_result = await db.execute(select(EmergencyContact).where(EmergencyContact.contact_user_id == partner.id))
@@ -146,6 +169,11 @@ async def verify_partner_setup(data: VerifyPartnerSetupRequest, db: AsyncSession
         inviter = inviter_result.scalar_one_or_none()
         
         if inviter:
+            # She sees them as connected straight away (live + push + Notification Centre).
+            from app.modules.users.partner_sync import tell
+            await tell(db, inviter.id, "partner_connected", "Support partner connected",
+                       f"{partner.name} joined your support circle.", {"partner_name": partner.name})
+            await db.commit()
             # Send emails in background
             import asyncio
             asyncio.create_task(send_inviter_connection_success_email(inviter.email, partner.name))

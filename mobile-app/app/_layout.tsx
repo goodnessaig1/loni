@@ -7,17 +7,42 @@ import 'react-native-reanimated';
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../lib/queryClient';
 import { AuthProvider } from '../context/AuthContext';
+import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { EmergencyContactsProvider } from '../context/EmergencyContactsContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { CallModals } from '../components/CallModals';
+import { RideTrackerHost } from '../components/RideTrackerModal';
+import { useSubscriptionSync } from '../hooks/useSubscription';
+import { useSyncTimezone } from '../hooks/useCheckins';
 
 import '../global.css';
 
 import Toast from 'react-native-toast-message';
+import { OfflineBanner } from '../components/OfflineBanner';
 
-const queryClient = new QueryClient();
+/** Inside the providers so it can read the theme: the stack's background must follow it, or page transitions flash white in dark mode. */
+function ThemedShell() {
+  const { colors } = useTheme();
+  useSubscriptionSync();
+  useSyncTimezone();
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'ios_from_right', gestureEnabled: true }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+      <RideTrackerHost />
+      <CallModals />
+      <OfflineBanner />
+      <StatusBar style="auto" />
+      <Toast />
+    </>
+  );
+}
 
 export default function RootLayout() {
   const [loaded] = useFonts({
@@ -33,21 +58,16 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <NotificationProvider>
-          <EmergencyContactsProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
-            <CallModals />
-            <StatusBar style="auto" />
-            <Toast />
-          </EmergencyContactsProvider>
-        </NotificationProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <NotificationProvider>
+            <EmergencyContactsProvider>
+              <ThemedShell />
+            </EmergencyContactsProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

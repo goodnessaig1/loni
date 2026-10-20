@@ -16,7 +16,7 @@ export type CallRecord = {
   time: string;    // e.g. "02:30 PM"
   duration: string; // e.g. "12:34" or "20s"
   status: CallStatus;
-  img: string;
+  img?: string;
 };
 
 export const useCallHistory = (limit: number = 50) => {
@@ -36,10 +36,11 @@ export const useCallHistory = (limit: number = 50) => {
         else if (isYesterday(dateObj)) timeLabel = 'Yesterday';
         else timeLabel = format(dateObj, 'MMM d, yyyy');
 
-        const isCompleted = call.status === 'ended' || call.status === 'ENDED' || call.status === 'ACCEPTED' || call.status === 'CONNECTED';
-        const statusLabel = isCompleted ? 'completed' : 'missed';
-
         const durationSeconds = call.duration_seconds || 0;
+        // Talked = completed. Rung but never answered (rejected, timed out, cancelled, failed) = missed.
+        const st = String(call.status).toUpperCase();
+        const isCompleted = durationSeconds > 0 || ['CONNECTED', 'CONNECTING', 'ACCEPTED', 'RECONNECTING'].includes(st);
+        const statusLabel = isCompleted ? 'completed' : 'missed';
         
         let durationStr = '';
         let durationFormatted = '';
@@ -67,11 +68,30 @@ export const useCallHistory = (limit: number = 50) => {
           time: format(dateObj, 'hh:mm a'),
           duration: durationStr,
           status: statusLabel,
-          img: otherUser?.profile_picture || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+          img: otherUser?.profile_picture || undefined,
         };
       });
       return formatted;
     },
+    enabled: !!user?.id,
+  });
+};
+
+export interface CallStats {
+  total_calls: number;
+  total_duration_seconds: number;
+  total_duration_formatted: string;
+  today_calls: number;
+  rating_avg: number | null;
+  rating_count: number;
+}
+
+/** Calls this user took part in, today's count, and the average rating mothers gave. */
+export const useCallStats = () => {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['calls', 'stats', user?.id],
+    queryFn: async (): Promise<CallStats> => (await apiClient.get('/calls/stats')).data,
     enabled: !!user?.id,
   });
 };

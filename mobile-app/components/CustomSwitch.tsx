@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Pressable } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
 
 export const CustomSwitch = ({ value, onValueChange, disabled, activeColor = '#D62D88' }: { value: boolean, onValueChange: (v: boolean) => void, disabled?: boolean, activeColor?: string }) => {
+  const { isDark } = useTheme();
+  const offTrack = isDark ? '#3A3D44' : '#E5E7EB';
   const translateX = useRef(new Animated.Value(value ? 14 : 0)).current;
   const animatedTrackColor = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -22,11 +25,11 @@ export const CustomSwitch = ({ value, onValueChange, disabled, activeColor = '#D
 
   const interpolatedTrackColor = animatedTrackColor.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#E5E7EB', activeColor]
+    outputRange: [offTrack, activeColor]
   });
 
-  const trackColor = disabled ? '#9CA3AF' : interpolatedTrackColor;
-  const thumbColor = disabled ? '#D1D5DB' : '#FFFFFF';
+  const trackColor = disabled ? (isDark ? '#2B2E35' : '#9CA3AF') : interpolatedTrackColor;
+  const thumbColor = disabled ? (isDark ? '#6B6B6B' : '#D1D5DB') : '#FFFFFF';
 
   return (
     <Pressable

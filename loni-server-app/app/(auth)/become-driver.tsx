@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useStartOnboarding } from '../../hooks/useDriverTraining';
 
 export default function BecomeDriverScreen() {
@@ -30,33 +31,39 @@ export default function BecomeDriverScreen() {
         </Pressable>
 
         <View style={styles.content}>
-          <Image 
-            source={require('../../assets/images/car.png')}
-            style={styles.carImage}
-            contentFit="contain"
-          />
+          <Reveal index={0} style={{ width: '100%', alignItems: 'center' }}>
+            <Image 
+              source={require('../../assets/images/car.png')}
+              style={styles.carImage}
+              contentFit="contain"
+            />
 
-          <CalText style={styles.heading}>Become a LONI Driver</CalText>
-          <HelixaText style={styles.subtitle}>
-            Help mothers get safe transportation during urgent situations.
-          </HelixaText>
-
-          <View style={styles.infoBox}>
-            <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="shield-plus-outline" size={20} color="#D62D88" />
-            </View>
-            <HelixaText style={styles.infoText}>
-              Your vehicle helps ensure mothers reach medical care when they need it most.
+            <CalText style={styles.heading}>Become a LONI Driver</CalText>
+            <HelixaText style={styles.subtitle}>
+              Help mothers get safe transportation during urgent situations.
             </HelixaText>
-          </View>
+          </Reveal>
+
+          <Reveal index={1} style={{ width: '100%' }}>
+            <View style={styles.infoBox}>
+              <View style={styles.iconCircle}>
+                <MaterialCommunityIcons name="shield-plus-outline" size={20} color="#D62D88" />
+              </View>
+              <HelixaText style={styles.infoText}>
+                Your vehicle helps ensure mothers reach medical care when they need it most.
+              </HelixaText>
+            </View>
+          </Reveal>
         </View>
 
-        <Button
-          title="Continue"
-          onPress={handleContinue}
-          isLoading={isPending}
-          style={styles.button}
-        />
+        <Reveal index={2}>
+          <Button
+            title="Continue"
+            onPress={handleContinue}
+            isLoading={isPending}
+            style={styles.button}
+          />
+        </Reveal>
 
       </ScrollView>
     </SafeAreaView>

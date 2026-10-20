@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Pressable,
@@ -17,6 +17,9 @@ import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
 import { useLogin } from '../../hooks/useAuth';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const LoginSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
@@ -24,6 +27,8 @@ const LoginSchema = Yup.object().shape({
 });
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [showPassword, setShowPassword] = useState(false);
   const { mutateAsync: loginUser } = useLogin();
 
@@ -46,14 +51,16 @@ export default function LoginScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={28} color="black" />
+            <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Log In</CalText>
           <HelixaText style={styles.subtext}>
             Log in to your LONI Server account.
           </HelixaText>
+          </Reveal>
 
           <Formik
             initialValues={{ email: 'goodness6337@gmail.com', password: 'goodness' }}
@@ -62,12 +69,13 @@ export default function LoginScreen() {
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isSubmitting }) => (
               <>
+                <Reveal index={1}>
                 <View style={styles.inputGroup}>
                   <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
                   <TextInput
                     style={[styles.input, touched.email && errors.email ? styles.inputError : null]}
                     placeholder="Sarahchen@example.com"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={values.email}
@@ -85,14 +93,14 @@ export default function LoginScreen() {
                     <TextInput
                       style={styles.passwordInput}
                       placeholder="Min. 8 characters"
-                      placeholderTextColor="#9CA3AF"
+                      placeholderTextColor={colors.textMuted}
                       secureTextEntry={!showPassword}
                       value={values.password}
                       onChangeText={handleChange('password')}
                       onBlur={handleBlur('password')}
                     />
                     <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                      <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#6B7280" />
+                      <Feather name={showPassword ? "eye" : "eye-off"} size={20} color={colors.textSecondary} />
                     </Pressable>
                   </View>
                   {touched.password && errors.password && (
@@ -103,22 +111,27 @@ export default function LoginScreen() {
                 <Pressable onPress={() => router.push('/(auth)/reset-password')} style={styles.forgotPasswordContainer}>
                   <HelixaText style={styles.forgotPasswordText} weight="bold">Forgot Password?</HelixaText>
                 </Pressable>
+                </Reveal>
 
+                <Reveal index={2}>
                 <Button
                   title="Continue"
                   onPress={handleSubmit as any}
                   isLoading={isSubmitting}
                   style={styles.continueButtonSpacing}
                 />
+                </Reveal>
               </>
             )}
           </Formik>
 
+          <Reveal index={3}>
           <View style={styles.signUpContainer}>
             <HelixaText style={styles.signUpText}>
               Don't have an account? <HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
             </HelixaText>
           </View>
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -126,10 +139,10 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -148,12 +161,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 24,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 6,
   },
   subtext: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 22,
     marginBottom: 36,
   },
@@ -162,34 +175,34 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#111827',
+    color: c.text,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   passwordInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   passwordInput: {
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
   },
   eyeIcon: {
@@ -219,7 +232,7 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   signUpTextBold: {
     fontSize: 14,

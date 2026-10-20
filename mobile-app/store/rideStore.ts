@@ -70,6 +70,15 @@ export interface RouteInfo {
   is_estimate: boolean;
 }
 
+/** Live progress from each driver GPS heartbeat (backend `ride_progress`). */
+export interface RideProgress {
+  phase: 'to_pickup' | 'at_pickup' | 'to_dropoff';
+  remaining_meters: number;
+  eta_seconds: number;
+  /** close enough to tell her to get ready / that she is nearly there */
+  near: boolean;
+}
+
 export interface Ride {
   id: number;
   status: RideStatus;
@@ -87,6 +96,14 @@ export interface Ride {
   fare_final?: number | null;
   rider_rating?: number | null;
   driver_rating?: number | null;
+  notify_contacts?: boolean;
+  /** set when her driver backed out and a new one is being found */
+  rematching?: boolean;
+  requested_at?: string | null;
+  assigned_at?: string | null;
+  arrived_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
   rider?: RiderInfo | null;
   driver?: DriverInfo | null;
   next_route?: RouteInfo | null;
@@ -116,6 +133,7 @@ interface RideState {
   offers: RideOffer[];
   /** live driver position (mother app populates this from ride_driver_location) */
   driverLocation: { lat: number; lng: number; heading?: number | null; ts?: string } | null;
+  progress: RideProgress | null;
 
   lastEventRideId: number | null;
   lastEventStatus: RideStatus | null;
@@ -125,7 +143,7 @@ interface RideState {
   setOffers: (offers: RideOffer[]) => void;
   setRide: (ride: Ride | null) => void;
   patchRide: (patch: Partial<Ride> & { status?: RideStatus }) => void;
-  setDriverLocation: (loc: { lat: number; lng: number; heading?: number | null; ts?: string }) => void;
+  setDriverLocation: (loc: { lat: number; lng: number; heading?: number | null; ts?: string }, progress?: RideProgress | null) => void;
   clear: (status?: RideStatus) => void;
   /** ignore an event that doesn't apply to the ride we're tracking */
   isStale: (rideId: number) => boolean;
@@ -136,6 +154,7 @@ const initial = {
   ride: null,
   offers: [] as RideOffer[],
   driverLocation: null,
+  progress: null as RideProgress | null,
   lastEventRideId: null,
   lastEventStatus: null,
 };
@@ -174,15 +193,18 @@ export const useRideStore = create<RideState>((set, get) => ({
 
   patchRide: (patch) => set((s) => {
     const next = s.ride ? { ...s.ride, ...patch } : (patch.id ? (patch as Ride) : s.ride);
+    const phaseChanged = patch.status && patch.status !== s.status;
     return {
       ride: next,
+      // progress is per leg; a new status (arrived, started) makes the old figure meaningless
+      progress: phaseChanged ? null : s.progress,
       status: patch.status ?? s.status,
       lastEventRideId: next?.id ?? s.lastEventRideId,
       lastEventStatus: patch.status ?? s.lastEventStatus,
     };
   }),
 
-  setDriverLocation: (loc) => set({ driverLocation: loc }),
+  setDriverLocation: (loc, progress) => set((s) => ({ driverLocation: loc, progress: progress ?? s.progress })),
 
   clear: (status = 'IDLE') => set({ ...initial, status, lastEventStatus: status }),
 }));

@@ -65,7 +65,10 @@ export async function applyServerCallEvent(type: string, data: any) {
       if (callId == null) return;
       // A brand new incoming call always wins over whatever we were
       // tracking (there is at most one active call per user in this app).
-      store.setIncomingCall(callId, data.room_name, toParticipant(data.caller));
+      store.setIncomingCall(callId, data.room_name, toParticipant(data.caller), {
+        kind: data.kind === 'ride' ? 'ride' : 'nurse',
+        rideId: data.ride_id != null ? Number(data.ride_id) : null,
+      });
       return;
     }
 

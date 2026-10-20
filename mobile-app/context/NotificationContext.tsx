@@ -1,5 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import Toast from 'react-native-toast-message';
+import { openFromPush, PushData } from '../lib/checkinLinks';
+import { queryClient } from '../lib/queryClient';
 import { registerForPushNotificationsAsync } from '../utils/notifications';
+import { registerPushToken } from '../lib/pushRegistration';
 import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { AuthContext } from './AuthContext';
@@ -7,6 +11,8 @@ import { apiClient } from '../api/client';
 import { connectCallSocket, disconnectCallSocket } from '../api/socket';
 import { applyServerCallEvent } from '../lib/callEvents';
 import { applyServerRideEvent } from '../lib/rideEvents';
+import { applyPartnerEvent, isPartnerEvent } from '../lib/partnerSync';
+import { router } from 'expo-router';
 import { setupCallKeep } from '../lib/callKeepService';
 import { requestMicrophonePermission } from '../lib/permissions';
 
@@ -20,6 +26,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   const [pushToken, setPushToken] = useState<string | null>(null);
 
   const { user } = useContext(AuthContext);
+  const userRef = useRef(user);
+  const pendingOpen = useRef<PushData>(undefined);
+  useEffect(() => {
+    userRef.current = user;
+    if (user && pendingOpen.current) {
+      const data = pendingOpen.current;
+      pendingOpen.current = undefined;
+      openFromPush(data);
+    }
+  }, [user]);
 
   useEffect(() => {
     // Native outgoing-call UI (Issue 5) - see lib/callKeepService.ts.
@@ -46,10 +62,43 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
      * foreground push and the WebSocket apply identical logic.
      */
     const importMessaging = require('@react-native-firebase/messaging').default;
-    const unsubscribeFirebase = importMessaging().onMessage(async (remoteMessage: any) => {
+    const messaging = importMessaging();
+
+    // Tapping a notification (app in background, or launching the app from it) opens what it points at.
+    const handleOpen = (remoteMessage: any) => {
+      const data: PushData = remoteMessage?.data;
+      // A partner joined or left: open her support-partner list.
+      if (isPartnerEvent((data as any)?.type)) {
+        if (userRef.current) router.push('/profile/emergency-contacts' as any);
+        return;
+      }
+      if (data?.type !== 'checkin') return;
+      if (userRef.current) openFromPush(data);
+      else pendingOpen.current = data;   // cold start: wait until she is signed in
+    };
+    const unsubscribeOpened = messaging.onNotificationOpenedApp(handleOpen);
+    messaging.getInitialNotification().then(handleOpen).catch(() => {});
+
+    const unsubscribeFirebase = messaging.onMessage(async (remoteMessage: any) => {
       const data = remoteMessage.data;
+      if (data?.type === 'checkin') {
+        // App is open: a quiet in-app banner instead of a system alert. Tap it to open the conversation.
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        Toast.show({
+          type: 'info',
+          text1: data.title || remoteMessage.notification?.title || 'Loni',
+          text2: data.body || remoteMessage.notification?.body || '',
+          visibilityTime: 8000,
+          onPress: () => { Toast.hide(); openFromPush(data); },
+        });
+        return;
+      }
       if (typeof data?.type === 'string' && data.type.startsWith('ride_')) {
         applyServerRideEvent(data.type, data);
+        return;
+      }
+      if (isPartnerEvent(data?.type)) {
+        applyPartnerEvent(data.type, data, { title: remoteMessage.notification?.title, body: remoteMessage.notification?.body });
         return;
       }
       if (data?.type) {
@@ -65,6 +114,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     return () => {
       unsubscribeFirebase();
+      unsubscribeOpened();
     };
   }, []);
 
@@ -77,14 +127,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
         setPushToken(token);
 
         try {
-          const deviceId = Platform.OS === 'android' ? Device.osBuildId : Device.modelId || 'ios_device';
-
-          await apiClient.post('/notifications/devices', {
-            device_id: deviceId || 'unknown_device',
-            device_type: Platform.OS,
-            token: token
-          });
-
+          await registerPushToken(token);
           console.log('[Push] Successfully registered device with backend.');
         } catch (error) {
           console.error('[Push] Failed to register device with backend:', error);
@@ -93,6 +136,16 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
     }
 
     initPush();
+
+    // Firebase rotates tokens from time to time; without this, pushes stop until the app is reopened.
+    if (!user) return;
+    const Notifications = require('expo-notifications');
+    const sub = Notifications.addPushTokenListener(({ data }: { data: string }) => {
+      if (typeof data !== 'string' || !data) return;
+      setPushToken(data);
+      registerPushToken(data).catch((e) => console.error('[Push] Re-register after token change failed', e));
+    });
+    return () => sub.remove();
   }, [user]);
 
   useEffect(() => {

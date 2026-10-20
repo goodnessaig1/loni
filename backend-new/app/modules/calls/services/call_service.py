@@ -12,7 +12,8 @@ from app.modules.calls.models import Call, CallParticipant, CallEvent, CallStatu
 from app.modules.calls.schemas import CallRequest, ParticipantInfo
 from app.modules.calls.services.livekit_service import LiveKitService
 from app.modules.notifications.service import NotificationService
-from app.modules.users.models import User, UserTypeEnum
+from app.modules.users.models import User, UserTypeEnum, AccountStatusEnum
+from app.modules.rides.models import Ride, ACTIVE_STATUSES as RIDE_ACTIVE_STATUSES
 from app.utils.user_enrichment import enrich_user_data
 from app.core.ws_manager import manager as ws_manager
 from app.core.database import AsyncSessionLocal
@@ -24,6 +25,16 @@ logger = logging.getLogger("call_service")
 # ever set them, so an unanswered call stayed "REQUESTED" in the DB forever
 # and the caller's screen had no server-driven way to know to stop trying).
 RING_TIMEOUT_SECONDS = 45
+
+# A participant who drops out of a connected call has this long to come back before the call is ended.
+RECONNECT_GRACE_SECONDS = 30
+
+# Someone is "on a call" while a call they are part of is in one of these states.
+LIVE_STATUSES = (
+    CallStatusEnum.REQUESTED, CallStatusEnum.RINGING, CallStatusEnum.ACCEPTED,
+    CallStatusEnum.CONNECTING, CallStatusEnum.CONNECTED, CallStatusEnum.RECONNECTING,
+)
+IN_CALL_STATUSES = LIVE_STATUSES[2:]  # answered, not just ringing
 
 TERMINAL_STATUSES = {
     CallStatusEnum.ENDED,
@@ -88,12 +99,36 @@ class CallService:
         if not caller:
             raise HTTPException(status_code=404, detail="Caller not found")
 
+        kind, receiver_id = await CallService._resolve_receiver(db, caller_id, request)
+
+        # One call at a time: a new request replaces any call of hers that is still ringing,
+        # and is refused while she is already talking to someone.
+        mine = (await db.execute(select(Call).where(
+            or_(Call.caller_id == caller_id, Call.receiver_id == caller_id),
+            Call.status.in_(LIVE_STATUSES),
+        ).with_for_update())).scalars().all()
+        if any(c.status in IN_CALL_STATUSES for c in mine):
+            raise HTTPException(status_code=409, detail="You are already on a call.")
+        for old in mine:
+            await CallService._stop_ringing(db, old, CallStatusEnum.CANCELLED, by=caller_id)
+
+        # Who will be rung: the named person, or every nurse who can take a call right now.
+        if receiver_id:
+            rung = [receiver_id]
+        else:
+            rung = await CallService._available_nurses(db, exclude=caller_id)
+            if not rung:
+                await db.commit()
+                raise HTTPException(status_code=409, detail="No nurse is available right now. Please try again in a few minutes.")
+
         room_name = f"room-{uuid.uuid4()}"
         call = Call(
             caller_id=caller_id,
-            receiver_id=request.nurse_id,
+            receiver_id=receiver_id,
             status=CallStatusEnum.RINGING,
-            room_name=room_name
+            room_name=room_name,
+            kind=kind,
+            ride_id=request.ride_id if kind == "ride" else None,
         )
         db.add(call)
         await db.flush()
@@ -105,7 +140,8 @@ class CallService:
         )
         db.add(participant)
 
-        event = CallEvent(call_id=call.id, event_type="CallRequested")
+        # The rung list is how everyone who was rung is later told the call was answered, cancelled or missed.
+        event = CallEvent(call_id=call.id, event_type="CallRequested", payload={"rung": rung})
         db.add(event)
 
         await db.commit()
@@ -118,25 +154,86 @@ class CallService:
             "caller": caller_info.model_dump(),
             "caller_name": caller_info.name,  # kept for backward-compat clients
             "created_at": call.created_at.isoformat(),
+            "kind": call.kind,
+            "ride_id": call.ride_id,
         }
 
-        if request.nurse_id:
-            asyncio.create_task(_emit(
-                request.nurse_id, "incoming_call", "Incoming Call", f"{caller_info.name} is calling you.", payload
-            ))
-        else:
-            # Broadcast to all online nurses
-            stmt = select(User.id).where(User.user_type == UserTypeEnum.nurse, User.is_online == True)
-            result = await db.execute(stmt)
-            nurse_ids = result.scalars().all()
-            for n_id in nurse_ids:
-                asyncio.create_task(_emit(
-                    n_id, "incoming_call", "Incoming Call", f"{caller_info.name} is calling.", payload
-                ))
+        body = f"{caller_info.name} is calling you." if receiver_id else f"{caller_info.name} needs a nurse."
+        for uid in rung:
+            asyncio.create_task(_emit(uid, "incoming_call", "Incoming Call", body, payload))
 
         asyncio.create_task(CallService._ring_timeout_watchdog(call.id))
 
         return call
+
+    @staticmethod
+    async def _available_nurses(db: AsyncSession, exclude: str | None = None) -> list[str]:
+        """Approved nurses who are online and not already on a call - at most CALL_RING_MAX_NURSES,
+        those who answered least recently first, so load spreads and one call never rings thousands."""
+        from sqlalchemy import func
+        from app.core.config import settings
+        busy = select(Call.receiver_id).where(Call.receiver_id.is_not(None), Call.status.in_(IN_CALL_STATUSES))
+        last_answer = (select(Call.receiver_id.label("nurse_id"), func.max(Call.answered_at).label("last"))
+                       .where(Call.receiver_id.is_not(None)).group_by(Call.receiver_id).subquery())
+        stmt = (
+            select(User.id)
+            .outerjoin(last_answer, last_answer.c.nurse_id == User.id)
+            .where(
+                User.user_type == UserTypeEnum.nurse,
+                User.is_online.is_(True),
+                User.account_status == AccountStatusEnum.active,
+                User.id.not_in(busy),
+            )
+            .order_by(last_answer.c.last.is_not(None), last_answer.c.last.asc())
+            .limit(settings.CALL_RING_MAX_NURSES + 1)
+        )
+        ids = (await db.execute(stmt)).scalars().all()
+        return [i for i in ids if i != exclude][: settings.CALL_RING_MAX_NURSES]
+
+    @staticmethod
+    async def rung_ids(db: AsyncSession, call: Call) -> list[str]:
+        """Everyone this call was rung to (recorded when it was requested)."""
+        ev = (await db.execute(select(CallEvent).where(
+            CallEvent.call_id == call.id, CallEvent.event_type == "CallRequested",
+        ))).scalars().first()
+        rung = list((ev.payload or {}).get("rung") or []) if ev else []
+        if call.receiver_id and call.receiver_id not in rung and not rung:
+            rung = [call.receiver_id]
+        return rung
+
+    @staticmethod
+    async def _stop_ringing(db: AsyncSession, call: Call, status: CallStatusEnum, *, by: str | None = None,
+                            notify_caller: bool = False) -> None:
+        """End a call that was never answered and stop it ringing everywhere. Caller commits."""
+        call.status = status
+        call.ended_at = datetime.now(timezone.utc)
+        db.add(CallEvent(call_id=call.id, event_type=f"Call{status.value.title()}", payload={"by": by}))
+        data = {"call_id": str(call.id), "status": status.value}
+        for uid in await CallService.rung_ids(db, call):
+            if uid != by:
+                asyncio.create_task(_emit(uid, "call_ended" if status == CallStatusEnum.CANCELLED else "call_missed",
+                                          "Call ended" if status == CallStatusEnum.CANCELLED else "Missed call",
+                                          "The mother ended the request." if status == CallStatusEnum.CANCELLED else "You missed a call.",
+                                          data))
+        if notify_caller and call.caller_id != by:
+            asyncio.create_task(_emit(call.caller_id, "call_timeout", "No answer", "No one answered your call.", data))
+
+    @staticmethod
+    async def _resolve_receiver(db: AsyncSession, caller_id: str, request: CallRequest) -> tuple[str, str | None]:
+        """Who may be rung. A ride call goes only to the other party of an active ride the caller is on;
+        any other call goes to a nurse (a named one, or every online nurse)."""
+        if request.ride_id is not None:
+            ride = await db.get(Ride, request.ride_id)
+            if not ride or caller_id not in (ride.rider_id, ride.driver_id):
+                raise HTTPException(status_code=404, detail="Ride not found")
+            if ride.status not in RIDE_ACTIVE_STATUSES or not ride.driver_id:
+                raise HTTPException(status_code=400, detail="You can only call during an active ride.")
+            return "ride", (ride.driver_id if caller_id == ride.rider_id else ride.rider_id)
+        if request.nurse_id:
+            nurse = await db.get(User, request.nurse_id)
+            if not nurse or nurse.user_type != UserTypeEnum.nurse:
+                raise HTTPException(status_code=400, detail="That person is not a LONI nurse.")
+        return "nurse", request.nurse_id
 
     @staticmethod
     async def _ring_timeout_watchdog(call_id: int):
@@ -153,21 +250,41 @@ class CallService:
             if not call or call.status not in (CallStatusEnum.REQUESTED, CallStatusEnum.RINGING):
                 return  # already accepted/rejected/cancelled
 
-            call.status = CallStatusEnum.TIMEOUT
-            call.ended_at = datetime.now(timezone.utc)
-            db.add(CallEvent(call_id=call.id, event_type="CallTimeout"))
+            await CallService._stop_ringing(db, call, CallStatusEnum.TIMEOUT, notify_caller=True)
             await db.commit()
 
-            data = {"call_id": str(call.id), "status": CallStatusEnum.TIMEOUT.value}
-            await _emit(call.caller_id, "call_timeout", "No Answer", "No one answered your call.", data)
-            if call.receiver_id:
-                await _emit(call.receiver_id, "call_missed", "Missed Call", "You missed a call.", data)
-            else:
-                # broadcast case: tell all nurses who were rung to clear the UI
-                stmt2 = select(User.id).where(User.user_type == UserTypeEnum.nurse, User.is_online == True)
-                res2 = await db.execute(stmt2)
-                for n_id in res2.scalars().all():
-                    await _emit(n_id, "call_missed", "Missed Call", "You missed a call.", data)
+    @staticmethod
+    async def _reconnect_watchdog(call_id: int):
+        """A participant left a connected call (crash, lost signal). If they are not back within the
+        grace period, end the call for both sides instead of leaving the other one waiting."""
+        await asyncio.sleep(RECONNECT_GRACE_SECONDS)
+        async with AsyncSessionLocal() as db:
+            call = (await db.execute(select(Call).where(Call.id == call_id).with_for_update())).scalar_one_or_none()
+            if not call or call.status != CallStatusEnum.RECONNECTING:
+                return
+            await CallService._finish(db, call, CallStatusEnum.ENDED, by=None)
+            await db.commit()
+            data = {"call_id": str(call.id), "status": call.status.value, "duration_seconds": call.duration_seconds}
+            for uid in (call.caller_id, call.receiver_id):
+                if uid:
+                    await _emit(uid, "call_ended", "Call ended", "The call was disconnected.", data)
+        await LiveKitService.delete_room(call.room_name)
+
+    @staticmethod
+    async def _finish(db: AsyncSession, call: Call, status: CallStatusEnum, by: str | None) -> None:
+        """Close an answered call: timestamps, talk time, participants. Caller commits."""
+        call.status = status
+        call.ended_at = datetime.now(timezone.utc)
+        basis = call.started_at or call.answered_at
+        if basis:
+            if basis.tzinfo is None:
+                basis = basis.replace(tzinfo=timezone.utc)
+            call.duration_seconds = max(0, int((call.ended_at - basis).total_seconds()))
+        db.add(CallEvent(call_id=call.id, event_type="CallEnded", payload={"ended_by": by}))
+        for p in (await db.execute(select(CallParticipant).where(
+            CallParticipant.call_id == call.id, CallParticipant.left_at.is_(None),
+        ))).scalars().all():
+            p.left_at = call.ended_at
 
     @staticmethod
     async def accept_call(db: AsyncSession, call_id: int, nurse_id: str):
@@ -210,6 +327,19 @@ class CallService:
         nurse = await _load_user(db, nurse_id)
         if not nurse:
             raise HTTPException(status_code=404, detail="Nurse not found")
+        # A call rung to one person can only be answered by that person; an open call only by a nurse.
+        if call.receiver_id and call.receiver_id != nurse_id:
+            raise HTTPException(status_code=403, detail="This call is not for you.")
+        if not call.receiver_id and nurse.user_type != UserTypeEnum.nurse:
+            raise HTTPException(status_code=403, detail="Only a LONI nurse can answer this call.")
+        if nurse_id == call.caller_id:
+            raise HTTPException(status_code=400, detail="You cannot answer your own call.")
+        busy = (await db.execute(select(Call.id).where(
+            Call.id != call.id, Call.status.in_(IN_CALL_STATUSES),
+            or_(Call.caller_id == nurse_id, Call.receiver_id == nurse_id),
+        ))).first()
+        if busy:
+            raise HTTPException(status_code=409, detail="Finish your current call first.")
 
         caller = await _load_user(db, call.caller_id)
 
@@ -247,6 +377,8 @@ class CallService:
             "receiver": nurse_info.model_dump(),
             "livekit_url": livekit_url,
             "answered_at": call.answered_at.isoformat(),
+            "kind": call.kind,
+            "ride_id": call.ride_id,
         }
         # This is THE fix for Issue 1 - fires the instant the commit above
         # lands, with zero dependency on LiveKit. The caller's UI can show
@@ -257,6 +389,11 @@ class CallService:
         asyncio.create_task(_emit(
             call.caller_id, "call_accepted", "Call Accepted", f"{nurse_info.name} accepted your call.", accepted_data
         ))
+        # Everyone else who was rung stops ringing (their apps clear the request on `call_accepted`).
+        taken = {"call_id": str(call.id), "status": CallStatusEnum.ACCEPTED.value, "taken": True}
+        for uid in await CallService.rung_ids(db, call):
+            if uid != nurse_id:
+                asyncio.create_task(_emit(uid, "call_accepted", "Call answered", "Another nurse answered this call.", taken))
 
         # --- Step 2: create the LiveKit room (overlaps with the caller
         # processing the notification above and calling POST /join) ---
@@ -340,8 +477,30 @@ class CallService:
         if not call:
             raise HTTPException(status_code=404, detail="Call not found")
 
-        # If broadcast to all nurses, one nurse rejecting doesn't end the call
+        if call.status not in (CallStatusEnum.REQUESTED, CallStatusEnum.RINGING):
+            return call  # already answered, cancelled or timed out
+
+        # An open call to several nurses keeps ringing the others; it only ends once every nurse
+        # it was rung to has declined - then she hears straight away instead of waiting out the timeout.
         if not call.receiver_id:
+            rung = await CallService.rung_ids(db, call)
+            if user_id not in rung:
+                raise HTTPException(status_code=403, detail="Unauthorized to reject this call")
+            db.add(CallEvent(call_id=call.id, event_type="CallDeclined", payload={"by": user_id}))
+            await db.flush()
+            declined = {
+                (e.payload or {}).get("by") for e in (await db.execute(select(CallEvent).where(
+                    CallEvent.call_id == call.id, CallEvent.event_type == "CallDeclined",
+                ))).scalars().all()
+            }
+            if set(rung) <= declined:
+                call.status = CallStatusEnum.REJECTED
+                call.ended_at = datetime.now(timezone.utc)
+                db.add(CallEvent(call_id=call.id, event_type="CallRejected", payload={"rejected_by": "all"}))
+                asyncio.create_task(_emit(call.caller_id, "call_rejected", "No nurse available",
+                                          "No nurse could take your call right now.",
+                                          {"call_id": str(call.id), "status": CallStatusEnum.REJECTED.value}))
+            await db.commit()
             return call
 
         if call.receiver_id == user_id or call.caller_id == user_id:
@@ -372,36 +531,17 @@ class CallService:
             # both "hang up" taps racing each other don't error out.
             return call
 
-        was_still_ringing = call.status in (CallStatusEnum.REQUESTED, CallStatusEnum.RINGING)
+        if call.status in (CallStatusEnum.REQUESTED, CallStatusEnum.RINGING):
+            if user_id != call.caller_id:
+                raise HTTPException(status_code=403, detail="Decline the call instead")
+            # She gave up waiting: stop it ringing for everyone it was sent to.
+            await CallService._stop_ringing(db, call, CallStatusEnum.CANCELLED, by=user_id)
+            await db.commit()
+            return call
 
-        call.status = CallStatusEnum.CANCELLED if was_still_ringing else CallStatusEnum.ENDED
-        call.ended_at = datetime.now(timezone.utc)
-
-        # Talk time is measured from when media actually started (set by
-        # the LiveKit webhook handler on room_started / first participant
-        # join - see webhook_router.py), NOT from when the row was created.
-        # Falls back to answered_at so we still record *something* if the
-        # webhook never fired (e.g. webhooks misconfigured).
-        basis = call.started_at or call.answered_at
-        if basis:
-            delta = call.ended_at - basis
-            call.duration_seconds = max(0, int(delta.total_seconds()))
-
-        db.add(CallEvent(call_id=call.id, event_type="CallEnded", payload={"ended_by": user_id}))
-
-        # Issue 14: mark every participant who hasn't already left as having
-        # left now, so call history / presence can be reconstructed later.
-        # This column existed in the schema but nothing ever wrote to it.
-        p_stmt = select(CallParticipant).where(
-            CallParticipant.call_id == call.id, CallParticipant.left_at.is_(None)
-        )
-        p_result = await db.execute(p_stmt)
-        for p in p_result.scalars().all():
-            p.left_at = call.ended_at
-
-        await LiveKitService.delete_room(call.room_name)
-
+        await CallService._finish(db, call, CallStatusEnum.ENDED, by=user_id)
         await db.commit()
+        await LiveKitService.delete_room(call.room_name)
 
         other_participant_id = call.receiver_id if user_id == call.caller_id else call.caller_id
         if other_participant_id:
@@ -413,6 +553,24 @@ class CallService:
             asyncio.create_task(_emit(other_participant_id, "call_ended", "Call Ended", "The call has ended.", data))
 
         return call
+
+    @staticmethod
+    async def get_call_state(db: AsyncSession, call_id: int, user_id: str) -> dict:
+        """The server's view of one call, for a client that may have missed events (app was in the
+        background, socket dropped) to resync. Participants and anyone it was rung to may ask."""
+        call = await db.get(Call, call_id)
+        if not call:
+            raise HTTPException(status_code=404, detail="Call not found")
+        if user_id not in (call.caller_id, call.receiver_id) and user_id not in await CallService.rung_ids(db, call):
+            raise HTTPException(status_code=403, detail="Not your call")
+        return {
+            "call_id": str(call.id),
+            "status": call.status.value,
+            "kind": call.kind,
+            "receiver_id": call.receiver_id,
+            "answered_by_other": bool(call.receiver_id and user_id not in (call.caller_id, call.receiver_id)),
+            "duration_seconds": call.duration_seconds,
+        }
 
     @staticmethod
     async def rate_call(db: AsyncSession, call_id: int, user_id: str, rating: int, feedback: str | None = None):

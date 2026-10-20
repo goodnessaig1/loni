@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { Alert } from 'react-native';
-import { useCallStore } from '../store/callStore';
+import { useCallStore, ParticipantInfo } from '../store/callStore';
 import { apiClient } from '../api/client';
 
 function toParticipant(raw: any) {
@@ -24,11 +24,13 @@ export const useCall = () => {
     setOutgoingCall, setConnecting, endCall, removeIncomingCall,
   } = useCallStore();
 
-  const requestCall = useCallback(async (nurseId?: string) => {
+  /** Drivers call the passenger of their active ride with `rideId`; the server picks the other party. */
+  const requestCall = useCallback(async (opts: { rideId?: number; remote?: ParticipantInfo | null } = {}) => {
+    if (useCallStore.getState().status !== 'IDLE') return null;
     try {
-      const response = await apiClient.post('/calls/request', { nurse_id: nurseId });
+      const response = await apiClient.post('/calls/request', { ride_id: opts.rideId });
       const call = response.data;
-      setOutgoingCall(call.id, call.room_name);
+      setOutgoingCall(call.id, call.room_name, { kind: call.kind ?? 'ride', rideId: call.ride_id ?? null }, opts.remote ?? null);
       return call;
     } catch (error) {
       console.error('Failed to request call', error);

@@ -16,6 +16,7 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal } from '../../components/motion';
 import { useLogin, useAuth } from '../../hooks/useAuth';
 import { getPostAuthRoute } from '../../lib/driverOnboarding';
 import { useEffect } from 'react';
@@ -59,75 +60,83 @@ export default function LoginScreen() {
             <Feather name="chevron-left" size={28} color="black" />
           </Pressable>
 
-          <CalText style={styles.heading}>Log In</CalText>
-          <HelixaText style={styles.subtext}>
-            Log in to your LONI Server account.
-          </HelixaText>
+          <Reveal index={0}>
+            <CalText style={styles.heading}>Log In</CalText>
+            <HelixaText style={styles.subtext}>
+              Log in to your LONI Server account.
+            </HelixaText>
+          </Reveal>
 
           <Formik
-            initialValues={{ email: 'goodness6337+nurse@gmail.com', password: 'goodness' }}
+            initialValues={{ email: '', password: '' }}
             validationSchema={LoginSchema}
             onSubmit={handleLogin}
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isSubmitting }) => (
               <>
-                <View style={styles.inputGroup}>
-                  <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
-                  <TextInput
-                    style={[styles.input, touched.email && errors.email ? styles.inputError : null]}
-                    placeholder="Sarahchen@example.com"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    value={values.email}
-                    onChangeText={handleChange('email')}
-                    onBlur={handleBlur('email')}
-                  />
-                  {touched.email && errors.email && (
-                    <HelixaText style={styles.errorText}>{errors.email}</HelixaText>
-                  )}
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <HelixaText style={styles.inputLabel} weight="bold">Password</HelixaText>
-                  <View style={[styles.passwordInputContainer, touched.password && errors.password ? styles.inputError : null]}>
+                <Reveal index={1}>
+                  <View style={styles.inputGroup}>
+                    <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
                     <TextInput
-                      style={styles.passwordInput}
-                      placeholder="Min. 8 characters"
+                      style={[styles.input, touched.email && errors.email ? styles.inputError : null]}
+                      placeholder="Sarahchen@example.com"
                       placeholderTextColor="#9CA3AF"
-                      secureTextEntry={!showPassword}
-                      value={values.password}
-                      onChangeText={handleChange('password')}
-                      onBlur={handleBlur('password')}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      value={values.email}
+                      onChangeText={handleChange('email')}
+                      onBlur={handleBlur('email')}
                     />
-                    <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                      <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#6B7280" />
-                    </Pressable>
+                    {touched.email && errors.email && (
+                      <HelixaText style={styles.errorText}>{errors.email}</HelixaText>
+                    )}
                   </View>
-                  {touched.password && errors.password && (
-                    <HelixaText style={styles.errorText}>{errors.password}</HelixaText>
-                  )}
-                </View>
 
-                <Pressable onPress={() => router.push('/(auth)/reset-password')} style={styles.forgotPasswordContainer}>
-                  <HelixaText style={styles.forgotPasswordText} weight="bold">Forgot Password?</HelixaText>
-                </Pressable>
+                  <View style={styles.inputGroup}>
+                    <HelixaText style={styles.inputLabel} weight="bold">Password</HelixaText>
+                    <View style={[styles.passwordInputContainer, touched.password && errors.password ? styles.inputError : null]}>
+                      <TextInput
+                        style={styles.passwordInput}
+                        placeholder="Min. 8 characters"
+                        placeholderTextColor="#9CA3AF"
+                        secureTextEntry={!showPassword}
+                        value={values.password}
+                        onChangeText={handleChange('password')}
+                        onBlur={handleBlur('password')}
+                      />
+                      <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                        <Feather name={showPassword ? "eye" : "eye-off"} size={20} color="#6B7280" />
+                      </Pressable>
+                    </View>
+                    {touched.password && errors.password && (
+                      <HelixaText style={styles.errorText}>{errors.password}</HelixaText>
+                    )}
+                  </View>
+                </Reveal>
 
-                <Button
-                  title="Continue"
-                  onPress={handleSubmit as any}
-                  isLoading={isSubmitting}
-                  style={styles.continueButtonSpacing}
-                />
+                <Reveal index={2}>
+                  <Pressable onPress={() => router.push('/(auth)/reset-password')} style={styles.forgotPasswordContainer}>
+                    <HelixaText style={styles.forgotPasswordText} weight="bold">Forgot Password?</HelixaText>
+                  </Pressable>
+
+                  <Button
+                    title="Continue"
+                    onPress={handleSubmit as any}
+                    isLoading={isSubmitting}
+                    style={styles.continueButtonSpacing}
+                  />
+                </Reveal>
               </>
             )}
           </Formik>
 
-          <View style={styles.signUpContainer}>
-            <HelixaText style={styles.signUpText}>
-              {"Don't have an account? "}<HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
-            </HelixaText>
-          </View>
+          <Reveal index={3}>
+            <View style={styles.signUpContainer}>
+              <HelixaText style={styles.signUpText}>
+                {"Don't have an account? "}<HelixaText style={styles.signUpTextBold} weight="bold" onPress={() => router.push('/(auth)/register')}>Sign Up</HelixaText>
+              </HelixaText>
+            </View>
+          </Reveal>
 
         </ScrollView>
       </KeyboardAvoidingView>

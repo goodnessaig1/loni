@@ -29,6 +29,9 @@ from app.core.security import ALGORITHM
 from app.core.ws_manager import manager
 
 logger = logging.getLogger("calls.ws")
+
+# Topics a client may subscribe to over this socket (see ConnectionManager.broadcast_topic).
+ALLOWED_TOPICS = {"community"}
 router = APIRouter()
 
 
@@ -60,8 +63,14 @@ async def call_signaling_socket(websocket: WebSocket, token: str = Query(...)):
                 msg = json.loads(raw)
             except Exception:
                 continue
-            if msg.get("type") == "ping":
+            kind = msg.get("type")
+            if kind == "ping":
                 await websocket.send_text('{"type":"pong"}')
+            elif kind in ("subscribe", "unsubscribe") and msg.get("topic") in ALLOWED_TOPICS:
+                if kind == "subscribe":
+                    manager.subscribe(user_id, msg["topic"])
+                else:
+                    manager.unsubscribe(user_id, msg["topic"])
     except WebSocketDisconnect:
         pass
     except Exception as e:

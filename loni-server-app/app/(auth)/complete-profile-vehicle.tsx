@@ -9,6 +9,7 @@ import { Button } from '../../components/Button';
 import { DatePickerInput } from '../../components/DatePickerInput';
 import { SelectModal } from '../../components/SelectModal';
 import { UploadBox } from '../../components/UploadBox';
+import { Reveal } from '../../components/motion';
 import { useAuth, useUploadDocument } from '../../hooks/useAuth';
 import { useSaveVehicleInfo } from '../../hooks/useDriverTraining';
 
@@ -137,119 +138,127 @@ export default function CompleteProfileVehicleScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <CalText style={styles.heading}>Complete Your Profile</CalText>
-        <HelixaText style={styles.subtext}>Vehicle Information</HelixaText>
+        <Reveal index={0}>
+          <CalText style={styles.heading}>Complete Your Profile</CalText>
+          <HelixaText style={styles.subtext}>Vehicle Information</HelixaText>
+        </Reveal>
 
-        <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Vehicle Type</HelixaText>
-          <View style={styles.pillsContainer}>
-            {VEHICLE_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[styles.pill, vehicleType === type && styles.pillSelected]}
-                onPress={() => setVehicleType(type)}
-              >
-                <HelixaText style={[styles.pillText, vehicleType === type && styles.pillTextSelected]}>
-                  {type}
-                </HelixaText>
-              </TouchableOpacity>
-            ))}
+        <Reveal index={1}>
+          <View style={styles.formGroup}>
+            <HelixaText style={styles.label}>Vehicle Type</HelixaText>
+            <View style={styles.pillsContainer}>
+              {VEHICLE_TYPES.map((type) => (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.pill, vehicleType === type && styles.pillSelected]}
+                  onPress={() => setVehicleType(type)}
+                >
+                  <HelixaText style={[styles.pillText, vehicleType === type && styles.pillTextSelected]}>
+                    {type}
+                  </HelixaText>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
 
-        <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Does your Car have AC?</HelixaText>
-          <TouchableOpacity style={styles.inputContainer} onPress={() => setAcModalVisible(true)} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="air-conditioner" size={20} color="#6B7280" style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: hasAC ? '#000' : '#9CA3AF' }]}
-              placeholder="Yes / No"
-              placeholderTextColor="#9CA3AF"
-              value={hasAC}
-              editable={false}
-              pointerEvents="none"
-            />
-            <Feather name="chevron-down" size={20} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
+          <View style={styles.formGroup}>
+            <HelixaText style={styles.label}>Does your Car have AC?</HelixaText>
+            <TouchableOpacity style={styles.inputContainer} onPress={() => setAcModalVisible(true)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="air-conditioner" size={20} color="#6B7280" style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: hasAC ? '#000' : '#9CA3AF' }]}
+                placeholder="Yes / No"
+                placeholderTextColor="#9CA3AF"
+                value={hasAC}
+                editable={false}
+                pointerEvents="none"
+              />
+              <Feather name="chevron-down" size={20} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.rowGroup}>
-          <View style={[styles.formGroup, { flex: 1, marginRight: 12 }]}>
-            <HelixaText style={styles.label}>Vehicle Brand</HelixaText>
+          <View style={styles.rowGroup}>
+            <View style={[styles.formGroup, { flex: 1, marginRight: 12 }]}>
+              <HelixaText style={styles.label}>Vehicle Brand</HelixaText>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="car-side" size={20} color="#6B7280" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Toyota"
+                  placeholderTextColor="#9CA3AF"
+                  value={brand}
+                  onChangeText={setBrand}
+                />
+              </View>
+            </View>
+            <DatePickerInput label="Vehicle Year" value={year} onChangeText={setYear} placeholder="12/03/2023" style={{ flex: 1 }} />
+          </View>
+
+          <View style={styles.formGroup}>
+            <HelixaText style={styles.label}>Vehicle Model</HelixaText>
             <View style={styles.inputContainer}>
               <MaterialCommunityIcons name="car-side" size={20} color="#6B7280" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Toyota"
-                placeholderTextColor="#9CA3AF"
-                value={brand}
-                onChangeText={setBrand}
-              />
+              <TextInput style={styles.input} placeholder="Camry" placeholderTextColor="#9CA3AF" value={model} onChangeText={setModel} />
             </View>
           </View>
-          <DatePickerInput label="Vehicle Year" value={year} onChangeText={setYear} placeholder="12/03/2023" style={{ flex: 1 }} />
-        </View>
 
-        <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Vehicle Model</HelixaText>
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="car-side" size={20} color="#6B7280" style={styles.inputIcon} />
-            <TextInput style={styles.input} placeholder="Camry" placeholderTextColor="#9CA3AF" value={model} onChangeText={setModel} />
-          </View>
-        </View>
-
-        <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Plate Number</HelixaText>
-          <View style={styles.inputContainer}>
-            <MaterialCommunityIcons name="car-side" size={20} color="#6B7280" style={styles.inputIcon} />
-            <TextInput style={styles.input} placeholder="ABC-1234" placeholderTextColor="#9CA3AF" value={plate} onChangeText={setPlate} />
-          </View>
-        </View>
-
-        <View style={styles.formGroup}>
-          <HelixaText style={styles.label}>Vehicle Color</HelixaText>
-          <TouchableOpacity style={styles.inputContainer} onPress={() => setColorModalVisible(true)} activeOpacity={0.7}>
-            <MaterialCommunityIcons name="palette-outline" size={20} color="#6B7280" style={styles.inputIcon} />
-            <TextInput
-              style={[styles.input, { color: color ? '#000' : '#9CA3AF' }]}
-              placeholder="Select Color"
-              placeholderTextColor="#9CA3AF"
-              value={color}
-              editable={false}
-              pointerEvents="none"
-            />
-            <Feather name="chevron-down" size={20} color="#6B7280" />
-          </TouchableOpacity>
-        </View>
-
-        {color === 'Other' && (
-          <View style={[styles.formGroup, { marginTop: -8 }]}>
-            <HelixaText style={styles.label}>Specify Color</HelixaText>
+          <View style={styles.formGroup}>
+            <HelixaText style={styles.label}>Plate Number</HelixaText>
             <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Matte Black"
-                placeholderTextColor="#9CA3AF"
-                value={customColor}
-                onChangeText={setCustomColor}
-              />
+              <MaterialCommunityIcons name="car-side" size={20} color="#6B7280" style={styles.inputIcon} />
+              <TextInput style={styles.input} placeholder="ABC-1234" placeholderTextColor="#9CA3AF" value={plate} onChangeText={setPlate} />
             </View>
           </View>
-        )}
 
-        <UploadBox label="Vehicle Front View" fileUri={front.uri} fileName={front.name} setUri={setUploadUri(setFront)} setName={setUploadName(setFront)} defaultFileName="front_view.jpg" />
-        <UploadBox label="Vehicle Back View" fileUri={back.uri} fileName={back.name} setUri={setUploadUri(setBack)} setName={setUploadName(setBack)} defaultFileName="back_view.jpg" />
-        <UploadBox label="Vehicle VIN" fileUri={vin.uri} fileName={vin.name} setUri={setUploadUri(setVin)} setName={setUploadName(setVin)} defaultFileName="vin.jpg" />
-        <UploadBox label="Vehicle Interior" fileUri={interior.uri} fileName={interior.name} setUri={setUploadUri(setInterior)} setName={setUploadName(setInterior)} defaultFileName="interior.jpg" />
+          <View style={styles.formGroup}>
+            <HelixaText style={styles.label}>Vehicle Color</HelixaText>
+            <TouchableOpacity style={styles.inputContainer} onPress={() => setColorModalVisible(true)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="palette-outline" size={20} color="#6B7280" style={styles.inputIcon} />
+              <TextInput
+                style={[styles.input, { color: color ? '#000' : '#9CA3AF' }]}
+                placeholder="Select Color"
+                placeholderTextColor="#9CA3AF"
+                value={color}
+                editable={false}
+                pointerEvents="none"
+              />
+              <Feather name="chevron-down" size={20} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
 
-        <View style={styles.buttonWrapper}>
-          <Button
-            title="Continue"
-            onPress={handleContinue}
-            disabled={!isFormValid || submitting || isPending}
-            isLoading={submitting || isPending}
-          />
-        </View>
+          {color === 'Other' && (
+            <View style={[styles.formGroup, { marginTop: -8 }]}>
+              <HelixaText style={styles.label}>Specify Color</HelixaText>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Matte Black"
+                  placeholderTextColor="#9CA3AF"
+                  value={customColor}
+                  onChangeText={setCustomColor}
+                />
+              </View>
+            </View>
+          )}
+        </Reveal>
+
+        <Reveal index={2}>
+          <UploadBox label="Vehicle Front View" fileUri={front.uri} fileName={front.name} setUri={setUploadUri(setFront)} setName={setUploadName(setFront)} defaultFileName="front_view.jpg" />
+          <UploadBox label="Vehicle Back View" fileUri={back.uri} fileName={back.name} setUri={setUploadUri(setBack)} setName={setUploadName(setBack)} defaultFileName="back_view.jpg" />
+          <UploadBox label="Vehicle VIN" fileUri={vin.uri} fileName={vin.name} setUri={setUploadUri(setVin)} setName={setUploadName(setVin)} defaultFileName="vin.jpg" />
+          <UploadBox label="Vehicle Interior" fileUri={interior.uri} fileName={interior.name} setUri={setUploadUri(setInterior)} setName={setUploadName(setInterior)} defaultFileName="interior.jpg" />
+        </Reveal>
+
+        <Reveal index={3}>
+          <View style={styles.buttonWrapper}>
+            <Button
+              title="Continue"
+              onPress={handleContinue}
+              disabled={!isFormValid || submitting || isPending}
+              isLoading={submitting || isPending}
+            />
+          </View>
+        </Reveal>
 
         <SelectModal title="Does your Car have AC?" visible={acModalVisible} onClose={() => setAcModalVisible(false)} options={AC_OPTIONS} selectedValue={hasAC} onSelect={setHasAC} />
         <SelectModal title="Vehicle Color" visible={colorModalVisible} onClose={() => setColorModalVisible(false)} options={COLOR_OPTIONS} selectedValue={color} onSelect={setColor} />

@@ -165,3 +165,14 @@ def get_latest_updates(status: str, current_week: int, limit: int = 4) -> list[d
     passed = [m for m in table if m["week"] <= current_week]
     passed.sort(key=lambda m: m["week"], reverse=True)
     return passed[:limit]
+
+
+def get_timeline(status: str, current_week: int) -> list[dict]:
+    """Every milestone for her stage, oldest first, marked done / current / upcoming."""
+    table = PREGNANCY_MILESTONES if status == 'pregnant' else NEWMOM_MILESTONES
+    rows = sorted(table, key=lambda m: m["week"])
+    current = max((m["week"] for m in rows if m["week"] <= current_week), default=None)
+    return [
+        {**m, "state": "current" if m["week"] == current else ("done" if m["week"] < current_week else "upcoming")}
+        for m in rows
+    ]

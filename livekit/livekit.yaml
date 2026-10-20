@@ -3,6 +3,10 @@ bind_addresses:
   - ""
 rtc:
   tcp_port: 7881
+  # Scale: all WebRTC UDP traffic is multiplexed on this ONE port (exposed in docker-compose.yml).
+  # Without it LiveKit gives each participant a port from the range below, and 50000-50050 is only
+  # 51 ports - about 25 simultaneous calls for the whole service.
+  udp_port: 7882
   port_range_start: 50000
   port_range_end: 50050
   # Issue 9 root cause: `node_ip` was hardcoded to one developer's LAN IP
@@ -26,7 +30,7 @@ rtc:
   # firewalls) fall back to the TURN relay configured below - which is why
   # getting TURN right matters just as much as node_ip.
   use_external_ip: false
-  node_ip: 192.168.100.156 # <-- CHANGE PER ENVIRONMENT. See comment above.
+  node_ip: 192.168.100.192 # <-- CHANGE PER ENVIRONMENT. See comment above.
   enable_loopback_candidate: false
 redis:
   address: "redis:6379"

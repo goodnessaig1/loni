@@ -14,6 +14,7 @@ import { usePartnerDashboard } from '../../hooks/usePartnerDashboard';
 import { useNotifications } from '../../hooks/useNotifications';
 import { relativeTime } from '../../lib/relativeTime';
 import type { PartnerDashboardUpdate } from '../../api/partner';
+import { PressableScale, Reveal } from '../../components/motion';
 
 const CARD_COLORS = [
   { bg: '#FBD9F1', pill: '#CF7DAD' },
@@ -85,9 +86,9 @@ function PregnancyJourneyCard({ status, week }: { status: 'pregnant' | 'newMom' 
           <View style={[styles.journeyDot, { left: `${progress * 100}%` }]}>
             <View style={styles.journeyDotInner} />
           </View>
-          <View style={styles.journeyNextButton}>
+          <Pressable style={styles.journeyNextButton} hitSlop={10} onPress={() => router.push('/partner/pregnancy-updates' as any)}>
             <Feather name="chevron-right" size={12} color="#FFFFFF" />
-          </View>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -105,6 +106,7 @@ export default function PartnerDashboard() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Reveal index={0}>
         <View style={styles.header}>
           <Avatar uri={user?.profilePicture || null} name={user?.name || 'You'} style={styles.avatar} />
           <Pressable style={styles.bellButton} onPress={() => router.push('/partner/notifications' as any)}>
@@ -112,28 +114,37 @@ export default function PartnerDashboard() {
             {!!unreadCount && <View style={styles.bellBadge} />}
           </Pressable>
         </View>
+        </Reveal>
 
+        <Reveal index={1}>
         <CalText style={styles.greeting}>{greeting()}, {firstName}</CalText>
         <HelixaText style={styles.subGreeting}>Stay connected to her journey.</HelixaText>
+        </Reveal>
 
         {data?.active_alert && (
+          <Reveal index={2}>
           <EmergencyAlertCard
             inviterName={data.inviter.name}
             rideId={data.active_alert.ride_id}
             requestedAt={data.active_alert.requested_at}
             style={styles.alertCardSpacing}
           />
+          </Reveal>
         )}
 
         {data?.inviter.week != null && (
+          <Reveal index={3}>
           <PregnancyJourneyCard status={data.inviter.status} week={data.inviter.week} />
+          </Reveal>
         )}
 
-        {!!data?.active_alert && (() => {
+        {!!data?.active_alert && (data.active_alert.driver_location ?? data.active_alert.pickup) && (() => {
+          // No map when she keeps her location private; the emergency card above still shows.
           const alert = data.active_alert!;
-          const fix = alert.driver_location ?? alert.pickup;
+          const fix = (alert.driver_location ?? alert.pickup)!;
           return (
-            <Pressable style={styles.mapCard} onPress={() => router.push('/partner/shared-location' as any)}>
+            <Reveal index={4}>
+            <PressableScale style={styles.mapCard} onPress={() => router.push('/partner/shared-location' as any)}>
               <Image
                 source={{ uri: staticMapUrl(fix.lat, fix.lng) ?? undefined }}
                 style={StyleSheet.absoluteFill}
@@ -149,18 +160,25 @@ export default function PartnerDashboard() {
                 </View>
                 <HelixaText style={styles.mapPillTime} weight="bold">{relativeTime(alert.requested_at)}</HelixaText>
               </View>
-            </Pressable>
+            </PressableScale>
+            </Reveal>
           );
         })()}
 
         {!!data?.updates.length && (
+          <Reveal index={5}>
           <View style={styles.updatesSection}>
-            <CalText style={styles.updatesHeading}>Her Latest Updates</CalText>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <CalText style={styles.updatesHeading}>Her Latest Updates</CalText>
+              <Pressable hitSlop={8} onPress={() => router.push('/partner/pregnancy-updates' as any)}>
+                <HelixaText weight="bold" style={{ color: '#D62D88', fontSize: 13 }}>See all</HelixaText>
+              </Pressable>
+            </View>
             <View style={styles.updatesGrid}>
               {data.updates.map((u, i) => {
                 const colors = CARD_COLORS[i % CARD_COLORS.length];
                 return (
-                  <Pressable
+                  <PressableScale
                     key={u.week}
                     style={[styles.updateCard, { backgroundColor: colors.bg }]}
                     onPress={() => setSelected({ update: u, colors })}
@@ -173,11 +191,12 @@ export default function PartnerDashboard() {
                     <View style={styles.updateExpand}>
                       <Feather name="arrow-right" size={14} color="#000" style={styles.updateExpandIcon} />
                     </View>
-                  </Pressable>
+                  </PressableScale>
                 );
               })}
             </View>
           </View>
+          </Reveal>
         )}
       </ScrollView>
 

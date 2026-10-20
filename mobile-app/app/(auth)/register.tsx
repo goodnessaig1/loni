@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   View, 
   Pressable, 
@@ -18,12 +18,15 @@ import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Button } from '../../components/Button';
 import { useRegister } from '../../hooks/useAuth';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const validationSchema = Yup.object().shape({
   name: Yup.string().required('Name is required'),
   email: Yup.string().email('Invalid email').required('Email is required'),
   password: Yup.string().min(8, 'Password must be at least 8 chars').required('Password is required'),
-  status: Yup.string().oneOf(['pregnant', 'newMom']).required('Please select your current status'),
+  status: Yup.string().oneOf(['pregnant', 'newMom', 'ttc', 'general']).required('Please select your current status'),
   trimester: Yup.string().when('status', {
     is: (status: string) => status === 'pregnant' || status === 'newMom',
     then: (schema) => schema.required('Please select your current stage'),
@@ -62,6 +65,8 @@ const getWeeksForPostpartumStage = (stage: string) => {
 };
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { mutateAsync: registerUser } = useRegister();
 
   return (
@@ -102,13 +107,16 @@ export default function RegisterScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
               
+              <Reveal index={0}>
               <Pressable onPress={() => router.back()} style={styles.backButton}>
-                <Feather name="chevron-left" size={28} color="black" />
+                <Feather name="chevron-left" size={28} color={colors.text} />
               </Pressable>
 
               <CalText style={styles.heading}>Let's set up your profile</CalText>
               <HelixaText style={styles.subtext}>This helps us provide the right support for your journey.</HelixaText>
+              </Reveal>
 
+              <Reveal index={1}>
               <View style={styles.inputContainer}>
                 <HelixaText style={styles.inputLabel} weight="bold">Your name</HelixaText>
                 <TextInput 
@@ -117,7 +125,7 @@ export default function RegisterScreen() {
                   onChangeText={handleChange('name')}
                   onBlur={handleBlur('name')}
                   value={values.name}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
                 {touched.name && errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
               </View>
@@ -132,7 +140,7 @@ export default function RegisterScreen() {
                   onChangeText={handleChange('email')}
                   onBlur={handleBlur('email')}
                   value={values.email}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
                 {touched.email && errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
               </View>
@@ -146,11 +154,13 @@ export default function RegisterScreen() {
                   onChangeText={handleChange('password')}
                   onBlur={handleBlur('password')}
                   value={values.password}
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.textMuted}
                 />
                 {touched.password && errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
               </View>
+              </Reveal>
 
+              <Reveal index={2}>
               <View style={styles.statusSection}>
                 <HelixaText style={styles.inputLabel} weight="bold">I am currently</HelixaText>
                 
@@ -190,11 +200,53 @@ export default function RegisterScreen() {
                     <HelixaText style={styles.statusSubtitle}>0-8 weeks postpartum</HelixaText>
                   </Pressable>
                 </View>
+
+                <View style={[styles.statusRow, { marginTop: 12 }]}>
+                  {/* Not pregnant: women's health in general */}
+                  <Pressable
+                    style={[styles.statusBox, values.status === 'general' && styles.statusBoxSelected]}
+                    onPress={() => {
+                      setFieldValue('status', 'general');
+                      setFieldValue('trimester', '');
+                      setFieldValue('pregnancyWeek', '');
+                      setFieldValue('babyAge', '');
+                    }}
+                  >
+                    <View style={styles.statusHeader}>
+                      <HelixaText style={styles.statusTitle} weight="bold">Not pregnant</HelixaText>
+                      <View style={[styles.radioEmpty, values.status === 'general' && styles.radioSelected]}>
+                        {values.status === 'general' && <View style={styles.radioInner} />}
+                      </View>
+                    </View>
+                    <HelixaText style={styles.statusSubtitle}>Here for my health</HelixaText>
+                  </Pressable>
+
+                  {/* Trying to conceive */}
+                  <Pressable
+                    style={[styles.statusBox, values.status === 'ttc' && styles.statusBoxSelected]}
+                    onPress={() => {
+                      setFieldValue('status', 'ttc');
+                      setFieldValue('trimester', '');
+                      setFieldValue('pregnancyWeek', '');
+                      setFieldValue('babyAge', '');
+                    }}
+                  >
+                    <View style={styles.statusHeader}>
+                      <HelixaText style={styles.statusTitle} weight="bold">Trying</HelixaText>
+                      <View style={[styles.radioEmpty, values.status === 'ttc' && styles.radioSelected]}>
+                        {values.status === 'ttc' && <View style={styles.radioInner} />}
+                      </View>
+                    </View>
+                    <HelixaText style={styles.statusSubtitle}>Trying to conceive</HelixaText>
+                  </Pressable>
+                </View>
                 {touched.status && errors.status && <Text style={styles.errorText}>{errors.status}</Text>}
               </View>
+              </Reveal>
 
               {/* Conditional Field: Trimester */}
               {values.status === 'pregnant' && (
+                <Reveal>
                 <View style={styles.conditionalSection}>
                   <HelixaText style={styles.inputLabelSubtitle}>Which trimester are you in?</HelixaText>
                   <View style={styles.trimesterRow}>
@@ -242,10 +294,12 @@ export default function RegisterScreen() {
                     </View>
                   ) : null}
                 </View>
+                </Reveal>
               )}
 
               {/* Conditional Field: Baby Age (Postpartum) */}
               {values.status === 'newMom' && (
+                <Reveal>
                 <View style={styles.conditionalSection}>
                   <HelixaText style={styles.inputLabelSubtitle}>Which postpartum stage are you in?</HelixaText>
                   
@@ -299,8 +353,10 @@ export default function RegisterScreen() {
                     </View>
                   ) : null}
                 </View>
+                </Reveal>
               )}
 
+              <Reveal index={3}>
               <Button 
                 title="Continue"
                 onPress={handleSubmit as any}
@@ -313,6 +369,7 @@ export default function RegisterScreen() {
                   Already have an account? <HelixaText style={styles.switchModeHighlight} weight="bold">Sign in</HelixaText>
                 </HelixaText>
               </Pressable>
+              </Reveal>
 
             </ScrollView>
           </KeyboardAvoidingView>
@@ -322,10 +379,10 @@ export default function RegisterScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -344,12 +401,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   subtext: {
     fontSize: 16,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 24,
     marginBottom: 32,
   },
@@ -358,22 +415,22 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   inputLabelSubtitle: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     marginBottom: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
   },
   inputError: {
@@ -403,10 +460,10 @@ const styles = StyleSheet.create({
   statusBox: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   trimesterBox: {
     flex: 1,
@@ -414,10 +471,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   statusBoxSelected: {
     // No border or background color for selected state
@@ -430,18 +487,18 @@ const styles = StyleSheet.create({
   },
   statusTitle: {
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
   },
   statusSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   radioEmpty: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -470,7 +527,7 @@ const styles = StyleSheet.create({
   },
   switchModeText: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
   },
   switchModeHighlight: {
     color: '#D62D88',
@@ -487,8 +544,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFFFFF',
+    borderColor: c.border,
+    backgroundColor: c.bgSoft,
   },
   weekBoxSelected: {
     backgroundColor: '#D62D88',
@@ -496,7 +553,7 @@ const styles = StyleSheet.create({
   },
   weekText: {
     fontSize: 14,
-    color: '#374151',
+    color: c.text,
   },
   weekTextSelected: {
     color: '#FFFFFF',

@@ -14,6 +14,7 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal, RevealList, PressableScale } from '../../components/motion';
 import { useTrainingModules, useCompleteModule } from '../../hooks/useDriverTraining';
 import { getDriverTrainingImage } from '../../lib/driverTrainingAssets';
 import type { TrainingSection } from '../../api/driverTraining';
@@ -105,66 +106,77 @@ export default function TrainingModuleScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <CalText style={styles.title}>{mod.title}</CalText>
-        <HelixaText style={styles.subtitle}>{mod.subtitle}</HelixaText>
+        <Reveal index={0}>
+          <CalText style={styles.title}>{mod.title}</CalText>
+          <HelixaText style={styles.subtitle}>{mod.subtitle}</HelixaText>
+        </Reveal>
 
-        <View style={styles.heroCard}>
-          <Image source={getDriverTrainingImage(mod.hero)} style={styles.hero} contentFit="cover" />
-        </View>
+        <Reveal index={1}>
+          <View style={styles.heroCard}>
+            <Image source={getDriverTrainingImage(mod.hero)} style={styles.hero} contentFit="cover" />
+          </View>
+        </Reveal>
 
-        {isChecklist ? (
-          <View style={styles.checklist}>
-            {mod.sections.map((section) => {
-              const read = readTitles.includes(section.title) || moduleDone;
-              return (
-                <Pressable
-                  key={section.title}
-                  style={styles.checkRow}
-                  onPress={() => setActiveSection(section)}
-                >
-                  <View style={[styles.checkbox, read && styles.checkboxDone]}>
-                    {read && <Feather name="check" size={14} color="#FFFFFF" />}
+        <Reveal index={2}>
+          {isChecklist ? (
+            <View style={styles.checklist}>
+              {mod.sections.map((section, i) => {
+                const read = readTitles.includes(section.title) || moduleDone;
+                return (
+                  <RevealList key={section.title} index={i}>
+                    <PressableScale
+                      style={styles.checkRow}
+                      onPress={() => setActiveSection(section)}
+                    >
+                      <View style={[styles.checkbox, read && styles.checkboxDone]}>
+                        {read && <Feather name="check" size={14} color="#FFFFFF" />}
+                      </View>
+                      <HelixaText style={styles.checkLabel}>{section.title}</HelixaText>
+                    </PressableScale>
+                  </RevealList>
+                );
+              })}
+
+              {moduleDone && (
+                <View style={styles.moduleCompleteBanner}>
+                  <View style={[styles.checkbox, styles.checkboxDone]}>
+                    <Feather name="check" size={14} color="#FFFFFF" />
                   </View>
-                  <HelixaText style={styles.checkLabel}>{section.title}</HelixaText>
-                </Pressable>
-              );
-            })}
-
-            {moduleDone && (
-              <View style={styles.moduleCompleteBanner}>
-                <View style={[styles.checkbox, styles.checkboxDone]}>
-                  <Feather name="check" size={14} color="#FFFFFF" />
+                  <HelixaText style={styles.moduleCompleteText}>Module Complete</HelixaText>
                 </View>
-                <HelixaText style={styles.moduleCompleteText}>Module Complete</HelixaText>
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.reading}>
-            {mod.sections.map((section, idx) => (
-              <View key={section.title} style={styles.readingSection}>
-                <HelixaText style={styles.readingHeading} weight="bold">
-                  {idx + 1}. {section.title}
-                </HelixaText>
-                {!!section.body && <HelixaText style={styles.readingBody}>{section.body}</HelixaText>}
-                {section.bullets?.map((b) => (
-                  <View key={b} style={styles.bulletRow}>
-                    <HelixaText style={styles.bulletDot}>{'•'}</HelixaText>
-                    <HelixaText style={styles.bulletText}>{b}</HelixaText>
+              )}
+            </View>
+          ) : (
+            <View style={styles.reading}>
+              {mod.sections.map((section, idx) => (
+                <RevealList key={section.title} index={idx}>
+                  <View style={styles.readingSection}>
+                    <HelixaText style={styles.readingHeading} weight="bold">
+                      {idx + 1}. {section.title}
+                    </HelixaText>
+                    {!!section.body && <HelixaText style={styles.readingBody}>{section.body}</HelixaText>}
+                    {section.bullets?.map((b) => (
+                      <View key={b} style={styles.bulletRow}>
+                        <HelixaText style={styles.bulletDot}>{'•'}</HelixaText>
+                        <HelixaText style={styles.bulletText}>{b}</HelixaText>
+                      </View>
+                    ))}
+                    {!!section.note && (
+                      <View style={styles.note}>
+                        <HelixaText style={styles.noteText}>{section.note}</HelixaText>
+                      </View>
+                    )}
                   </View>
-                ))}
-                {!!section.note && (
-                  <View style={styles.note}>
-                    <HelixaText style={styles.noteText}>{section.note}</HelixaText>
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
+                </RevealList>
+              ))}
+            </View>
+          )}
+        </Reveal>
       </ScrollView>
 
-      <View style={styles.footer}>{renderFooter()}</View>
+      <Reveal index={3}>
+        <View style={styles.footer}>{renderFooter()}</View>
+      </Reveal>
 
       {/* Checkpoint detail card */}
       <Modal visible={!!activeSection} transparent animationType="fade" onRequestClose={() => setActiveSection(null)}>

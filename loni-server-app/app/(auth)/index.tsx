@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Dimensions, TouchableOpacity, StatusBar } from 'react-native';
+import { View, StyleSheet, Dimensions, StatusBar } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
+import { Reveal, PressableScale } from '../../components/motion';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -88,41 +89,47 @@ export default function OnboardingScreen() {
 
       {/* Bottom White Container positioned absolutely at the bottom */}
       <View style={[styles.bottomContainer, { paddingBottom: insets.bottom > 0 ? insets.bottom + 10 : 30 }]}>
-        <View style={styles.textContent}>
-          <HelixaText style={styles.subtext}>
-            Answer requests. Deliver support.
-          </HelixaText>
-          <CalText style={styles.heading}>
-            Support mothers through every urgent moment.
-          </CalText>
-        </View>
+        <Reveal index={0}>
+          <View style={styles.textContent}>
+            <HelixaText style={styles.subtext}>
+              Answer requests. Deliver support.
+            </HelixaText>
+            <CalText style={styles.heading}>
+              Support mothers through every urgent moment.
+            </CalText>
+          </View>
+        </Reveal>
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity 
-            style={styles.createAccountBtn}
-            onPress={() => router.push('/(auth)/register')}
-            activeOpacity={0.8}
-          >
-            <HelixaText weight="bold" style={styles.createAccountText}>Create Account</HelixaText>
-          </TouchableOpacity>
+        <Reveal index={1}>
+          <View style={styles.buttonContainer}>
+            <PressableScale
+              style={styles.createAccountBtn}
+              onPress={() => router.push('/(auth)/register')}
+              activeOpacity={0.8}
+            >
+              <HelixaText weight="bold" style={styles.createAccountText}>Create Account</HelixaText>
+            </PressableScale>
 
-          <TouchableOpacity 
-            style={styles.signInBtn}
-            onPress={() => router.push('/(auth)/login')}
-            activeOpacity={0.8}
-          >
-            <HelixaText weight="bold" style={styles.signInText}>Sign In</HelixaText>
-          </TouchableOpacity>
-        </View>
+            <PressableScale
+              style={styles.signInBtn}
+              onPress={() => router.push('/(auth)/login')}
+              activeOpacity={0.8}
+            >
+              <HelixaText weight="bold" style={styles.signInText}>Sign In</HelixaText>
+            </PressableScale>
+          </View>
+        </Reveal>
 
-        <View style={styles.footerContainer}>
-          <HelixaText style={styles.footerText}>
-            By continuing, you agree to our{' '}
-            <HelixaText style={styles.footerLink} onPress={() => {}}>Terms of Service</HelixaText>
-            {' '}and{' '}
-            <HelixaText style={styles.footerLink} onPress={() => {}}>Privacy Policy.</HelixaText>
-          </HelixaText>
-        </View>
+        <Reveal index={2}>
+          <View style={styles.footerContainer}>
+            <HelixaText style={styles.footerText}>
+              By continuing, you agree to our{' '}
+              <HelixaText style={styles.footerLink} onPress={() => {}}>Terms of Service</HelixaText>
+              {' '}and{' '}
+              <HelixaText style={styles.footerLink} onPress={() => {}}>Privacy Policy.</HelixaText>
+            </HelixaText>
+          </View>
+        </Reveal>
       </View>
     </View>
   );

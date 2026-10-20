@@ -12,6 +12,9 @@ import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, T
 import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker } from '../lib/audioSession';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
 import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
+import { router } from 'expo-router';
+import { callSoundsEnabled } from '../lib/localPrefs';
+import { cdnImage } from '../lib/cdnImage';
 
 const LOG = '[Call/Nurse]';
 const CONNECT_TIMEOUT_MS = 20000;
@@ -205,7 +208,7 @@ const ActiveCallUI = () => {
     <View style={styles.container}>
       <StatusBar style='light' />
       {remoteParticipant?.profile_picture ? (
-        <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.bgImage} contentFit="cover" />
+        <Image source={{ uri: cdnImage(remoteParticipant.profile_picture, 400) }} style={styles.bgImage} contentFit="cover" />
       ) : (
         <View style={[styles.bgImage, { backgroundColor: '#2b2a29' }]} />
       )}
@@ -316,6 +319,8 @@ const ActiveCallUI = () => {
 
 export const CallModals = () => {
   const isIncoming = useCallStore((s) => s.isIncoming);
+  const isOutgoing = useCallStore((s) => s.isOutgoing);
+  const kind = useCallStore((s) => s.kind);
   const isActive = useCallStore((s) => s.isActive);
   const status = useCallStore((s) => s.status);
   const remoteParticipant = useCallStore((s) => s.remoteParticipant);
@@ -330,7 +335,61 @@ export const CallModals = () => {
 
   useCallLogger();
 
-  const visible = isActive;
+  // Remember the call while it is live so its summary can be shown once it ends
+  // (Figma "Support session ended successfully"). Only nurse sessions get a summary.
+  const connectedAt = useCallStore((s) => s.connectedAt);
+  const last = useRef<{ id: number; name: string; picture?: string | null; trimester?: string | null; startedAt: number; kind: string } | null>(null);
+  if (callId && connectedAt && remoteParticipant) {
+    last.current = {
+      id: callId, name: remoteParticipant.name, picture: remoteParticipant.profile_picture,
+      trimester: remoteParticipant.trimester, startedAt: connectedAt, kind,
+    };
+  }
+  useEffect(() => {
+    // The call is over once the store has moved off it (IDLE, or on to the next queued request).
+    if (!last.current || (callId === last.current.id && status !== 'IDLE')) return;
+    const done = last.current;
+    last.current = null;
+    if (done.kind !== 'nurse') return;
+    router.push({
+      pathname: '/call-summary',
+      params: {
+        callId: String(done.id),
+        name: done.name,
+        picture: done.picture ?? '',
+        trimester: done.trimester ?? '',
+        seconds: String(Math.max(0, Math.round((Date.now() - done.startedAt) / 1000))),
+      },
+    } as any);
+  }, [status, callId]);
+
+  // Ring while a request is waiting and we're not already on a call - the WebSocket path has no
+  // notification sound of its own. Honours Settings > Call sounds (lib/localPrefs.ts).
+  const waiting = useCallStore((s) => s.incomingRequests.length > 0);
+  const ringing = waiting && !isActive && !isOutgoing;
+  useEffect(() => {
+    if (!ringing) return;
+    let stopped = false;
+    let InCallManager: any = null;
+    callSoundsEnabled().then((on) => {
+      if (!on || stopped) return;
+      try {
+        InCallManager = require('react-native-incall-manager').default;
+        InCallManager.startRingtone('_DEFAULT_');
+      } catch { /* no ringtone available */ }
+    });
+    // Never ring longer than the server's 45s ring timeout.
+    const cap = setTimeout(() => { try { InCallManager?.stopRingtone(); } catch {} }, 45_000);
+    return () => {
+      stopped = true;
+      clearTimeout(cap);
+      try { (InCallManager ?? require('react-native-incall-manager').default).stopRingtone(); } catch {}
+    };
+  }, [ringing]);
+
+  // Nurses pick up open requests from their dashboard card; a call from the passenger of a ride
+  // (or one this user is placing) takes the screen so it can be answered or cancelled.
+  const visible = isActive || isOutgoing || (isIncoming && kind === 'ride');
   const micGranted = micStatus === 'granted';
 
   useEffect(() => {
@@ -391,7 +450,7 @@ export const CallModals = () => {
   // INCOMING CALL (WhatsApp Style)
   if (isIncoming && !isActive && callId) {
     const hasTrimester = remoteParticipant?.trimester || remoteParticipant?.pregnancy_week;
-    const specialtyLabel = hasTrimester
+    const specialtyLabel = kind === 'ride' ? 'Your passenger' : hasTrimester
       ? `${remoteParticipant.trimester || ''} ${remoteParticipant.pregnancy_week ? `• Week ${remoteParticipant.pregnancy_week}` : ''}`
       : remoteParticipant?.hospital_affiliation || '';
 
@@ -403,7 +462,7 @@ export const CallModals = () => {
             <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
               <View style={styles.incomingAvatarPlaceholder}>
                 {remoteParticipant?.profile_picture ? (
-                  <Image source={{ uri: remoteParticipant.profile_picture }} style={styles.incomingAvatar} contentFit="cover" />
+                  <Image source={{ uri: cdnImage(remoteParticipant.profile_picture, 400) }} style={styles.incomingAvatar} contentFit="cover" />
                 ) : (
                   <Text style={styles.incomingAvatarInitial}>{(remoteParticipant?.name || 'M')[0]}</Text>
                 )}
@@ -432,6 +491,19 @@ export const CallModals = () => {
             </View>
           </SafeAreaView>
         </BlurView>
+      </View>
+    );
+  } else if (isOutgoing && !isActive) {
+    content = (
+      <View style={styles.centerContent}>
+        <StatusBar style='light' />
+        <Text style={styles.title}>
+          {status === 'ACCEPTED' ? 'Connecting…' : `Calling ${remoteParticipant?.name || 'your passenger'}…`}
+        </Text>
+        <Text style={styles.statusText}>{kind === 'ride' ? 'Ringing your passenger' : 'Ringing'}</Text>
+        <TouchableOpacity style={styles.cancelBtn} onPress={() => { if (callId) hangupCall(callId); else endCall('CANCELLED'); }}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </TouchableOpacity>
       </View>
     );
   } else if (isActive && roomToken) {

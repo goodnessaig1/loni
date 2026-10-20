@@ -4,6 +4,7 @@ from sqlalchemy import inspect
 
 from app.core.database import get_db
 from app.api.deps import get_current_user
+from app.core.ratelimit import limit
 from app.modules.users.models import User
 from app.modules.calls.schemas import CallRequest, CallResponse, CallActionResponse, CallRatingRequest, CallHistoryFilter, CallStatsResponse
 from app.modules.calls.services.call_service import CallService, _participant_info
@@ -25,6 +26,8 @@ def map_call_response(call) -> dict:
         "duration_seconds": call.duration_seconds,
         "rating": call.rating,
         "feedback": call.feedback,
+        "kind": call.kind or "nurse",
+        "ride_id": call.ride_id,
         "created_at": call.created_at,
     }
     unloaded = inspect(call).unloaded
@@ -34,7 +37,8 @@ def map_call_response(call) -> dict:
         call_dict["receiver"] = _participant_info(call.receiver).model_dump()
     return call_dict
 
-@router.post("/request", response_model=CallResponse)
+@router.post("/request", response_model=CallResponse,
+             dependencies=[Depends(limit("calls.request", 10, 60, "You're starting calls too quickly. Please wait a moment."))])
 async def request_call(
     request: CallRequest,
     current_user: User = Depends(get_current_user),
@@ -63,7 +67,7 @@ async def accept_call(
     token = LiveKitService.create_token(
         room_name=call.room_name,
         participant_identity=str(current_user.id),
-        participant_name=current_user.name or "Nurse"
+        participant_name=current_user.name or "Participant"
     )
 
     return CallActionResponse(
@@ -159,3 +163,13 @@ async def get_stats(
 ):
     stats = await get_user_call_stats(db, str(current_user.id))
     return stats
+
+
+@router.get("/{call_id}/state")
+async def get_call_state(
+    call_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Server truth for one call, so an app that missed events (background, dropped socket) can resync."""
+    return await CallService.get_call_state(db, call_id, str(current_user.id))

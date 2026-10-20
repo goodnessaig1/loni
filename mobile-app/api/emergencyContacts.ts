@@ -27,6 +27,11 @@ export const emergencyContactsApi = {
     const response = await apiClient.post('/users/emergency-contacts', { contacts });
     return response.data;
   },
+  /** Email the invite again to a partner who hasn't accepted yet. */
+  resendInvite: async (contactId: number) => {
+    const response = await apiClient.post(`/users/emergency-contacts/${contactId}/resend-invite`);
+    return response.data as { success: boolean; message: string };
+  },
   removeContact: async (contactId: number) => {
     const response = await apiClient.delete(`/users/emergency-contacts/${contactId}`);
     return response.data;

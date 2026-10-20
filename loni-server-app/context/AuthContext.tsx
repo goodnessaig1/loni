@@ -1,6 +1,11 @@
 import React, { createContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient } from '../api/client';
+import { unregisterPush } from '../lib/pushRegistration';
+import { queryClient } from '../lib/queryClient';
+import { setSessionExpiredHandler } from '../api/client';
+import { router } from 'expo-router';
+import Toast from 'react-native-toast-message';
 
 export type User = {
   id: string;
@@ -70,9 +75,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logoutUser = async () => {
+    // Before the login token goes: a signed-out nurse/driver must not be rung or offered rides here.
+    await unregisterPush();
     await SecureStore.deleteItemAsync('userToken');
+    queryClient.clear();
     setUser(null);
   };
+
+  // Login expired on the server (8 days): sign out once and go back to sign-in with a short note.
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      (async () => {
+        await unregisterPush({ skipServer: true });
+        await SecureStore.deleteItemAsync('userToken');
+        queryClient.clear();
+        setUser(null);
+        Toast.show({ type: 'info', text1: 'Please sign in again', text2: 'Your session has expired.' });
+        router.replace('/(auth)/login');
+      })().catch(() => {});
+    });
+    return () => setSessionExpiredHandler(null);
+  }, []);
 
   const refreshUser = async () => {
     await loadUser();

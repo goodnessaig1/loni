@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, Enum, ForeignKey, JSON
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, Enum, ForeignKey, JSON, Index
 from sqlalchemy.orm import relationship as sa_relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -24,6 +24,7 @@ class ParticipantRoleEnum(str, enum.Enum):
 
 class Call(Base):
     __tablename__ = 'calls'
+    __table_args__ = (Index('ix_calls_caller_status', 'caller_id', 'status'), Index('ix_calls_receiver_status', 'receiver_id', 'status'), Index('ix_calls_status_updated', 'status', 'updated_at'),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     caller_id = Column(String(12), ForeignKey('users.id'), nullable=False)
@@ -36,6 +37,9 @@ class Call(Base):
     duration_seconds = Column(Integer, default=0, nullable=False)
     rating = Column(Integer, nullable=True)
     feedback = Column(String(1000), nullable=True)
+    # 'nurse' = a mother asking a LONI nurse for help; 'ride' = the mother and her driver during an emergency ride.
+    kind = Column(String(20), default='nurse', server_default='nurse', nullable=False)
+    ride_id = Column(Integer, ForeignKey('rides.id'), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -46,6 +50,7 @@ class Call(Base):
 
 class CallParticipant(Base):
     __tablename__ = 'call_participants'
+    __table_args__ = (Index('ix_call_participants_call', 'call_id'),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     call_id = Column(Integer, ForeignKey('calls.id'), nullable=False)
@@ -59,6 +64,7 @@ class CallParticipant(Base):
 
 class CallEvent(Base):
     __tablename__ = 'call_events'
+    __table_args__ = (Index('ix_call_events_call_type', 'call_id', 'event_type'),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     call_id = Column(Integer, ForeignKey('calls.id'), nullable=False)

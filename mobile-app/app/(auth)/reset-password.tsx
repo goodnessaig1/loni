@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   View, 
   Pressable, 
@@ -16,12 +16,17 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const ResetSchema = Yup.object().shape({
   email: Yup.string().email('Invalid email').required('Email is required'),
 });
 
 export default function ResetPasswordScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const handleReset = (values: any, { setSubmitting }: any) => {
     setTimeout(() => {
       setSubmitting(false);
@@ -33,14 +38,16 @@ export default function ResetPasswordScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={28} color="black" />
+            <Feather name="chevron-left" size={28} color={colors.text} />
           </Pressable>
 
           <CalText style={styles.heading}>Reset Password</CalText>
           <HelixaText style={styles.subtext}>
             Enter your email address and we'll send you a verification code.
           </HelixaText>
+          </Reveal>
 
           <Formik
             initialValues={{ email: '' }}
@@ -49,12 +56,13 @@ export default function ResetPasswordScreen() {
           >
             {({ handleChange, handleBlur, handleSubmit, values, errors, touched, isSubmitting, isValid, dirty }) => (
               <>
+                <Reveal index={1}>
                 <View style={styles.inputGroup}>
                   <HelixaText style={styles.inputLabel} weight="bold">Email</HelixaText>
                   <TextInput 
                     style={[styles.input, touched.email && errors.email ? styles.inputError : null]} 
                     placeholder="Sarahchen@example.com"
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     value={values.email}
@@ -65,13 +73,16 @@ export default function ResetPasswordScreen() {
                     <HelixaText style={styles.errorText}>{errors.email}</HelixaText>
                   )}
                 </View>
+                </Reveal>
 
+                <Reveal index={2}>
                 <Button 
                   title="Send Reset Code"
                   onPress={handleSubmit as any}
                   isLoading={isSubmitting}
                   disabled={!(isValid && dirty)}
                 />
+                </Reveal>
               </>
             )}
           </Formik>
@@ -82,10 +93,10 @@ export default function ResetPasswordScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   flex1: {
     flex: 1,
@@ -104,12 +115,12 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 28,
     lineHeight: 34,
-    color: '#000000',
+    color: c.text,
     marginBottom: 8,
   },
   subtext: {
     fontSize: 15,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 22,
     marginBottom: 32,
   },
@@ -118,19 +129,19 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 14,
-    color: '#111827',
+    color: c.text,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    color: '#000000',
+    color: c.text,
     fontFamily: 'Helvetica Neue',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bgSoft,
   },
   continueButton: {
     borderRadius: 9999,

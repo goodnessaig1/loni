@@ -204,9 +204,11 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         });
 
         // Fallback: Play default system ringtone via InCallManager if CallKeep is off
+        // (unless the user turned "Call sounds" off in Settings - lib/localPrefs.ts).
         try {
+          const { callSoundsEnabled } = require('./lib/localPrefs');
           const InCallManager = require('react-native-incall-manager').default;
-          InCallManager.startRingtone('_DEFAULT_');
+          if (await callSoundsEnabled()) InCallManager.startRingtone('_DEFAULT_');
           
           // Safety timeout: Always stop ringing after 30 seconds in case 'call_ended' FCM is missed
           setTimeout(() => {

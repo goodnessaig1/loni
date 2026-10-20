@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { Reveal, RevealList, PressableScale } from '../../components/motion';
 import { useTrainingModules } from '../../hooks/useDriverTraining';
 import { getDriverTrainingImage } from '../../lib/driverTrainingAssets';
 
@@ -62,67 +63,74 @@ export default function DriverTrainingScreen() {
       ) : (
         <>
           <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.heroWrap}>
-              <Image
-                source={getDriverTrainingImage('driver-training')}
-                style={styles.hero}
-                contentFit="contain"
-              />
-            </View>
-
-            <CalText style={styles.heading}>Before your first trip.</CalText>
-            <HelixaText style={styles.subtitle}>
-              Learn how LONI works, how to safely support mothers, and what to expect on every trip.
-            </HelixaText>
-
-            <View style={styles.card}>
-              <View style={styles.progressRow}>
-                <HelixaText style={styles.progressLabel}>Progress</HelixaText>
-                <HelixaText style={styles.progressCount}>
-                  {completed.length}/{total} Modules
-                </HelixaText>
-              </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${Math.max(progressRatio * 100, 4)}%` }]} />
+            <Reveal index={0}>
+              <View style={styles.heroWrap}>
+                <Image
+                  source={getDriverTrainingImage('driver-training')}
+                  style={styles.hero}
+                  contentFit="contain"
+                />
               </View>
 
-              {modules.map((mod) => {
-                const done = completed.includes(mod.id);
-                return (
-                  <Pressable
-                    key={mod.id}
-                    style={styles.moduleRow}
-                    onPress={() =>
-                      router.push({
-                        pathname: '/(auth)/training-module',
-                        params: { order: String(mod.order) },
-                      })
-                    }
-                  >
-                    <View style={styles.moduleIconWrap}>
-                      <Image
-                        source={getDriverTrainingImage(mod.icon)}
-                        style={styles.moduleIcon}
-                        contentFit="cover"
-                      />
-                    </View>
-                    <HelixaText style={styles.moduleTitle} numberOfLines={2}>
-                      {mod.title}
-                    </HelixaText>
-                    {done ? (
-                      <Feather name="check-circle" size={20} color="#22C55E" />
-                    ) : (
-                      <Feather name="chevron-right" size={20} color="#9CA3AF" />
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
+              <CalText style={styles.heading}>Before your first trip.</CalText>
+              <HelixaText style={styles.subtitle}>
+                Learn how LONI works, how to safely support mothers, and what to expect on every trip.
+              </HelixaText>
+            </Reveal>
+
+            <Reveal index={1}>
+              <View style={styles.card}>
+                <View style={styles.progressRow}>
+                  <HelixaText style={styles.progressLabel}>Progress</HelixaText>
+                  <HelixaText style={styles.progressCount}>
+                    {completed.length}/{total} Modules
+                  </HelixaText>
+                </View>
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${Math.max(progressRatio * 100, 4)}%` }]} />
+                </View>
+
+                {modules.map((mod, i) => {
+                  const done = completed.includes(mod.id);
+                  return (
+                    <RevealList key={mod.id} index={i}>
+                      <PressableScale
+                        style={styles.moduleRow}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/(auth)/training-module',
+                            params: { order: String(mod.order) },
+                          })
+                        }
+                      >
+                        <View style={styles.moduleIconWrap}>
+                          <Image
+                            source={getDriverTrainingImage(mod.icon)}
+                            style={styles.moduleIcon}
+                            contentFit="cover"
+                          />
+                        </View>
+                        <HelixaText style={styles.moduleTitle} numberOfLines={2}>
+                          {mod.title}
+                        </HelixaText>
+                        {done ? (
+                          <Feather name="check-circle" size={20} color="#22C55E" />
+                        ) : (
+                          <Feather name="chevron-right" size={20} color="#9CA3AF" />
+                        )}
+                      </PressableScale>
+                    </RevealList>
+                  );
+                })}
+              </View>
+            </Reveal>
           </ScrollView>
 
-          <View style={styles.footer}>
-            <Button title={ctaTitle} onPress={handleStart} />
-          </View>
+          <Reveal index={2}>
+            <View style={styles.footer}>
+              <Button title={ctaTitle} onPress={handleStart} />
+            </View>
+          </Reveal>
         </>
       )}
     </SafeAreaView>

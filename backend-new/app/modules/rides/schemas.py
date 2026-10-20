@@ -116,6 +116,11 @@ class CancelBody(BaseModel):
     reason: Optional[str] = None
 
 
+class NotifyContactsBody(BaseModel):
+    # 'share' = share the live trip with her partners; 'arrived' = tell them she arrived safely
+    kind: str
+
+
 # --------------------------------------------------------------------------
 # Responses
 # --------------------------------------------------------------------------
@@ -125,7 +130,8 @@ class RideResponse(BaseModel):
     rider_id: str
     driver_id: Optional[str] = None
 
-    pickup: LatLng
+    pickup: Optional[LatLng] = None          # hidden from a partner she doesn't share location with
+    location_shared: bool = True
     pickup_address: Optional[str] = None
     dropoff: LatLng
     dropoff_address: Optional[str] = None

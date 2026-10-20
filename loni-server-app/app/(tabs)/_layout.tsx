@@ -30,6 +30,8 @@ export default function TabsLayout() {
       <Tabs
         screenOptions={{
           headerShown: false,
+          // Tab content slides gently instead of snapping when switching tabs.
+          animation: 'shift',
           tabBarActiveTintColor: '#FFFFFF',
           tabBarInactiveTintColor: '#6B6B6B',
           tabBarStyle: {

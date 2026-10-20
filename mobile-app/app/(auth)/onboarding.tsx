@@ -1,10 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { View, StyleSheet, useWindowDimensions, Pressable, FlatList, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { HelixaText } from '../../components/HelixaText';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useTheme } from '../../context/ThemeContext';
+import type { Palette } from '../../lib/theme';
+import { Reveal } from '../../components/motion';
 
 const slides = [
   {
@@ -42,6 +45,8 @@ const slides = [
 ];
 
 export default function OnboardingScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -83,12 +88,12 @@ export default function OnboardingScreen() {
         <View style={styles.navRow}>
           {index > 0 ? (
             <Pressable style={styles.navButton} onPress={handlePrev}>
-              <Feather name="arrow-left" size={20} color="#000" />
+              <Feather name="arrow-left" size={20} color={colors.text} />
             </Pressable>
           ) : <View style={{ width: 48 }} />}
 
           <Pressable style={styles.navButton} onPress={handleNext}>
-            <Feather name="arrow-right" size={20} color="#000" />
+            <Feather name="arrow-right" size={20} color={colors.text} />
           </Pressable>
         </View>
 
@@ -119,6 +124,7 @@ export default function OnboardingScreen() {
         bounces={false}
       />
 
+      <Reveal index={2}>
       <View style={styles.footer}>
         {/* Loni logo */}
         <Image source={require('../../assets/logo.svg')} style={styles.logo} contentFit="contain" />
@@ -131,14 +137,15 @@ export default function OnboardingScreen() {
           <Feather name="arrow-right" size={16} color="#D62D88" style={{ marginLeft: 4 }} />
         </Pressable>
       </View>
+      </Reveal>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.bg,
   },
   slideContainer: {
     flex: 1,
@@ -151,7 +158,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 34,
     lineHeight: 40,
-    color: '#000000',
+    color: c.text,
     marginBottom: 16,
     fontWeight: '700'
   },
@@ -160,7 +167,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#6B7280',
+    color: c.textSecondary,
     lineHeight: 24,
   },
   navRow: {
@@ -174,7 +181,7 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: c.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -203,7 +210,7 @@ const styles = StyleSheet.create({
   skipButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FCE8F3',
+    backgroundColor: c.primarySoft,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 24,

@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from typing import List
 from app.modules.users.models import User
-from app.api.deps import get_current_user
+from typing import Optional
+from app.api.deps import get_admin_user, get_current_user
+from pydantic import BaseModel, Field
 from app.modules.ai_chat import schemas, service
+from app.core.ratelimit import limit
 
 router = APIRouter()
 
@@ -65,7 +68,7 @@ async def update_session_title(
         raise HTTPException(status_code=404, detail="Session not found")
     return {"success": True, "message": "Session updated"}
 
-@router.post("/sessions/{session_id}/messages")
+@router.post("/sessions/{session_id}/messages", dependencies=[Depends(limit("ai.message", 30, 60, "You're sending messages very quickly. Please wait a moment."))])
 async def send_message(
     session_id: str,
     data: schemas.ChatMessageRequest,
@@ -77,6 +80,36 @@ async def send_message(
         raise HTTPException(status_code=403, detail="Not authorized to access this session")
         
     return StreamingResponse(
-        service.stream_chat_message(session_id, current_user.id, data.content),
+        service.stream_chat_message(session_id, current_user.id, data.content, current_user),
         media_type="text/event-stream"
     )
+
+
+# ── Human review of high-risk conversations (admins only) ────────────────────────────────────────────
+# The audit trail stores what was decided and why, never the mother's words. A reviewer who needs the
+# conversation opens it deliberately from here, which is limited to admins.
+
+class ReviewIn(BaseModel):
+    note: Optional[str] = Field(None, max_length=1000)
+
+
+@router.get("/admin/safety-events")
+async def list_safety_events(needs_review: bool = True, limit: int = 50, skip: int = 0, admin: User = Depends(get_admin_user)):
+    events = await service.list_safety_events(needs_review, min(max(limit, 1), 200), max(skip, 0))
+    return {"success": True, "data": {"events": events}}
+
+
+@router.get("/admin/safety-events/{event_id}/conversation")
+async def safety_event_conversation(event_id: str, admin: User = Depends(get_admin_user)):
+    event = await service.get_safety_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+    messages = await service.get_session_messages(event["session_id"])
+    return {"success": True, "data": {"event": event, "messages": messages}}
+
+
+@router.post("/admin/safety-events/{event_id}/review")
+async def review_safety_event(event_id: str, data: ReviewIn, admin: User = Depends(get_admin_user)):
+    if not await service.mark_safety_event_reviewed(event_id, admin.id, data.note):
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {"success": True, "message": "Marked as reviewed"}

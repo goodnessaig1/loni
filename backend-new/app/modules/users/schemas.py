@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 
 class UserResponse(BaseModel):
@@ -81,8 +81,16 @@ class UpdateUserProfileRequest(BaseModel):
     phone: Optional[str] = None
     gender: Optional[str] = None
 
+class UpdateStageRequest(BaseModel):
+    """Any combination: switch `status`, or pick a `trimester` (pregnant) / `recovery_stage` (postpartum)."""
+    status: Optional[Literal['pregnant', 'newMom', 'ttc', 'general']] = None
+    trimester: Optional[Literal[1, 2, 3]] = None
+    recovery_stage: Optional[Literal['early', 'active', 'extended']] = None
+
+
 class UpdateNurseProfileRequest(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     hospital_affiliation: Optional[str] = None
     years_of_experience: Optional[int] = None
+    license_number: Optional[str] = None

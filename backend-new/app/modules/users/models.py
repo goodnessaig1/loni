@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, String, Boolean, DateTime, Enum, Integer, Float, ForeignKey, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Enum, Integer, Float, ForeignKey, JSON, Index
 from sqlalchemy.orm import relationship as sa_relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -12,6 +12,8 @@ class AccountStatusEnum(str, enum.Enum):
 class StatusEnum(str, enum.Enum):
     pregnant = 'pregnant'
     newMom = 'newMom'
+    ttc = 'ttc'            # trying to conceive
+    general = 'general'    # women's health in general (not pregnant, not postpartum)
 
 class GenderEnum(str, enum.Enum):
     Male = 'Male'
@@ -32,6 +34,7 @@ class EmergencyContactStatus(str, enum.Enum):
 
 class User(Base):
     __tablename__ = 'users'
+    __table_args__ = (Index('ix_users_type_online', 'user_type', 'is_online'),)
 
     id = Column(String(12), primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -61,6 +64,7 @@ class User(Base):
 
 class EmergencyContact(Base):
     __tablename__ = 'emergency_contacts'
+    __table_args__ = (Index('ix_emergency_contacts_user', 'user_id'), Index('ix_emergency_contacts_contact', 'contact_user_id'),)
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(String(12), ForeignKey('users.id'), nullable=False)

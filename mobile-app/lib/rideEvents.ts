@@ -8,7 +8,7 @@
  * notifications/service.py `_stringify`); the WebSocket delivers real
  * objects. `parseRideData` normalises both.
  */
-import { useRideStore, Ride } from '../store/rideStore';
+import { useRideStore, Ride, RideProgress } from '../store/rideStore';
 
 export function parseRideData(data: any): any {
   if (!data) return data;
@@ -28,6 +28,7 @@ const STATUS_BY_EVENT: Record<string, Ride['status']> = {
   ride_completed: 'COMPLETED',
   ride_cancelled: 'CANCELLED',
   ride_no_drivers: 'NO_DRIVERS',
+  ride_driver_cancelled: 'SEARCHING',
 };
 
 export function applyServerRideEvent(type: string, raw: any) {
@@ -38,12 +39,20 @@ export function applyServerRideEvent(type: string, raw: any) {
 
   if (type === 'ride_driver_location') {
     if (store.ride?.id === rideId || store.ride == null) {
+      const progress: RideProgress | null = data.phase
+        ? {
+            phase: data.phase,
+            remaining_meters: Number(data.remaining_meters ?? 0),
+            eta_seconds: Number(data.eta_seconds ?? 0),
+            near: data.near === true || data.near === 'true' || data.near === 'True',
+          }
+        : null;
       store.setDriverLocation({
         lat: Number(data.lat),
         lng: Number(data.lng),
         heading: data.heading != null ? Number(data.heading) : null,
         ts: data.ts,
-      });
+      }, progress);
     }
     return;
   }
@@ -52,5 +61,10 @@ export function applyServerRideEvent(type: string, raw: any) {
   if (!status) return;
   if (store.isStale(rideId)) return;
 
+  if (type === 'ride_driver_cancelled') {
+    // Her driver backed out and LONI is finding another: drop the old driver everywhere.
+    store.patchRide({ ...(data as Partial<Ride>), id: rideId, status, driver: null, driver_id: null, next_route: null, rematching: true });
+    return;
+  }
   store.patchRide({ id: rideId, status, ...(data as Partial<Ride>) });
 }

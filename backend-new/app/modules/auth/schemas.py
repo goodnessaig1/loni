@@ -5,6 +5,8 @@ from enum import Enum
 class StatusEnum(str, Enum):
     pregnant = "pregnant"
     newMom = "newMom"
+    ttc = "ttc"
+    general = "general"
 
 class GenderEnum(str, Enum):
     Male = "Male"
@@ -91,6 +93,7 @@ class SetupPartnerRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     phone: str = Field(..., min_length=10)
+    name: Optional[str] = Field(default=None, max_length=255)
 
 class VerifyPartnerSetupRequest(BaseModel):
     email: EmailStr

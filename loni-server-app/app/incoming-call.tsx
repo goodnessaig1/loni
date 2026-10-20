@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useCallStore } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
+import { PressableScale, Reveal } from '../components/motion';
 
 const { width, height } = Dimensions.get('window');
 
@@ -65,45 +66,49 @@ export default function IncomingCallScreen() {
       colors={['#8B7355', '#2F4F4F', '#001F3F']}
       style={styles.container}
     >
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          {remoteParticipant?.profile_picture ? (
-            <Image
-              source={{ uri: remoteParticipant.profile_picture }}
-              style={styles.avatar}
-              contentFit="cover"
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={40} color="white" />
-            </View>
-          )}
+      <Reveal index={0}>
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            {remoteParticipant?.profile_picture ? (
+              <Image
+                source={{ uri: remoteParticipant.profile_picture }}
+                style={styles.avatar}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={40} color="white" />
+              </View>
+            )}
+          </View>
+          <View style={styles.callerInfo}>
+            <Text style={styles.callerName}>{remoteParticipant?.name || 'Unknown Caller'}</Text>
+            {!!remoteParticipant?.trimester && (
+              <Text style={styles.statusText}>
+                {remoteParticipant.trimester}{remoteParticipant.pregnancy_week ? ` · ${remoteParticipant.pregnancy_week}` : ''}
+              </Text>
+            )}
+          </View>
         </View>
-        <View style={styles.callerInfo}>
-          <Text style={styles.callerName}>{remoteParticipant?.name || 'Unknown Caller'}</Text>
-          {!!remoteParticipant?.trimester && (
-            <Text style={styles.statusText}>
-              {remoteParticipant.trimester}{remoteParticipant.pregnancy_week ? ` · ${remoteParticipant.pregnancy_week}` : ''}
-            </Text>
-          )}
-        </View>
-      </View>
+      </Reveal>
 
-      <View style={styles.buttonContainer}>
-        <View style={styles.buttonWrapper}>
-          <TouchableOpacity style={[styles.actionButton, styles.declineButton]} onPress={handleDecline}>
-            <MaterialIcons name="call-end" size={32} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.buttonLabel}>Decline</Text>
-        </View>
+      <Reveal index={1}>
+        <View style={styles.buttonContainer}>
+          <View style={styles.buttonWrapper}>
+            <PressableScale style={[styles.actionButton, styles.declineButton]} onPress={handleDecline}>
+              <MaterialIcons name="call-end" size={32} color="white" />
+            </PressableScale>
+            <Text style={styles.buttonLabel}>Decline</Text>
+          </View>
 
-        <View style={styles.buttonWrapper}>
-          <TouchableOpacity style={[styles.actionButton, styles.acceptButton]} onPress={handleAccept}>
-            <Feather name="phone" size={32} color="white" />
-          </TouchableOpacity>
-          <Text style={styles.buttonLabel}>Accept</Text>
+          <View style={styles.buttonWrapper}>
+            <PressableScale style={[styles.actionButton, styles.acceptButton]} onPress={handleAccept}>
+              <Feather name="phone" size={32} color="white" />
+            </PressableScale>
+            <Text style={styles.buttonLabel}>Accept</Text>
+          </View>
         </View>
-      </View>
+      </Reveal>
     </LinearGradient>
   );
 }

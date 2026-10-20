@@ -5,8 +5,11 @@ from app.modules.calls.models import CallStatusEnum, ParticipantRoleEnum
 
 
 class CallRequest(BaseModel):
-    # If nurse_id is provided, calls specific nurse. Else calls all available.
+    # If nurse_id is provided, calls that nurse. Else rings every online nurse.
     nurse_id: Optional[str] = None
+    # During an emergency ride, rider and driver call each other with the ride id;
+    # the server works out who the other party is (nurse_id is ignored).
+    ride_id: Optional[int] = None
 
 
 class CallRatingRequest(BaseModel):
@@ -52,6 +55,8 @@ class CallResponse(BaseModel):
     duration_seconds: int
     rating: Optional[int] = None
     feedback: Optional[str] = None
+    kind: str = "nurse"
+    ride_id: Optional[int] = None
     created_at: datetime
     caller: Optional[ParticipantInfo] = None
     receiver: Optional[ParticipantInfo] = None
@@ -81,3 +86,6 @@ class CallStatsResponse(BaseModel):
     total_calls: int
     total_duration_seconds: int
     total_duration_formatted: str
+    today_calls: int = 0
+    rating_avg: Optional[float] = None
+    rating_count: int = 0

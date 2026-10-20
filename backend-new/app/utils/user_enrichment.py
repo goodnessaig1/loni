@@ -81,7 +81,7 @@ def enrich_user_data(user: User) -> dict:
         if status_val == 'pregnant':
             user_data["pregnancyWeek"] = f"{weeks} weeks"
             user_data["pregnancy_week"] = f"{weeks} weeks"
-            if weeks <= 13:
+            if weeks <= 12:
                 user_data["trimester"] = '1st Trimester'
             elif weeks <= 27:
                 user_data["trimester"] = '2nd Trimester'

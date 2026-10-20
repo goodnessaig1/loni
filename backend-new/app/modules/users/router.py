@@ -13,12 +13,13 @@ from app.core.security import verify_password, get_password_hash
 from app.modules.users.schemas import (
     UpdateContactPermissions, ChangePasswordRequest,
     ToggleOnlineRequest, UpdateNurseProfileRequest, UpdateUserProfileRequest,
-    DriverPersonalInfoRequest, DriverVehicleInfoRequest, DriverDocumentsRequest
+    DriverPersonalInfoRequest, DriverVehicleInfoRequest, DriverDocumentsRequest, UpdateStageRequest
 )
+from app.modules.users.stage import apply_stage
 from app.modules.driver_training.onboarding import build_status, require_step
 from app.core.database import get_db
 from app.api.deps import get_current_user
-from app.modules.users.models import User, EmergencyContact, NurseProfile, DriverProfile, UserTypeEnum
+from app.modules.users.models import User, EmergencyContact, EmergencyContactStatus, NurseProfile, DriverProfile, UserTypeEnum
 from app.modules.auth.schemas import (
     StandardResponse, UpdateProfileRequest,
     EmergencyContactsRequest, InvitePartnerRequest
@@ -33,7 +34,9 @@ from app.modules.notifications.models import NotificationLog
 from app.modules.notifications.service import NotificationService
 from app.core.ws_manager import manager as ws_manager
 from app.utils.user_enrichment import enrich_user_data, calculate_pregnancy_start_date
-from app.utils.partner_content import get_latest_updates
+from app.utils.partner_content import get_latest_updates, get_timeline
+from app.modules.users import partner_sync
+from app.core.ratelimit import limit, hit as rate_hit
 
 router = APIRouter()
 
@@ -74,6 +77,38 @@ async def update_profile(
     db.add(current_user)
     await db.commit()
     return {"success": True, "message": "Profile updated successfully"}
+
+@router.patch("/stage", response_model=StandardResponse)
+async def update_stage(
+    data: UpdateStageRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change trimester / recovery stage, or switch between pregnancy and postpartum. Returns the fresh user."""
+    if current_user.user_type not in (None, UserTypeEnum.user):
+        raise HTTPException(status_code=403, detail="Only mothers have a stage")
+    if data.status is None and data.trimester is None and data.recovery_stage is None:
+        raise HTTPException(status_code=400, detail="Nothing to update")
+    old_status = current_user.status.value if current_user.status else None
+    apply_stage(current_user, data.status, data.trimester, data.recovery_stage)
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+
+    # Partners she shares updates with see her new stage right away.
+    new_status = current_user.status.value if current_user.status else None
+    first = (current_user.name or "She").split(" ")[0]
+    for c in await partner_sync.partners_of(db, current_user.id):
+        if c.updates:
+            body = f"{first} updated her journey." if new_status == old_status else {
+                "pregnant": f"{first} is now sharing her pregnancy journey.",
+                "newMom": f"{first} is now sharing her recovery after birth.",
+            }.get(new_status, f"{first} updated her journey.")
+            await partner_sync.tell(db, c.contact_user_id, "partner_stage_changed", "Her journey was updated", body,
+                                    {"status": new_status})
+    await db.commit()
+    await partner_sync.send_due_updates(db, current_user)
+    return {"success": True, "message": "Stage updated", "data": {"user": enrich_user_data(current_user)}}
 
 @router.put("/me/password", response_model=StandardResponse)
 async def change_password(
@@ -170,6 +205,83 @@ async def get_emergency_contacts(
             })
     return {"success": True, "data": {"contacts": contacts_data}}
 
+async def _delete_partner_account(db: AsyncSession, partner: User) -> None:
+    """A support partner's account exists only for one connection; remove it and the rows that point at it."""
+    from sqlalchemy import delete as sa_delete
+    from app.modules.account.models import UserSettings, SupportMessage
+    await db.execute(sa_delete(NotificationLog).where(NotificationLog.user_id == partner.id))
+    await db.execute(sa_delete(UserSettings).where(UserSettings.user_id == partner.id))
+    await db.execute(update(SupportMessage).where(SupportMessage.user_id == partner.id).values(user_id=None))
+    await db.delete(partner)
+
+
+@router.delete("/partner-connection", response_model=StandardResponse)
+async def leave_partner_connection(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """A partner stops getting her alerts: the connection and their partner account are removed,
+    and she is told (Notification Centre + push + email). She can invite them again later."""
+    if current_user.user_type != UserTypeEnum.partner:
+        raise HTTPException(status_code=403, detail="Only partners can leave a connection")
+    contact = (await db.execute(
+        select(EmergencyContact).where(EmergencyContact.contact_user_id == current_user.id)
+        .options(selectinload(EmergencyContact.user))
+    )).scalars().first()
+    if not contact:
+        raise HTTPException(status_code=404, detail="No connection found")
+    mother = contact.user
+    partner_name = current_user.name or "Your support partner"
+    from app.modules.rides.services.ride_service import forget_contacts
+    forget_contacts(contact.user_id)
+    await db.delete(contact)
+    await _delete_partner_account(db, current_user)
+    if mother:
+        await partner_sync.tell(db, mother.id, "partner_left", "Support partner left",
+                                f"{partner_name} will no longer receive your updates and alerts.", {})
+    await db.commit()
+    if mother:
+        if mother.email:
+            background_tasks.add_task(send_partner_removal_user_email, mother.email, partner_name)
+    return {"success": True, "message": "You will no longer receive her alerts"}
+
+
+@router.get("/partner-updates", response_model=StandardResponse)
+async def partner_updates(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """The full week-by-week timeline for the Pregnancy Updates screen (only if she shares updates)."""
+    if current_user.user_type != UserTypeEnum.partner:
+        raise HTTPException(status_code=403, detail="Only partners have updates")
+    contact = (await db.execute(
+        select(EmergencyContact).where(EmergencyContact.contact_user_id == current_user.id)
+        .options(selectinload(EmergencyContact.user))
+    )).scalars().first()
+    if not contact or not contact.user:
+        raise HTTPException(status_code=404, detail="No connection found")
+    mother = contact.user
+    data = enrich_user_data(mother)
+    status_val = mother.status.value if mother.status else None
+    week = None
+    if mother.pregnancy_start_date:
+        start = mother.pregnancy_start_date
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+        week = max(int((datetime.now(timezone.utc) - start).total_seconds() // (7 * 86400)), 0)
+    shared = bool(contact.updates)
+    milestones = get_timeline(status_val, week) if (shared and week is not None and status_val in ("pregnant", "newMom")) else []
+    return {"success": True, "data": {
+        "inviter_name": mother.name,
+        "status": status_val,
+        "week": week,
+        "trimester": data.get("trimester"),
+        "shared": shared,
+        "milestones": milestones,
+    }}
+
+
 @router.get("/partner-connection", response_model=StandardResponse)
 async def get_partner_connection(
     current_user: User = Depends(get_current_user),
@@ -262,32 +374,8 @@ async def get_partner_dashboard(
     if contact.updates and current_week is not None and status_val:
         updates = get_latest_updates(status_val, current_week)
         data["updates"] = updates
-        # Lazily detect "she just reached a new milestone" - no scheduler
-        # needed since this runs every time the dashboard is viewed, and a
-        # NotificationLog row makes it idempotent (logged once per week).
-        if updates:
-            latest = updates[0]
-            last_logged = (await db.execute(
-                select(NotificationLog)
-                .where(NotificationLog.user_id == current_user.id, NotificationLog.type == "pregnancy_update")
-                .order_by(NotificationLog.created_at.desc())
-                .limit(1)
-            )).scalar_one_or_none()
-            if not (last_logged and (last_logged.data or {}).get("week") == latest["week"]):
-                title = "New pregnancy update" if status_val == "pregnant" else "New recovery update"
-                body = f"{inviter.name} shared an update for week {latest['week']}."
-                notif_data = {"week": latest["week"], "title": latest["title"]}
-                db.add(NotificationLog(
-                    user_id=current_user.id, type="pregnancy_update", title=title, body=body, data=notif_data,
-                ))
-                await db.commit()
-                try:
-                    await ws_manager.send_to_user(current_user.id, "pregnancy_update", notif_data)
-                except Exception:
-                    pass
-                asyncio.create_task(
-                    NotificationService.notify_user(current_user.id, title, body, {"type": "pregnancy_update", **notif_data})
-                )
+        # Her newest milestone, if this partner hasn't been told yet (also sent by the hourly sweep).
+        await partner_sync.send_due_updates(db, inviter, only_partner=current_user.id)
 
     if contact.emergency:
         ride_stmt = select(Ride).where(
@@ -302,7 +390,8 @@ async def get_partner_dashboard(
         if ride:
             driver_profile = getattr(ride.driver, "driver_profile", None)
             driver_location = None
-            if driver_profile and driver_profile.current_lat is not None and driver_profile.current_lng is not None:
+            # Where she is (pickup, the driver's live position) is only shared if she allows location.
+            if contact.location and driver_profile and driver_profile.current_lat is not None and driver_profile.current_lng is not None:
                 driver_location = {
                     "lat": driver_profile.current_lat,
                     "lng": driver_profile.current_lng,
@@ -311,8 +400,9 @@ async def get_partner_dashboard(
             data["active_alert"] = {
                 "ride_id": ride.id,
                 "status": ride.status.value,
-                "pickup": {"lat": ride.pickup_lat, "lng": ride.pickup_lng},
-                "pickup_address": ride.pickup_address,
+                "pickup": {"lat": ride.pickup_lat, "lng": ride.pickup_lng} if contact.location else None,
+                "pickup_address": ride.pickup_address if contact.location else None,
+                "location_shared": contact.location,
                 "dropoff_name": ride.dropoff_name,
                 "driver_name": ride.driver.name if ride.driver else None,
                 "driver_location": driver_location,
@@ -448,24 +538,62 @@ async def remove_emergency_contact(
     partner_user = contact.contact_user
     partner_email = partner_user.email if partner_user else None
     partner_name = partner_user.name if partner_user else "Partner"
-    
-    # 2. Delete EmergencyContact
-    await db.delete(contact)
-    
-    # 3. Delete partner User account
+    # Revoking an invite nobody accepted yet: no "you were removed" email to someone who never joined.
+    was_connected = contact.status == EmergencyContactStatus.connected
+
+    # Their app is told first (live + push) so it signs out instead of failing on a deleted account.
     if partner_user and partner_user.user_type.value == "partner":
-        await db.delete(partner_user)
-        
+        await partner_sync.tell(None, partner_user.id, "partner_removed", "Connection ended",
+                                f"{current_user.name or 'She'} removed you from her support circle.", {}, log=False)
+
+    from app.modules.rides.services.ride_service import forget_contacts
+    forget_contacts(current_user.id)
+
+    # 2. Delete EmergencyContact, then 3. the partner account that only existed for it
+    await db.delete(contact)
+    if partner_user and partner_user.user_type.value == "partner":
+        await _delete_partner_account(db, partner_user)
+
     await db.commit()
 
-    # 4. Dispatch emails
+    # 4. Dispatch emails (only for a partner who had actually joined)
     inviter_name = current_user.name if current_user.name else "A Loni User"
-    if current_user.email:
-        background_tasks.add_task(send_partner_removal_user_email, current_user.email, partner_name)
-    if partner_email:
-        background_tasks.add_task(send_partner_removal_partner_email, partner_email, inviter_name)
+    if was_connected:
+        if current_user.email:
+            background_tasks.add_task(send_partner_removal_user_email, current_user.email, partner_name)
+        if partner_email:
+            background_tasks.add_task(send_partner_removal_partner_email, partner_email, inviter_name)
 
-    return {"success": True, "message": "Contact removed successfully"}
+    return {"success": True, "message": "Contact removed successfully" if was_connected else "Invite revoked"}
+
+
+DEFAULT_INVITE_MESSAGE = ("I'm using LONI for pregnancy and recovery support. I'd love for you to join my support "
+                          "circle so we can stay connected during important moments 💜")
+
+
+@router.post("/emergency-contacts/{contact_id}/resend-invite", response_model=StandardResponse,
+             dependencies=[Depends(limit("partners.resend", 10, 3600, "You've resent several invites. Please try again later."))])
+async def resend_partner_invite(
+    contact_id: int,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send the invite email again to a support partner who hasn't set up their account yet."""
+    contact = (await db.execute(
+        select(EmergencyContact).where(EmergencyContact.id == contact_id, EmergencyContact.user_id == current_user.id)
+        .options(selectinload(EmergencyContact.contact_user))
+    )).scalars().first()
+    if not contact or not contact.contact_user:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    if contact.status == EmergencyContactStatus.connected:
+        raise HTTPException(status_code=409, detail="They have already accepted your invite.")
+    # At most one resend per minute for the same person, so a double tap doesn't send two emails.
+    if not await rate_hit(f"partners.resend.contact:{contact.id}", 1, 60):
+        raise HTTPException(status_code=429, detail="Invite just sent. Please wait a minute before sending again.")
+    background_tasks.add_task(send_partner_invite_email, contact.contact_user.email,
+                              current_user.name or "A Loni User", DEFAULT_INVITE_MESSAGE)
+    return {"success": True, "message": f"Invite sent again to {contact.contact_user.email}"}
 
 @router.patch("/emergency-contacts/{contact_id}/permissions", response_model=StandardResponse)
 async def update_emergency_contact_permissions(
@@ -486,6 +614,9 @@ async def update_emergency_contact_permissions(
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found or access denied")
 
+    from app.modules.rides.services.ride_service import forget_contacts
+    forget_contacts(current_user.id)
+    before = {"location": contact.location, "updates": contact.updates, "emergency": contact.emergency}
     if permissions.location is not None:
         contact.location = permissions.location
     if permissions.updates is not None:
@@ -494,7 +625,21 @@ async def update_emergency_contact_permissions(
         contact.emergency = permissions.emergency
 
     db.add(contact)
+    after = {"location": contact.location, "updates": contact.updates, "emergency": contact.emergency}
+    changed = {k: v for k, v in after.items() if before[k] != v}
+
+    # Tell the partner (live, push, Notification Centre) so their screens match what she now shares.
+    if changed and contact.status == EmergencyContactStatus.connected:
+        labels = {"location": "her location", "updates": "pregnancy updates", "emergency": "emergency alerts"}
+        first = (current_user.name or "She").split(" ")[0]
+        on = [labels[k] for k, v in changed.items() if v]
+        off = [labels[k] for k, v in changed.items() if not v]
+        parts = ([f"now shares {', '.join(on)}"] if on else []) + ([f"stopped sharing {', '.join(off)}"] if off else [])
+        await partner_sync.tell(db, contact.contact_user_id, "partner_sharing_changed", "Sharing updated",
+                                f"{first} {' and '.join(parts)} with you.", {"sharing": after})
     await db.commit()
+    if changed.get("updates"):
+        await partner_sync.send_due_updates(db, current_user, only_partner=contact.contact_user_id)
 
     return {"success": True, "message": "Permissions updated successfully"}
 
@@ -930,6 +1075,11 @@ async def update_nurse_profile(
             nurse_profile.hospital_affiliation = data.hospital_affiliation
         if data.years_of_experience is not None:
             nurse_profile.years_of_experience = data.years_of_experience
+        if data.license_number is not None and data.license_number.strip():
+            # Reassign (not mutate) so SQLAlchemy sees the JSON column change.
+            docs = dict(nurse_profile.verification_documents or {})
+            docs["licenseNumber"] = data.license_number.strip()
+            nurse_profile.verification_documents = docs
         db.add(nurse_profile)
     
     await db.commit()
