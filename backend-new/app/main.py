@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.router import api_router
 from app.core import mongo_db
+from app.core.migrations import run_migrations
 from motor.motor_asyncio import AsyncIOMotorClient
 import firebase_admin
 from firebase_admin import credentials
@@ -54,7 +55,10 @@ import certifi
 
 @app.on_event("startup")
 async def startup_db_client():
-    mongo_db.client = AsyncIOMotorClient(settings.MONGODB_URI, tlsCAFile=certifi.where())
+    # First, before any background job touches the new tables. A failure stops the deploy.
+    await run_migrations()
+
+    mongo_db.client =AsyncIOMotorClient(settings.MONGODB_URI, tlsCAFile=certifi.where())
     mongo_db.db = mongo_db.client["loni_ai_chat"]
     print("Connected to MongoDB")
     
