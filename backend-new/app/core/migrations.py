@@ -8,15 +8,21 @@ from sqlalchemy import text
 
 from app.core.database import engine
 
-ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
+MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "db" / "migrations"
 MIGRATION_LOCK_KEY = 73520419
 
 
-def _upgrade_to_head() -> None:
-    config = Config(str(ALEMBIC_INI))
+def alembic_config() -> Config:
+    # Built here rather than read from alembic.ini: that file is gitignored, so deploys don't have it.
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS_DIR).replace("%", "%%"))
     # env.py would otherwise replace the logging setup of the running server.
     config.attributes["configure_logger"] = False
-    command.upgrade(config, "head")
+    return config
+
+
+def _upgrade_to_head() -> None:
+    command.upgrade(alembic_config(), "head")
 
 
 async def run_migrations() -> None:
