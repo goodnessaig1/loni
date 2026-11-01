@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useRef } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { apiClient } from '../api/client';
 import { queryClient } from '../lib/queryClient';
@@ -47,23 +47,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadUser = async () => {
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  const loadUser = async (timeout?: number) => {
     try {
       const token = await SecureStore.getItemAsync('userToken');
       if (token) {
-        const res = await apiClient.get('/users/me');
+        const res = await apiClient.get('/users/me', timeout ? { timeout } : undefined);
         setUser(res.data.data.user);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.log('Failed to load user', e);
-      await SecureStore.deleteItemAsync('userToken');
+      // Only the server rejecting the token ends the session. A timeout, a weak connection or a 5xx
+      // must keep it: wiping it here would leave the app looking signed in with no token to send.
+      if (e?.response?.status === 401) {
+        await SecureStore.deleteItemAsync('userToken');
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadUser();
+    // The server may be waking up on launch, so give this first request longer.
+    loadUser(60000);
   }, []);
 
   const loginUser = async (token: string, userData: User) => {
@@ -83,6 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Login expired on the server (8 days): sign out once and go back to sign-in with a short note.
   useEffect(() => {
     setSessionExpiredHandler(() => {
+      if (!userRef.current) return; // already signed out: nothing to expire
       (async () => {
         await unregisterPush({ skipServer: true });
         await SecureStore.deleteItemAsync('userToken');

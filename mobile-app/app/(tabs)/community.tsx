@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  KeyboardAvoidingView,
-  Platform,
   RefreshControl,
   TextInput,
   TouchableOpacity,
@@ -14,10 +12,12 @@ import { Feather } from '@expo/vector-icons';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Avatar } from '../../components/Avatar';
+import { KeyboardAvoid } from '../../components/KeyboardAvoid';
 import { PostCard } from '../../components/community/PostCard';
 import { ShareModal } from '../../components/community/ShareModal';
 import type { CommunityPost } from '../../api/community';
 import { useAuth } from '../../hooks/useAuth';
+import { useKeyboardReveal } from '../../hooks/useKeyboardReveal';
 import { useTheme } from '../../context/ThemeContext';
 import {
   useCommunityFeed,
@@ -52,6 +52,9 @@ export default function CommunityScreen() {
   useCommunityLive();
   const del = useDeletePost();
   const viewability = useViewTracker();
+  const listRef = useRef<FlatList<CommunityPost>>(null);
+  // A post's comment box sits deep in the list; bring it above the keyboard when it is focused.
+  const reveal = useKeyboardReveal((offset) => listRef.current?.scrollToOffset({ offset, animated: true }));
 
   const posts = useMemo(() => feed.data?.pages.flatMap((p) => p.items) ?? [], [feed.data]);
   const onRefresh = useCallback(async () => {
@@ -192,10 +195,9 @@ export default function CommunityScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={['top']}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}>
+      <KeyboardAvoid style={{ flex: 1 }}>
         <FlatList
+          ref={listRef}
           data={posts}
           keyExtractor={(p) => String(p.id)}
           renderItem={renderItem}
@@ -210,6 +212,8 @@ export default function CommunityScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          onScroll={reveal.onScroll}
+          scrollEventThrottle={16}
           onEndReached={() => feed.hasNextPage && !feed.isFetchingNextPage && feed.fetchNextPage()}
           onEndReachedThreshold={0.6}
           refreshControl={
@@ -227,7 +231,7 @@ export default function CommunityScreen() {
           windowSize={9}
           removeClippedSubviews
         />
-      </KeyboardAvoidingView>
+      </KeyboardAvoid>
 
       <ShareModal visible={shareOpen} onClose={() => setShareOpen(false)} />
     </SafeAreaView>

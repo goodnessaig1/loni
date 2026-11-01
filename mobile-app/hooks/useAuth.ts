@@ -24,7 +24,7 @@ export const useLogin = () => {
     mutationFn: async (data: any) => {
       const res = await apiClient.post('/auth/login', data);
       await loginUser(res.data.data.token, res.data.data.user);
-      // Fetch user details via auth/me
+      // Fetch user details via auth/me (the login response's user stands in if this fails)
       await refreshUser();
       return res.data;
     }

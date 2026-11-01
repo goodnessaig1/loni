@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, ActivityIndicator, Modal, FlatList, Image } from 'react-native';
+import { View, TouchableOpacity, TextInput, Animated, ActivityIndicator, Modal, FlatList, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../../components/HelixaText';
+import { KeyboardAvoid } from '../../components/KeyboardAvoid';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LumaIcon } from '../../components/icons/LumaIcon';
@@ -279,10 +280,7 @@ export default function ConversationScreen() {
       style={{ flex: 1 }}
     >
       <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
+        <KeyboardAvoid style={{ flex: 1 }}>
           {/* Header */}
           <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
             <TouchableOpacity 
@@ -443,7 +441,7 @@ export default function ConversationScreen() {
             </TouchableOpacity>
           </Modal>
 
-        </KeyboardAvoidingView>
+        </KeyboardAvoid>
       </SafeAreaView>
     </LinearGradient>
   );
