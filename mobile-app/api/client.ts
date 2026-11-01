@@ -6,7 +6,7 @@ import { markOffline, markOnline } from '../lib/connectivity';
 // Use your machine's local IP for physical devices, or 10.0.2.2 for Android emulator
 // ipconfig getifaddr en0
 // Local development: this Mac's LAN address (scripts/update-lan-ip.sh rewrites it).
-const LAN_API_URL = 'http://192.168.100.192:8000/api/v1';
+const LAN_API_URL = 'https://loni-1.onrender.com/api/v1';
 // Staging / production builds set EXPO_PUBLIC_API_URL (e.g. https://api.lonimum.com/api/v1).
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || LAN_API_URL;
 
@@ -51,7 +51,8 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     const url: string = error?.config?.url ?? '';
-    if (error?.response?.status === 401 && error?.config?.headers?.Authorization && !url.includes('/auth/') && !expiring) {
+    // No Authorization check here: a signed-in app with no token left must also go back to sign-in.
+    if (error?.response?.status === 401 && !url.includes('/auth/') && !expiring) {
       expiring = true;
       try { onSessionExpired?.(); } finally { setTimeout(() => { expiring = false; }, 5000); }
     }

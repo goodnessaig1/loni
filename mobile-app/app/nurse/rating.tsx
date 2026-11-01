@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { HelixaText } from '../../components/HelixaText';
+import { KeyboardScrollView } from '../../components/KeyboardAvoid';
 import { apiClient } from '../../api/client';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -67,11 +68,7 @@ export default function NurseRatingScreen() {
         style={styles.bgImage}
         contentFit="cover"
       />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
           <View style={styles.headerContainer}>
             <HelixaText weight="bold" style={styles.headerTopText}>
@@ -139,8 +136,7 @@ export default function NurseRatingScreen() {
             </TouchableOpacity>
           </View>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardScrollView>
     </SafeAreaView>
   );
 }

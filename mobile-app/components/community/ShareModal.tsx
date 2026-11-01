@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Modal, Pressable, ScrollView, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import Toast from 'react-native-toast-message';
 import { CalText } from '../CalText';
 import { HelixaText } from '../HelixaText';
+import { ModalKeyboardAvoid } from '../KeyboardAvoid';
 import { useCreatePost } from '../../hooks/useCommunity';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -27,8 +29,10 @@ type Picked = { uri: string; name?: string | null; type?: string | null };
  */
 export function ShareModal({ visible, onClose }: Props) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [image, setImage] = useState<Picked | null>(null);
+  const [typing, setTyping] = useState(false);
   const create = useCreatePost();
 
   const canPost = (text.trim().length > 0 || !!image) && !create.isPending;
@@ -66,15 +70,15 @@ export function ShareModal({ visible, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <ModalKeyboardAvoid style={{ flex: 1, backgroundColor: colors.overlay }}>
         <Pressable
           onPress={() => !create.isPending && onClose()}
-          style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: 'center', paddingHorizontal: 22 }}>
+          style={{ flex: 1, justifyContent: typing ? 'flex-start' : 'center', paddingHorizontal: 22, paddingTop: insets.top + 12, paddingBottom: 12 }}>
           {/* Swallow touches so tapping inside the card doesn't dismiss it. */}
           <Pressable
             onPress={() => {}}
             style={{
-              backgroundColor: colors.card, borderRadius: 22, paddingHorizontal: 22, paddingTop: 22, paddingBottom: 22,
+              maxHeight: '100%', backgroundColor: colors.card, borderRadius: 22, paddingHorizontal: 22, paddingTop: 22, paddingBottom: 22,
               shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.12, shadowRadius: 24, elevation: 10,
             }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 18, borderBottomWidth: 1, borderBottomColor: colors.divider }}>
@@ -84,9 +88,12 @@ export function ShareModal({ visible, onClose }: Props) {
               </TouchableOpacity>
             </View>
 
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={{ flexShrink: 1 }}>
             <TextInput
               value={text}
               onChangeText={setText}
+              onFocus={() => setTyping(true)} // the card moves up so Post stays above the keyboard
+              onBlur={() => setTyping(false)}
               placeholder="What's on your mind?"
               placeholderTextColor={colors.textMuted}
               multiline
@@ -95,7 +102,7 @@ export function ShareModal({ visible, onClose }: Props) {
               textAlignVertical="top"
               accessibilityLabel="Write your post"
               style={{
-                marginTop: 18, minHeight: 150, maxHeight: 230, borderWidth: 1, borderColor: colors.border, borderRadius: 16,
+                marginTop: 18, minHeight: 120, maxHeight: 230, borderWidth: 1, borderColor: colors.border, borderRadius: 16,
                 padding: 16, fontSize: 16, lineHeight: 23, color: colors.text, fontFamily: 'Helixa-Regular', backgroundColor: colors.bgSoft,
               }}
             />
@@ -118,15 +125,16 @@ export function ShareModal({ visible, onClose }: Props) {
                 </TouchableOpacity>
               </View>
             )}
+            </ScrollView>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 20 }}>
               <TouchableOpacity
                 onPress={pickImage}
                 disabled={create.isPending}
                 activeOpacity={0.7}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, height: 50, paddingHorizontal: 20, borderRadius: 25, borderWidth: 1, borderColor: colors.border }}>
+                style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, height: 50, paddingHorizontal: 12, borderRadius: 25, borderWidth: 1, borderColor: colors.border }}>
                 <Feather name="image" size={20} color={colors.textSecondary} />
-                <HelixaText style={{ fontSize: 16, color: colors.textSecondary }}>{image ? 'Change image' : 'Add an image'}</HelixaText>
+                <HelixaText numberOfLines={1} style={{ flexShrink: 1, fontSize: 16, color: colors.textSecondary }}>{image ? 'Change image' : 'Add an image'}</HelixaText>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -134,7 +142,7 @@ export function ShareModal({ visible, onClose }: Props) {
                 disabled={!canPost}
                 activeOpacity={0.8}
                 accessibilityState={{ disabled: !canPost }}
-                style={{ height: 50, minWidth: 120, paddingHorizontal: 28, borderRadius: 25, backgroundColor: PINK, opacity: canPost ? 1 : 0.45, alignItems: 'center', justifyContent: 'center' }}>
+                style={{ height: 50, minWidth: 100, paddingHorizontal: 24, borderRadius: 25, backgroundColor: PINK, opacity: canPost ? 1 : 0.45, alignItems: 'center', justifyContent: 'center' }}>
                 {create.isPending ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
@@ -144,7 +152,7 @@ export function ShareModal({ visible, onClose }: Props) {
             </View>
           </Pressable>
         </Pressable>
-      </KeyboardAvoidingView>
+      </ModalKeyboardAvoid>
     </Modal>
   );
 }

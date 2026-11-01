@@ -4,8 +4,6 @@ import {
   Pressable, 
   TextInput, 
   StyleSheet, 
-  KeyboardAvoidingView, 
-  Platform,
   ScrollView,
   Text
 } from 'react-native';
@@ -17,6 +15,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { Button } from '../../components/Button';
+import { KeyboardScrollView } from '../../components/KeyboardAvoid';
 import { useRegister } from '../../hooks/useAuth';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
@@ -104,8 +103,7 @@ export default function RegisterScreen() {
     >
       {({ handleChange, handleBlur, handleSubmit, setFieldValue, values, errors, touched, isValid, dirty, isSubmitting }) => (
         <SafeAreaView style={styles.container}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+          <KeyboardScrollView contentContainerStyle={styles.scrollContent}>
               
               <Reveal index={0}>
               <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -371,8 +369,7 @@ export default function RegisterScreen() {
               </Pressable>
               </Reveal>
 
-            </ScrollView>
-          </KeyboardAvoidingView>
+            </KeyboardScrollView>
         </SafeAreaView>
       )}
     </Formik>
@@ -383,9 +380,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.bg,
-  },
-  flex1: {
-    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 24,

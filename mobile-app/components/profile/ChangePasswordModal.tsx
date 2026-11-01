@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Modal, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Modal, TouchableOpacity, TextInput, ActivityIndicator, ScrollView } from 'react-native';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { HelixaText } from '../HelixaText';
+import { ModalKeyboardAvoid } from '../KeyboardAvoid';
 import { useTheme } from '../../context/ThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { useChangePassword } from '../../hooks/useAuth';
@@ -73,11 +74,8 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
       animationType="slide"
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
-        <View className="flex-1 justify-end" style={{ backgroundColor: colors.overlay }}>
+      <ModalKeyboardAvoid style={{ flex: 1, backgroundColor: colors.overlay }}>
+        <View className="flex-1 justify-end">
           <TouchableOpacity 
             className="absolute top-0 bottom-0 left-0 right-0" 
             onPress={handleClose} 
@@ -89,6 +87,7 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
               <View className="w-12 h-1.5 rounded-full mb-6" style={{ backgroundColor: isDark ? '#3A3D44' : '#D1D5DB' }} />
               <HelixaText className="text-[20px] text-center" weight="bold">Change Password</HelixaText>
             </View>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
             <View className="mb-4">
               <HelixaText className="text-[14px] mb-2" weight="bold">Current Password</HelixaText>
@@ -176,9 +175,10 @@ export const ChangePasswordModal = ({ visible, onClose }: ChangePasswordModalPro
                 <HelixaText className="text-white text-[16px]" weight="bold">Update Password</HelixaText>
               )}
             </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </ModalKeyboardAvoid>
     </Modal>
   );
 };

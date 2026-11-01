@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, ScrollView, TouchableOpacity, TextInput, Dimensions } from 'react-native';
+import { View, TouchableOpacity, TextInput, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Redirect, useRouter } from 'expo-router';
 import { HelixaText } from '../../components/HelixaText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardScrollView } from '../../components/KeyboardAvoid';
 import { useTheme } from '../../context/ThemeContext';
 import Toast from 'react-native-toast-message';
 import { CancelReason } from '../../api/subscription';
@@ -82,7 +83,7 @@ export default function CancelSubscriptionScreen() {
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }} edges={['top', 'bottom']}>
-      <ScrollView className="flex-1 px-6 mt-4" showsVerticalScrollIndicator={false}>
+      <KeyboardScrollView className="flex-1 px-6 mt-4" showsVerticalScrollIndicator={false}>
         
         {step === 1 && (
           <View className="flex-1">
@@ -293,7 +294,7 @@ export default function CancelSubscriptionScreen() {
           </View>
         )}
 
-      </ScrollView>
+      </KeyboardScrollView>
     </SafeAreaView>
   );
 }

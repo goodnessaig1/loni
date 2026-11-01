@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Modal, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import Toast from 'react-native-toast-message';
 import { CalText } from '../CalText';
 import { HelixaText } from '../HelixaText';
+import { ModalKeyboardAvoid } from '../KeyboardAvoid';
 import { useTheme } from '../../context/ThemeContext';
 import { emergencyContactsApi } from '../../api/emergencyContacts';
 import { useEmergencyContacts } from '../../context/EmergencyContactsContext';
@@ -73,8 +74,7 @@ export const InvitePartnerModal = ({ visible, onClose }: InvitePartnerModalProps
       transparent={true}
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <ModalKeyboardAvoid
         className="flex-1 justify-end"
         style={{ backgroundColor: colors.overlay }}
       >
@@ -90,7 +90,7 @@ export const InvitePartnerModal = ({ visible, onClose }: InvitePartnerModalProps
             <Feather name="x" size={18} color={colors.text} />
           </TouchableOpacity>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {/* Graphic */}
             <View className="items-center mt-6 mb-4">
               <Image
@@ -175,7 +175,7 @@ export const InvitePartnerModal = ({ visible, onClose }: InvitePartnerModalProps
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </ModalKeyboardAvoid>
     </Modal>
   );
 };

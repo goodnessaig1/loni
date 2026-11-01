@@ -3,10 +3,7 @@ import {
   View, 
   Pressable, 
   TextInput, 
-  StyleSheet, 
-  KeyboardAvoidingView, 
-  Platform,
-  ScrollView
+  StyleSheet,
 } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +13,7 @@ import * as Yup from 'yup';
 import { CalText } from '../../components/CalText';
 import { HelixaText } from '../../components/HelixaText';
 import { Button } from '../../components/Button';
+import { KeyboardScrollView } from '../../components/KeyboardAvoid';
 import { useTheme } from '../../context/ThemeContext';
 import type { Palette } from '../../lib/theme';
 import { Reveal } from '../../components/motion';
@@ -44,8 +42,7 @@ export default function CreatePasswordScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex1}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+      <KeyboardScrollView contentContainerStyle={styles.scrollContent}>
           <Reveal index={0}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={28} color={colors.text} />
@@ -126,8 +123,7 @@ export default function CreatePasswordScreen() {
           </View>
           </Reveal>
 
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </KeyboardScrollView>
     </SafeAreaView>
   );
 }
@@ -136,9 +132,6 @@ const makeStyles = (c: Palette) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.bg,
-  },
-  flex1: {
-    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 24,
