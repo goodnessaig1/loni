@@ -202,25 +202,34 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
         full += header
         yield _sse({"content": header})
 
-    # 6. Stream the model
-    try:
-        response = await create_chat(client, model=model, messages=openai_messages, temperature=0.5, stream=True)
-        model_text = ""
-        async for chunk in response:
-            delta = chunk.choices[0].delta.content if chunk.choices else None
-            if delta:
-                model_text += delta
-                yield _sse({"content": delta})
-        full += model_text
-    except Exception as e:
-        print(f"Error calling AI API: {e}")
-        if result.urgency == Urgency.urgent:
-            fallback = "I'm having trouble answering right now, but please don't wait: use **Talk to a Nurse** below or get to a health facility."
-        else:
-            fallback = "I'm sorry, I am currently experiencing technical difficulties. Please try again later."
-        yield _sse({"content": fallback})
-        full += fallback
-        model_text = fallback
+    # 6. Stream the model. If the main model is overloaded or down before it says anything, the fast one answers.
+    backup = get_provider().classifier_model
+    models = [model] + ([backup] if backup != model else [])
+    model_text = ""
+    for i, m in enumerate(models):
+        last = i == len(models) - 1
+        try:
+            # With a backup waiting, the main model gets one try instead of the client's retry.
+            response = await create_chat(client if last else client.with_options(max_retries=0),
+                                         model=m, messages=openai_messages, temperature=0.5, stream=True)
+            async for chunk in response:
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if delta:
+                    model_text += delta
+                    yield _sse({"content": delta})
+            full += model_text
+            break
+        except Exception as e:
+            print(f"Error calling AI API ({m}): {e}")
+            if model_text or last:
+                if result.urgency == Urgency.urgent:
+                    fallback = "I'm having trouble answering right now, but please don't wait: use **Talk to a Nurse** below or get to a health facility."
+                else:
+                    fallback = "I'm sorry, I am currently experiencing technical difficulties. Please try again later."
+                yield _sse({"content": fallback})
+                full += fallback
+                model_text = fallback
+                break
 
     # 7. Check what the model said before it is saved as the final answer.
     notes = safety.validate(result.urgency, model_text, result.answer_type,

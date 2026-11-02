@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Dict
 
+import httpx
 from openai import AsyncOpenAI
 
 from app.core.config import settings
@@ -48,23 +49,29 @@ def provider_name() -> str:
     return _LEGACY.get(legacy, "gemini")
 
 
+def _client(**kwargs) -> AsyncOpenAI:
+    # Without a limit a stalled provider holds the chat open for up to 10 minutes (the SDK default), and the app
+    # waits on its loading dots the whole time. The read limit is per chunk, so a long streamed answer still fits.
+    return AsyncOpenAI(**kwargs, timeout=httpx.Timeout(settings.AI_TIMEOUT_SECONDS, connect=10.0), max_retries=1)
+
+
 @lru_cache(maxsize=1)
 def get_provider() -> Provider:
     """One client per process (reused for every chat), built from .env."""
     name = provider_name()
     if name == "gemini":
         extra = {"reasoning_effort": settings.GEMINI_REASONING_EFFORT} if settings.GEMINI_REASONING_EFFORT else {}
-        return Provider("gemini", AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=settings.GEMINI_API_KEY or "missing"),
+        return Provider("gemini", _client(base_url=GEMINI_BASE_URL, api_key=settings.GEMINI_API_KEY or "missing"),
                         settings.AI_MODEL or settings.GEMINI_MODEL, extra, short_max_tokens=1024,
                         fast_model=settings.GEMINI_FAST_MODEL)
     if name == "openai":
-        return Provider("openai", AsyncOpenAI(api_key=settings.OPENAI_API_KEY or "missing"),
+        return Provider("openai", _client(api_key=settings.OPENAI_API_KEY or "missing"),
                         settings.AI_MODEL or settings.OPENAI_MODEL)
     if name == "abacus":
-        return Provider("abacus", AsyncOpenAI(base_url=ABACUS_BASE_URL, api_key=settings.ABACUS_API_KEY or "missing"),
+        return Provider("abacus", _client(base_url=ABACUS_BASE_URL, api_key=settings.ABACUS_API_KEY or "missing"),
                         settings.AI_MODEL or settings.ABACUS_MODEL)
     if name == "ollama":
-        return Provider("ollama", AsyncOpenAI(base_url=settings.OLLAMA_BASE_URL, api_key="ollama"),
+        return Provider("ollama", _client(base_url=settings.OLLAMA_BASE_URL, api_key="ollama"),
                         settings.AI_MODEL or settings.OLLAMA_MODEL, short_max_tokens=256)
     raise ValueError(f"Unknown AI_PROVIDER '{name}'. Use gemini, openai, abacus or ollama.")
 

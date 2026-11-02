@@ -105,6 +105,8 @@ class Settings(BaseSettings):
     ABACUS_MODEL: str = "deepseek-v4-flash"
     OLLAMA_BASE_URL: str = "http://localhost:11434/v1"
     OLLAMA_MODEL: str = "qwen3:8b"
+    # Longest wait for a model to connect or send its next piece of a reply; one retry, then the chat says sorry.
+    AI_TIMEOUT_SECONDS: float = 30.0
     # Legacy switch, used only when AI_PROVIDER is empty: production=abacus, openai, local=ollama.
     AI_ENVIRONMENT: str = ""
     # Number the app dials for "Call emergency services". Nigeria's national emergency number is 112, but it

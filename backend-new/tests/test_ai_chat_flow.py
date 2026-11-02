@@ -19,12 +19,17 @@ class FakeLLM:
     """`classifier_reply` answers the non-streaming triage call; `answer` is streamed for the real reply."""
 
     def __init__(self, answer=("Here is some ", "helpful information."), classifier_reply='{"urgency":"routine","domain":"general"}',
-                 classifier_error=None, answer_error=None):
+                 classifier_error=None, answer_error=None, failing_models=()):
         self.answer, self.classifier_reply = answer, classifier_reply
         self.classifier_error, self.answer_error = classifier_error, answer_error
+        self.failing_models = failing_models
         self.stream_calls = []
+        self.stream_models = []
         self.classifier_calls = 0
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    def with_options(self, **_):
+        return self
 
     async def _create(self, **kw):
         if not kw.get("stream"):
@@ -34,8 +39,11 @@ class FakeLLM:
             msg = SimpleNamespace(content=self.classifier_reply)
             return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
         self.stream_calls.append(kw["messages"])
+        self.stream_models.append(kw["model"])
         if self.answer_error:
             raise self.answer_error
+        if kw["model"] in self.failing_models:
+            raise RuntimeError("503 This model is currently experiencing high demand")
 
         async def gen():
             for piece in self.answer:
@@ -119,6 +127,17 @@ async def test_urgent_model_failure_still_tells_her_to_get_care(env):
     use(FakeLLM(answer_error=RuntimeError("provider down")))
     _, _, content = await run("I have a fever of 39")
     assert content.startswith("**Please get this checked") and "Talk to a Nurse" in content
+
+
+async def test_an_overloaded_main_model_hands_the_reply_to_the_fast_one(env, monkeypatch):
+    db, use = env
+    monkeypatch.setattr(service, "get_provider", lambda: SimpleNamespace(classifier_model="fake-fast", short_max_tokens=40))
+    llm = use(FakeLLM(failing_models=("fake-model",)))
+    events, meta, content = await run("What foods are good for iron?")
+    assert llm.stream_models == ["fake-model", "fake-fast"]
+    assert "Here is some helpful information." in content
+    assert "technical difficulties" not in content
+    assert events[-1] == "[DONE]"
 
 
 async def test_classifier_can_raise_a_message_the_rules_missed_to_an_emergency(env):

@@ -3,6 +3,11 @@ import { apiClient, API_URL } from '../api/client';
 import * as SecureStore from 'expo-secure-store';
 import EventSource from 'react-native-sse';
 
+// Longest silence allowed while a reply streams. The server gives up on the AI well before this and says sorry,
+// so this only catches a dropped connection that would otherwise leave the loading dots up forever.
+const STREAM_IDLE_MS = 90000;
+const NO_REPLY_TEXT = "Sorry, I couldn't get a reply just now. Please try again.";
+
 export type MessageRole = 'user' | 'assistant';
 
 /** What the server decided about this reply (from its safety triage). Shown as warning strips and buttons. */
@@ -123,20 +128,36 @@ export function useAIChat() {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ content }),
+        // The library reconnects 5 s after a stream ends by default, which re-sends this message.
+        pollingInterval: 0,
       });
 
       eventSourceRef.current = es;
 
+      // Ends the reply once: stops the dots, and says sorry instead of leaving an empty bubble.
+      let idleTimer: ReturnType<typeof setTimeout> | undefined;
+      const finish = () => {
+        clearTimeout(idleTimer);
+        es.removeAllEventListeners();
+        es.close();
+        setMessages(prev => prev.map(msg =>
+          msg.id === assistantMsgId ? { ...msg, isStreaming: false, content: msg.content || NO_REPLY_TEXT } : msg
+        ));
+        setIsLoading(false);
+      };
+      const resetIdle = () => {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(finish, STREAM_IDLE_MS);
+      };
+      resetIdle();
+
       es.addEventListener('message', (event) => {
+        resetIdle();
         if (event.data) {
           try {
             if (event.data === '[DONE]') {
-              es.close();
-              setMessages(prev => prev.map(msg => 
-                msg.id === assistantMsgId ? { ...msg, isStreaming: false } : msg
-              ));
-              setIsLoading(false);
+              finish();
               return;
             }
             
@@ -173,20 +194,10 @@ export function useAIChat() {
             console.error("Network error on stream", (event as any).message);
         }
         // Stream completed or errored out
-        es.close();
-        setMessages(prev => prev.map(msg => 
-          msg.id === assistantMsgId ? { ...msg, isStreaming: false } : msg
-        ));
-        setIsLoading(false);
+        finish();
       });
-      
-      es.addEventListener('close', () => {
-          es.close();
-          setMessages(prev => prev.map(msg => 
-            msg.id === assistantMsgId ? { ...msg, isStreaming: false } : msg
-          ));
-          setIsLoading(false);
-      });
+
+      es.addEventListener('close', finish);
 
     } catch (err: any) {
       console.error("Failed to send message:", err);
