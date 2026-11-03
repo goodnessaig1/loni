@@ -20,10 +20,15 @@ const IMAGES = {
 
 import * as SecureStore from 'expo-secure-store';
 import { useFocusEffect } from 'expo-router';
+import { useTheme } from '../../context/ThemeContext';
+
+// Read once when the app loads, so opening the tab can go straight to the conversation with no wait.
+let introSeen: Promise<boolean> | boolean = SecureStore.getItemAsync('hasSeenChatIntro').then((v) => v === 'true');
 
 export default function ChatScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { colors } = useTheme();
   const SUPPORT_OPTIONS = React.useMemo(() => chatTopicsFor(user?.status).map((t) => ({ ...t, image: IMAGES[t.image] })), [user?.status]);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isChecking, setIsChecking] = useState(true);
@@ -33,8 +38,7 @@ export default function ChatScreen() {
     React.useCallback(() => {
       let isActive = true;
       const checkOnboarding = async () => {
-        const hasSeen = await SecureStore.getItemAsync('hasSeenChatIntro');
-        if (hasSeen === 'true') {
+        if (await introSeen) {
           if (isActive) router.replace('/chat/conversation');
         } else {
           if (isActive) setIsChecking(false);
@@ -70,6 +74,7 @@ export default function ChatScreen() {
   const handleStartConversation = async () => {
     if (selectedOption !== null) {
       await SecureStore.setItemAsync('hasSeenChatIntro', 'true');
+      introSeen = true;
       const selected = SUPPORT_OPTIONS.find(o => o.id === selectedOption);
       router.replace({
         pathname: '/chat/conversation',
@@ -79,7 +84,13 @@ export default function ChatScreen() {
   };
 
   if (isChecking) {
-    return <View style={{ flex: 1, backgroundColor: '#D62D88' }} />;
+    // Same colour as the conversation screen it hands over to, with the tab bar already gone, so nothing flashes.
+    return (
+      <>
+        <Tabs.Screen options={{ tabBarStyle: { display: 'none' } }} />
+        <View style={{ flex: 1, backgroundColor: colors.bg }} />
+      </>
+    );
   }
 
   return (

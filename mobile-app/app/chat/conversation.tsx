@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, TouchableOpacity, TextInput, Animated, ActivityIndicator, Modal, FlatList, Image } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Feather } from '@expo/vector-icons';
 import { HelixaText } from '../../components/HelixaText';
@@ -14,6 +13,7 @@ import { chatTopicsFor } from '../../lib/chatTopics';
 import { useAIChat } from '../../hooks/useAIChat';
 import Markdown from 'react-native-markdown-display';
 import { useTheme } from '../../context/ThemeContext';
+import { BRAND } from '../../lib/theme';
 import { useAuth } from '../../hooks/useAuth';
 import { RevealList } from '../../components/motion';
 
@@ -127,7 +127,7 @@ export default function ConversationScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const firstName = user?.name?.trim().split(/\s+/)[0];
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { optionTitle, existingSessionId } = useLocalSearchParams<{ optionTitle: string, existingSessionId: string }>();
   const flatListRef = useRef<FlatList>(null);
   
@@ -169,10 +169,7 @@ export default function ConversationScreen() {
       if (existingSessionId) {
         await initializeSession('', existingSessionId);
       } else if (optionTitle) {
-        const newSessionId = await initializeSession(optionTitle);
-        if (newSessionId) {
-          await sendMessage(`I need some help or information regarding: ${optionTitle}`, newSessionId);
-        }
+        await sendMessage(`I need some help or information regarding: ${optionTitle}`, undefined, optionTitle);
       }
     };
     start();
@@ -191,16 +188,7 @@ export default function ConversationScreen() {
     // In an inverted list, index 0 is the bottom. Scroll to bottom smoothly.
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     
-    let activeSessionId = sessionId;
-    if (!activeSessionId) {
-      const shortTitle = textToSend.length > 35 ? textToSend.substring(0, 35) + '...' : textToSend;
-      activeSessionId = await initializeSession(shortTitle);
-    }
-    
-    if (activeSessionId) {
-      // Send it off to our streaming AI backend
-      await sendMessage(textToSend, activeSessionId);
-    }
+    await sendMessage(textToSend);
   };
 
   const handleLoadMore = () => {
@@ -272,21 +260,15 @@ export default function ConversationScreen() {
     };
 
   return (
-    <LinearGradient
-      colors={isDark ? ['#3A1530', '#0A0D13'] : ['#FFC2E3', '#FFEFF8']}
-      locations={[0.1082, 0.7028]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ flex: 1 }}
-    >
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoid style={{ flex: 1 }}>
           {/* Header */}
           <View className="flex-row items-center justify-between px-6 pt-4 pb-2">
             <TouchableOpacity 
               onPress={() => handleBackToHome()}
-              className="w-12 h-12 rounded-full items-center justify-center shadow-sm"
-              style={{ backgroundColor: colors.elevated }}
+              className="w-12 h-12 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.elevated, borderWidth: 1, borderColor: colors.border }}
             >
               <Feather name="arrow-left" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -297,8 +279,8 @@ export default function ConversationScreen() {
             
             <TouchableOpacity 
               onPress={() => setIsDropdownVisible(true)}
-              className="w-12 h-12 rounded-full items-center justify-center shadow-sm"
-              style={{ backgroundColor: colors.elevated }}
+              className="w-12 h-12 rounded-full items-center justify-center"
+              style={{ backgroundColor: colors.elevated, borderWidth: 1, borderColor: colors.border }}
             >
               <Feather name="more-horizontal" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -308,6 +290,9 @@ export default function ConversationScreen() {
           {/* {!isLoading  ? ( */}
           {isLoading && messages.length === 0 ? (
             <ChatSkeleton />
+          ) : messages.length === 0 && optionTitle && !existingSessionId ? (
+            // A topic was picked on the intro screen: its message lands on the first frame, so skip the greeting.
+            <View className="flex-1" />
           ) : messages.length === 0 ? (
             <View className="flex-1 justify-center items-center px-6 mt-10">
               <Image 
@@ -323,17 +308,9 @@ export default function ConversationScreen() {
                 {chatTopicsFor(user?.status).map((t) => t.title).map((option, idx) => (
                   <TouchableOpacity 
                     key={idx}
-                    onPress={async () => {
-                      let activeSessionId = sessionId;
-                      if (!activeSessionId) {
-                        activeSessionId = await initializeSession(option);
-                      }
-                      if (activeSessionId) {
-                        sendMessage(`I need some help or information regarding: ${option}`, activeSessionId);
-                      }
-                    }}
-                    className="rounded-[16px] py-4 px-2 mb-3 items-center justify-center shadow-sm"
-                    style={{ width: '48%', backgroundColor: colors.elevated }}
+                    onPress={() => sendMessage(`I need some help or information regarding: ${option}`, undefined, option)}
+                    className="rounded-[16px] py-4 px-2 mb-3 items-center justify-center"
+                    style={{ width: '48%', backgroundColor: colors.primarySoft }}
                   >
                     <HelixaText className="text-[13px] text-center" weight="regular">
                       {option}
@@ -384,27 +361,29 @@ export default function ConversationScreen() {
           )}
 
           {/* Input Area */}
-          <View className="px-6 py-4 pb-8">
-            <View className="flex-row items-center rounded-full pl-6 pr-2 py-2 min-h-[64px]" style={{ backgroundColor: isDark ? colors.nav : '#000' }}>
+          <View className="px-6 py-4 pb-8" style={{ backgroundColor: colors.primarySoft }}>
+            <View className="flex-row items-center rounded-full pl-6 pr-2 py-2 min-h-[64px]" style={{ backgroundColor: colors.bg }}>
               <TextInput
-                className="flex-1 text-white text-[15px] py-3"
+                className="flex-1 text-[15px] py-3"
+                style={{ color: colors.text }}
                 placeholder="Tell Luma How You Feel..."
-                placeholderTextColor="rgba(255,255,255,0.6)"
+                placeholderTextColor={colors.textMuted}
                 value={inputText}
                 onChangeText={setInputText}
                 multiline
                 maxLength={500}
               />
               <TouchableOpacity 
-                className="w-12 h-12 rounded-full bg-white items-center justify-center ml-2"
+                className="w-12 h-12 rounded-full items-center justify-center ml-2"
+                style={{ backgroundColor: BRAND.pink }}
                 onPress={isLoading ? stopStream : handleSend}
                 disabled={!isLoading && !inputText.trim()}
               >
                 {isLoading ? (
-                  <MaterialCommunityIcons name="checkbox-blank" size={20} color="#D62D88" />
+                  <MaterialCommunityIcons name="checkbox-blank" size={20} color="#FFFFFF" />
                   // <Feather name="pause" size={20} color="#D62D88" />
                 ) : (
-                  <Feather name="send" size={20} color="#D62D88" style={{ marginLeft: -2, marginTop: 2 }} />
+                  <Feather name="send" size={20} color="#FFFFFF" style={{ marginLeft: -2, marginTop: 2 }} />
                 )}
               </TouchableOpacity>
             </View>
@@ -443,6 +422,6 @@ export default function ConversationScreen() {
 
         </KeyboardAvoid>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
