@@ -37,11 +37,4 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
     return user
 
-async def get_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    from app.modules.users.models import UserTypeEnum
-    if current_user.user_type != UserTypeEnum.admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="The user doesn't have enough privileges"
-        )
-    return current_user
+# Admin endpoints are guarded by staff accounts and permissions: see app/modules/staff/deps.py.

@@ -100,3 +100,36 @@ class CommunityView(Base):
         UniqueConstraint('post_id', 'user_id', name='uq_community_view_post_user'),
         Index('ix_community_views_recent', 'post_id', 'created_at'),
     )
+
+
+class CommunityReport(Base):
+    """A member flagging a post. One report per member per post; reporters are never shown to the author."""
+    __tablename__ = 'community_reports'
+    __table_args__ = (
+        UniqueConstraint('post_id', 'reporter_id', name='uq_community_report_once'),
+        Index('ix_community_reports_post', 'post_id', 'created_at'),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    post_id = Column(Integer, ForeignKey('community_posts.id', ondelete='CASCADE'), nullable=False)
+    reporter_id = Column(String(12), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    # harmful_medical_advice | misinformation | harassment | spam | inappropriate | other
+    reason = Column(String(40), nullable=False)
+    note = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class CommunityModeration(Base):
+    """Where a reported post stands. Created on its first report; staff move it along."""
+    __tablename__ = 'community_moderation'
+    __table_args__ = (Index('ix_community_moderation_status', 'status', 'last_reported_at'),)
+
+    post_id = Column(Integer, ForeignKey('community_posts.id', ondelete='CASCADE'), primary_key=True)
+    # new | under_review | escalated | dismissed | removed
+    status = Column(String(20), nullable=False, default='new', server_default='new')
+    report_count = Column(Integer, nullable=False, default=0, server_default='0')
+    first_reported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_reported_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    note = Column(String(1000), nullable=True)
+    decided_by = Column(String(12), ForeignKey('staff.id', ondelete='SET NULL'), nullable=True)
+    decided_at = Column(DateTime(timezone=True), nullable=True)

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "loni-admin",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "loni-admin", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

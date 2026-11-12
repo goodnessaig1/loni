@@ -3,7 +3,8 @@ from fastapi.responses import StreamingResponse
 from typing import List
 from app.modules.users.models import User
 from typing import Optional
-from app.api.deps import get_admin_user, get_current_user
+from app.api.deps import get_current_user
+from app.modules.staff.deps import StaffContext, require_permission
 from pydantic import BaseModel, Field
 from app.modules.ai_chat import schemas, service
 from app.core.ratelimit import limit
@@ -94,13 +95,13 @@ class ReviewIn(BaseModel):
 
 
 @router.get("/admin/safety-events")
-async def list_safety_events(needs_review: bool = True, limit: int = 50, skip: int = 0, admin: User = Depends(get_admin_user)):
+async def list_safety_events(needs_review: bool = True, limit: int = 50, skip: int = 0, admin: StaffContext = Depends(require_permission("ai_safety.review"))):
     events = await service.list_safety_events(needs_review, min(max(limit, 1), 200), max(skip, 0))
     return {"success": True, "data": {"events": events}}
 
 
 @router.get("/admin/safety-events/{event_id}/conversation")
-async def safety_event_conversation(event_id: str, admin: User = Depends(get_admin_user)):
+async def safety_event_conversation(event_id: str, admin: StaffContext = Depends(require_permission("ai_safety.review"))):
     event = await service.get_safety_event(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
@@ -109,7 +110,7 @@ async def safety_event_conversation(event_id: str, admin: User = Depends(get_adm
 
 
 @router.post("/admin/safety-events/{event_id}/review")
-async def review_safety_event(event_id: str, data: ReviewIn, admin: User = Depends(get_admin_user)):
+async def review_safety_event(event_id: str, data: ReviewIn, admin: StaffContext = Depends(require_permission("ai_safety.review"))):
     if not await service.mark_safety_event_reviewed(event_id, admin.id, data.note):
         raise HTTPException(status_code=404, detail="Event not found")
     return {"success": True, "message": "Marked as reviewed"}

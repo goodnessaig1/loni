@@ -26,6 +26,8 @@ import app.modules.subscriptions.models
 import app.modules.care.models
 import app.modules.checkins.models
 import app.modules.account.models
+import app.modules.staff.models
+import app.modules.admin.models
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

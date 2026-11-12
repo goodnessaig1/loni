@@ -23,6 +23,8 @@ import app.modules.driver_training.models  # noqa: F401
 import app.modules.health.models  # noqa: F401
 import app.modules.notifications.models  # noqa: F401
 import app.modules.rides.models  # noqa: F401
+import app.modules.staff.models  # noqa: F401
+import app.modules.admin.models  # noqa: F401
 
 _ids = itertools.count(1)
 

@@ -13,6 +13,9 @@ from typing import Optional
 import cloudinary
 import cloudinary.uploader
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field
+
+from app.core.ratelimit import limit
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -141,6 +144,66 @@ async def delete_post(
     await db.commit()
     await ws_manager.broadcast_topic(TOPIC, "community_post_deleted", {"post_id": post_id})
     return _ok({"post_id": post_id}, "Post deleted")
+
+
+REPORT_REASONS = {
+    "harmful_medical_advice": "Harmful medical advice",
+    "misinformation": "Misinformation",
+    "harassment": "Harassment or bullying",
+    "spam": "Spam or promotion",
+    "inappropriate": "Inappropriate content",
+    "other": "Something else",
+}
+
+
+class ReportIn(BaseModel):
+    reason: str = Field(..., max_length=40)
+    note: Optional[str] = Field(None, max_length=500)
+
+
+@router.get("/report-reasons")
+async def report_reasons(current_user: User = Depends(get_current_user)):
+    return _ok({"reasons": [{"key": k, "label": v} for k, v in REPORT_REASONS.items()]})
+
+
+@router.post("/posts/{post_id}/report", dependencies=[Depends(limit("community.report", 20, 3600))])
+async def report_post(post_id: int, body: ReportIn, current_user: User = Depends(get_current_user),
+                      db: AsyncSession = Depends(get_db)):
+    """Flag a post for the LONI team. Reporting twice just updates your reason; the author never sees who reported."""
+    if body.reason not in REPORT_REASONS:
+        raise HTTPException(status_code=400, detail="Choose a reason for the report")
+    post = await service.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.author_id == current_user.id:
+        raise HTTPException(status_code=400, detail="You can't report your own post")
+    from sqlalchemy import select
+    from app.modules.admin.notify import notify_admins
+    from app.modules.community.models import CommunityModeration, CommunityReport
+
+    existing = (await db.execute(select(CommunityReport).where(
+        CommunityReport.post_id == post_id, CommunityReport.reporter_id == current_user.id))).scalar_one_or_none()
+    note = (body.note or "").strip() or None
+    if existing:
+        existing.reason, existing.note = body.reason, note
+        await db.commit()
+        return _ok({"post_id": post_id}, "Thanks, we've updated your report")
+
+    db.add(CommunityReport(post_id=post_id, reporter_id=current_user.id, reason=body.reason, note=note))
+    mod = await db.get(CommunityModeration, post_id)
+    now = datetime.now(timezone.utc)
+    if mod is None:
+        mod = CommunityModeration(post_id=post_id, status="new", report_count=0, first_reported_at=now)
+        db.add(mod)
+        notify_admins(db, kind="community_report", permission="community.moderate",
+                      link=f"/community/{post_id}", title="Community report received",
+                      body=f"A post was reported for {REPORT_REASONS[body.reason].lower()}.")
+    elif mod.status == "dismissed":
+        mod.status = "new"  # reported again after being cleared: look again
+    mod.report_count = (mod.report_count or 0) + 1
+    mod.last_reported_at = now
+    await db.commit()
+    return _ok({"post_id": post_id}, "Thanks for letting us know. Our team will review this post.")
 
 
 async def _like(post_id: int, liked: bool, current_user: User, db: AsyncSession) -> dict:

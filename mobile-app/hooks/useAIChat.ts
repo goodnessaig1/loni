@@ -95,14 +95,9 @@ export function useAIChat() {
     }
   }, [fetchMessages]);
 
-  // Send a message and stream the response
-  const sendMessage = useCallback(async (content: string, overrideSessionId?: string) => {
-    const activeSessionId = overrideSessionId || sessionId;
-    if (!activeSessionId) {
-      setError("Session not initialized.");
-      return;
-    }
-
+  // Send a message and stream the response. Without a session yet, one is created after the bubbles are on
+  // screen, so a first message shows at once instead of behind a loading skeleton.
+  const sendMessage = useCallback(async (content: string, overrideSessionId?: string, newSessionTitle?: string) => {
     if (!content.trim()) return;
 
     // 1. Add user message to UI immediately (at the START of the array for inverted FlatList)
@@ -116,6 +111,15 @@ export function useAIChat() {
     try {
       setIsLoading(true);
       setError(null);
+
+      let activeSessionId = overrideSessionId || sessionId;
+      if (!activeSessionId) {
+        const title = newSessionTitle || (content.length > 35 ? content.substring(0, 35) + '...' : content);
+        const response = await apiClient.post('/ai-chat/sessions', { title });
+        activeSessionId = response.data.data.session.id as string;
+        setSessionId(activeSessionId);
+        setHasMore(false); // a brand-new session has no older messages to page in
+      }
 
       const token = await SecureStore.getItemAsync('userToken');
       

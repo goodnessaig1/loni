@@ -74,6 +74,9 @@ async def contact_support(body: SupportIn, current_user: User = Depends(get_curr
         message=body.message,
     )
     db.add(msg)
+    from app.modules.admin.notify import notify_admins
+    notify_admins(db, kind="support_message", permission="support.manage", link="/support",
+                  title="Support message received", body=f"{msg.name}: {body.subject}")
     await db.commit()
     await db.refresh(msg)
     asyncio.create_task(_forward(msg))

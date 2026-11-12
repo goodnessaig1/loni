@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { AppState, ViewToken } from 'react-native';
-import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
-import { communityApi, CommunityComment, CommunityPost, FEED_PAGE_SIZE } from '../api/community';
+import { communityApi, CommunityComment, CommunityPost, DEFAULT_REPORT_REASONS, FEED_PAGE_SIZE } from '../api/community';
 import { subscribeTopic, unsubscribeTopic } from '../api/socket';
 import {
   appendComment, communityKeys, patchPost, prependPost, removeComment, removePost, replaceComment,
@@ -195,4 +195,33 @@ export function useViewTracker() {
       onViewableItemsChanged: onViewableItemsChanged.current,
     },
   ]).current;
+}
+
+
+/** Reasons a post can be reported for. Falls back to the built-in list so the sheet never waits on the network. */
+export function useReportReasons(enabled: boolean) {
+  const query = useQuery({
+    queryKey: ['community', 'report-reasons'],
+    queryFn: communityApi.reportReasons,
+    enabled,
+    staleTime: 24 * 60 * 60 * 1000,
+  });
+  return query.data?.length ? query.data : DEFAULT_REPORT_REASONS;
+}
+
+/** Report a post to the LONI team. Shows the server's thank-you (or why it failed) as a toast. */
+export function useReportPost() {
+  return useMutation({
+    mutationFn: ({ postId, reason, note }: { postId: number; reason: string; note?: string }) =>
+      communityApi.reportPost(postId, { reason, note: note?.trim() || undefined }),
+    onSuccess: (message) => Toast.show({ type: 'success', text1: 'Report sent', text2: message }),
+    onError: (e: any) => {
+      const tooMany = e?.response?.status === 429;
+      Toast.show({
+        type: 'error',
+        text1: tooMany ? 'Too many reports' : "Couldn't send report",
+        text2: tooMany ? "You've sent a lot of reports recently. Please try again later." : errorText(e, 'Please try again.'),
+      });
+    },
+  });
 }

@@ -740,6 +740,10 @@ async def update_nurse_profile(
     current_user.user_type = UserTypeEnum.nurse
     current_user.gender = gender
     db.add(current_user)
+    from app.modules.admin.notify import notify_admins
+    notify_admins(db, kind="nurse_application", permission="nurses.view", link=f"/nurses?open={current_user.id}",
+                  title="Nurse application received",
+                  body=f"{current_user.name} submitted credentials for review.")
     await db.commit()
     return {"success": True, "message": "Nurse profile updated"}
 
@@ -996,6 +1000,10 @@ async def submit_driver_application(
     current_user.user_type = UserTypeEnum.driver
     db.add(profile)
     db.add(current_user)
+    from app.modules.admin.notify import notify_admins
+    notify_admins(db, kind="driver_application", permission="drivers.view", link=f"/drivers?open={current_user.id}",
+                  title="Driver application received",
+                  body=f"{current_user.name} submitted their application for review.")
     await db.commit()
     return {"success": True, "message": "Application submitted for review", "data": await build_status(db, current_user)}
 
