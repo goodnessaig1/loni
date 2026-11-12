@@ -41,6 +41,23 @@ export interface PostStats {
   view_count: number;
 }
 
+export interface ReportReason {
+  key: string;
+  label: string;
+}
+
+/** Used until the server's list loads (or if it can't), so the report sheet always has choices. */
+export const DEFAULT_REPORT_REASONS: ReportReason[] = [
+  { key: 'harmful_medical_advice', label: 'Harmful medical advice' },
+  { key: 'misinformation', label: 'Misinformation' },
+  { key: 'harassment', label: 'Harassment or bullying' },
+  { key: 'spam', label: 'Spam or promotion' },
+  { key: 'inappropriate', label: 'Inappropriate content' },
+  { key: 'other', label: 'Something else' },
+];
+
+export const REPORT_NOTE_MAX = 500;
+
 export const FEED_PAGE_SIZE = 10;
 
 const unwrap = <T>(res: { data: { data: T } }): T => res.data.data;
@@ -73,6 +90,15 @@ export const communityApi = {
     unwrap(await apiClient.post(`/community/posts/${postId}/like`)),
   unlike: async (postId: number): Promise<{ liked: boolean; like_count: number }> =>
     unwrap(await apiClient.delete(`/community/posts/${postId}/like`)),
+
+  reportReasons: async (): Promise<ReportReason[]> =>
+    unwrap<{ reasons: ReportReason[] }>(await apiClient.get('/community/report-reasons')).reasons,
+
+  /** Flags a post for the LONI team. Anonymous: the author never sees who reported. Returns the server's thank-you message. */
+  reportPost: async (postId: number, body: { reason: string; note?: string }): Promise<string> => {
+    const res = await apiClient.post(`/community/posts/${postId}/report`, body);
+    return res.data?.message || "Thanks for letting us know. Our team will review this post.";
+  },
 
   comments: async (postId: number, cursor?: string | null): Promise<Page<CommunityComment>> =>
     unwrap(await apiClient.get(`/community/posts/${postId}/comments`, { params: { cursor: cursor || undefined, limit: 20 } })),

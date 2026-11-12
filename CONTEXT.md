@@ -37,6 +37,7 @@ Monorepo `https://github.com/goodnessaig1/loni.git`. Current branch `ft-communit
 | `loni-server-app/` | **Expo / React Native app for nurses, drivers and support partners** ("Loni Server", `com.loni.server`). | **Active** |
 | `loni-web/` | **React + Vite marketing website** (home, drivers, nurses, partners, about, legal) + a partner verify page. | **Active** |
 | `livekit/` | Docker stack for self-hosted **LiveKit** (voice), Redis, coturn (TURN), Caddy (TLS). | Active infra |
+| `loni-admin/` | **Next.js 16 admin portal** for LONI staff (separate git repo `goodnessaig1/loni-admin`). Login + 2FA, RBAC, staff & roles, overview dashboard. See `loni-admin/README.md`. | **Active, new** |
 | `backend/` | The **original Node/Express + Drizzle** backend (auth + health only). | **Legacy, superseded by `backend-new`** |
 | `scripts/update-lan-ip.sh` | Rewrites every file that hardcodes your machine's LAN IP when it changes. | Dev helper |
 | `CALL_SYSTEM_AUDIT.md` | Long record of voice-call bugs found and fixed. | Reference |
@@ -98,7 +99,7 @@ FastAPI 0.137, Python 3.13, SQLAlchemy 2 async + asyncpg, Alembic, Pydantic 2, M
 ```
 backend-new/
   app/main.py            app, CORS (*), exception handlers, startup/shutdown (Mongo, Firebase, background workers)
-  app/api/router.py      mounts every module under /api/v1; app/api/deps.py = get_current_user / get_admin_user
+  app/api/router.py      mounts every module under /api/v1; app/api/deps.py = get_current_user; admin routes use app/modules/staff/deps.py (require_permission)
   app/core/              config.py (settings), database.py, mongo_db.py, security.py (JWT/bcrypt), ws_manager.py
   app/modules/<name>/    models.py · schemas.py · router.py · service(s).py   (one folder per feature)
   app/utils/             user_enrichment.py (stage/week/trimester), partner_content.py (week-by-week partner copy), generateId.py
@@ -153,7 +154,9 @@ Prefix for everything: `/api/v1`.
 | **care** (`/care`, LONI Plus only) | Daily care plan, nutrition, weekly report, hospital bag, labour prep | `overview`, `today`, `PUT today/{key}`, `nutrition`, `weekly-report`, `hospital-bag`, `labour-prep[/{slug}]` | `care_task_logs`, `hospital_bag_checks` (content in `care/content.py`) |
 | **account** (`/account`) | Every role: saved notification settings, contact support | `GET/PUT settings`, `GET support` (contact info + subjects), `POST support` (stored + forwarded by email) | `user_settings`, `support_messages` |
 | **community** (`/community`) | Feed, likes, comments, views | `posts`, `images`, `posts/{id}/like`, `…/comments`, `views` | `community_posts`, `community_post_stats`, `community_likes`, `community_comments`, `community_views` |
-| **admin** (`/admin`) | Approve nurses/drivers | `GET users`, `PATCH users/{id}/status` | — |
+| **admin** (`/admin`) | Portal overview, account lists/decisions, staff notifications | `GET overview`; `GET accounts?segment=users\|nurses\|drivers&tab&q&sort&page`, `GET accounts/{id}`, `GET accounts/{id}/reviews`, `POST accounts/{id}/decision` (approve / request_changes / reject / suspend / reactivate, reason required for bad news), `GET accounts-export` (CSV, needs `reports.export`); `GET notifications`, `unread-count`, `POST notifications/{id}/read`, `read-all`; legacy `GET users`, `PATCH users/{id}/status` | `account_reviews`, `admin_notifications`, `admin_notification_reads` |
+| **admin ops** (`/admin/rides`, `/calls`, `/payouts`, `/support`, `/kyc`, `/community/*`, `/analytics`, `/subscriptions/summary`, `/reports/{kind}`) | Portal screens: emergency rides, nurse calls (mother shown only as `USR-xxxx`), driver payouts (mark paid), support status, KYC queue, community moderation (reports → dismiss/review/remove/escalate), platform analytics, subscription revenue (estimated, no payment provider), 7 CSV reports | list + detail per screen; `POST payouts/{ride}/verify`, `support/{id}/status`, `community/posts/{id}/action`; app side: `POST /community/posts/{id}/report`, `GET /community/report-reasons` | `ride_payouts`, `community_reports`, `community_moderation`; `staff.phone/timezone/avatar_url`; `support_messages.resolved_by/updated_at` |
+| **staff** (`/admin/auth`, `/admin/staff`, `/admin/roles`, `/admin/permissions`, `/admin/audit-logs`) | Admin-portal staff accounts, two-step sign-in, RBAC | `auth/login` → `auth/mfa/verify` (+ `mfa/resend`, `refresh`, `logout`, `me`, invite/reset/TOTP); staff invite/update/suspend; role CRUD | `staff`, `staff_roles`, `staff_sessions`, `staff_login_challenges`, `staff_action_tokens`, `staff_audit_logs` |
 | **health** (`/health`) | Liveness + DB check | `GET /` | `health_checks` |
 
 ### 5.5 Data model essentials

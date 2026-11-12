@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_admin_user, get_current_user
+from app.api.deps import get_current_user
+from app.modules.staff.deps import StaffContext, require_permission
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal, get_db
 from app.core.mongo_db import get_mongo_db
@@ -79,7 +80,7 @@ async def opened(checkin_id: int, current_user: User = Depends(get_current_user)
 # ── admin: see who would be messaged, or run a pass by hand ─────────────────────────────────────────
 
 @router.get("/admin/preview")
-async def preview(admin: User = Depends(get_admin_user)):
+async def preview(admin: StaffContext = Depends(require_permission("checkins.manage"))):
     """Dry run of the next pass: who is due, and how many were held back by which guard. Sends nothing."""
     mongo = get_mongo_db()
     daily = await service.run_cycle(AsyncSessionLocal, mongo, dry_run=True)
@@ -88,7 +89,7 @@ async def preview(admin: User = Depends(get_admin_user)):
 
 
 @router.post("/admin/run")
-async def run_now(confirm: bool = False, limit: Optional[int] = None, admin: User = Depends(get_admin_user)):
+async def run_now(confirm: bool = False, limit: Optional[int] = None, admin: StaffContext = Depends(require_permission("checkins.manage"))):
     """Send one real pass now (for external cron or a manual kick). `confirm=true` is required."""
     if not confirm:
         raise HTTPException(status_code=400, detail="Pass confirm=true to send real messages (use /admin/preview first)")

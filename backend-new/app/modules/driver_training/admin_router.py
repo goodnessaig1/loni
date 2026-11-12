@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
-from app.api.deps import get_admin_user
+from app.modules.staff.deps import StaffContext, require_permission
 from app.core.database import get_db
 from app.modules.driver_training import service
 from app.modules.driver_training.models import AptitudeAttempt, AptitudeQuestion
@@ -29,7 +29,7 @@ async def list_questions(
     is_visible: Optional[bool] = Query(None, description="Filter by visibility"),
     category: Optional[str] = Query(None, description="Filter by category"),
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    admin: StaffContext = Depends(require_permission("aptitude.manage")),
 ):
     """The full question bank, **including the correct answer** (admin only)."""
     query = select(AptitudeQuestion).order_by(AptitudeQuestion.id)
@@ -45,7 +45,7 @@ async def list_questions(
 async def create_question(
     data: CreateQuestionRequest,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    admin: StaffContext = Depends(require_permission("aptitude.manage")),
 ):
     """Add a question to the bank (beyond the bundled seed set)."""
     _validate_answer_index(data.answer_index, data.options)
@@ -72,7 +72,7 @@ async def update_question(
     question_id: int,
     data: UpdateQuestionRequest,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    admin: StaffContext = Depends(require_permission("aptitude.manage")),
 ):
     """Edit a question's text, options, correct answer, category or visibility."""
     result = await db.execute(select(AptitudeQuestion).where(AptitudeQuestion.id == question_id))
@@ -99,7 +99,7 @@ async def toggle_question_visibility(
     question_id: int,
     data: ToggleVisibilityRequest,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    admin: StaffContext = Depends(require_permission("aptitude.manage")),
 ):
     """Show or hide a single question. Hidden questions are never served or graded."""
     result = await db.execute(select(AptitudeQuestion).where(AptitudeQuestion.id == question_id))
@@ -117,7 +117,7 @@ async def toggle_question_visibility(
 async def delete_question(
     question_id: int,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    admin: StaffContext = Depends(require_permission("aptitude.manage")),
 ):
     """Permanently remove a question. Prefer toggling visibility off instead."""
     result = await db.execute(select(AptitudeQuestion).where(AptitudeQuestion.id == question_id))
@@ -131,7 +131,7 @@ async def delete_question(
 @router.post("/questions/seed")
 async def seed_questions(
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    admin: StaffContext = Depends(require_permission("aptitude.manage")),
 ):
     """Seed / refresh the bundled question bank. Safe to run any time."""
     summary = await service.seed_questions(db, load_aptitude_questions())
@@ -142,7 +142,7 @@ async def seed_questions(
 async def list_attempts(
     user_id: Optional[str] = Query(None, description="Filter to one driver's attempts"),
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user),
+    admin: StaffContext = Depends(require_permission("aptitude.manage")),
 ):
     """Audit log of graded aptitude attempts (newest first)."""
     query = select(AptitudeAttempt).order_by(AptitudeAttempt.created_at.desc())

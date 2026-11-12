@@ -6,7 +6,8 @@ from typing import List, Optional
 import asyncio
 
 from app.core.database import get_db
-from app.api.deps import get_admin_user
+from app.modules.staff.deps import StaffContext, get_current_staff, client_info, ClientInfo
+from app.modules.staff.service import audit
 from app.modules.users.models import User, UserTypeEnum, AccountStatusEnum
 from app.modules.users.schemas import UserResponse
 from app.modules.admin.schemas import UpdateAccountStatusRequest
@@ -16,17 +17,28 @@ from app.core.ws_manager import manager as ws_manager
 
 router = APIRouter()
 
+# Nurses and drivers have their own permissions (a verification officer needn't see every mother);
+# everyone else falls under users.*.
+VIEW_PERMISSION = {UserTypeEnum.nurse: "nurses.view", UserTypeEnum.driver: "drivers.view"}
+MANAGE_PERMISSION = {UserTypeEnum.nurse: "nurses.manage", UserTypeEnum.driver: "drivers.manage"}
+
+
+def _require(staff: StaffContext, permission: str) -> None:
+    if not staff.can(permission):
+        raise HTTPException(status_code=403, detail="You don't have access to this.")
+
 @router.get("/users", response_model=List[UserResponse])
 async def get_users_by_status(
     account_status: Optional[AccountStatusEnum] = Query(None, description="Filter users by account status"),
     user_type: Optional[UserTypeEnum] = Query(None, description="Filter users by user type (e.g. nurse, driver)"),
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user)
+    staff: StaffContext = Depends(get_current_staff)
 ):
     """
     Get users based on their account status and/or user type.
-    Requires admin privileges.
+    Needs nurses.view / drivers.view for those types, users.view otherwise.
     """
+    _require(staff, VIEW_PERMISSION.get(user_type, "users.view"))
     query = select(User).options(
         selectinload(User.nurse_profile),
         selectinload(User.driver_profile)
@@ -47,11 +59,12 @@ async def update_user_status(
     user_id: str,
     data: UpdateAccountStatusRequest,
     db: AsyncSession = Depends(get_db),
-    admin: User = Depends(get_admin_user)
+    staff: StaffContext = Depends(get_current_staff),
+    client: ClientInfo = Depends(client_info),
 ):
     """
     Update a user's account status (e.g., active,pending or suspended account).
-    Requires admin privileges.
+    Needs nurses.manage / drivers.manage for those types, users.manage otherwise.
     """
     result = await db.execute(
         select(User)
@@ -62,10 +75,15 @@ async def update_user_status(
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
+
+    _require(staff, MANAGE_PERMISSION.get(user.user_type, "users.manage"))
+
     old_status = user.account_status
     user.account_status = data.status
     db.add(user)
+    await audit(db, "user.status_changed", staff.id, client, "user", user.id,
+                {"before": old_status.value if old_status else None, "after": data.status.value,
+                 "user_type": user.user_type.value if user.user_type else None})
     await db.commit()
     await db.refresh(user)
     

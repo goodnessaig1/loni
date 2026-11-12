@@ -173,7 +173,27 @@ class Settings(BaseSettings):
     # Safety-net sweep for call/ride timeouts that survive restarts and deploys.
     TIMEOUT_SWEEP_SECONDS: int = 15
     RATE_LIMITS_ENABLED: bool = True
-    
+
+    # ---- Admin portal (staff accounts, RBAC, 2FA; app/modules/staff) ------------------------
+    # Staff tokens are signed with their own key and audience, so a mobile-app token can never be
+    # used on the admin API (and the reverse). Empty = derived from SECRET_KEY; set it in production.
+    ADMIN_JWT_SECRET: str = ""
+    # Key that encrypts authenticator-app (TOTP) secrets at rest. Empty = derived from SECRET_KEY.
+    ADMIN_ENCRYPTION_KEY: str = ""
+    ADMIN_ACCESS_TOKEN_MINUTES: int = 15        # short-lived; the portal refreshes it silently
+    ADMIN_SESSION_IDLE_MINUTES: int = 60        # signed out after this long without activity
+    ADMIN_SESSION_MAX_HOURS: int = 12           # and always after this, whatever the activity
+    ADMIN_MFA_CODE_MINUTES: int = 10            # lifetime of an emailed sign-in code
+    ADMIN_MFA_MAX_ATTEMPTS: int = 5             # wrong codes before the sign-in must start again
+    ADMIN_LOGIN_MAX_FAILURES: int = 5           # wrong passwords in a row before the account locks
+    ADMIN_LOCKOUT_MINUTES: int = 15
+    ADMIN_INVITE_HOURS: int = 72
+    ADMIN_RESET_MINUTES: int = 30
+    ADMIN_PORTAL_URL: str = "http://localhost:3000"  # links in invite / reset emails
+    # When set, every /admin/* call must carry X-Admin-Gateway: <this>, so only the portal's
+    # server (which holds it) can reach the admin API, and its X-Admin-Client-IP header is trusted.
+    ADMIN_GATEWAY_SECRET: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

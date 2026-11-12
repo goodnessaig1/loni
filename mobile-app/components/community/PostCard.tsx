@@ -6,6 +6,7 @@ import { Avatar } from '../Avatar';
 import { HelixaText } from '../HelixaText';
 import { CommentIcon, HeartIcon } from './CommunityIcons';
 import { InlineComments } from './InlineComments';
+import { ReportModal } from './ReportModal';
 import { ViewerStack } from './ViewerStack';
 import type { CommunityPost } from '../../api/community';
 import { formatCount } from '../../lib/formatCount';
@@ -26,6 +27,7 @@ function PostCardBase({ post, onDelete }: Props) {
   const { colors, isDark } = useTheme();
   const toggleLike = useToggleLike(post.id);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   // The heart pops whenever it flips to liked.
   const pop = useRef(new Animated.Value(1)).current;
@@ -44,6 +46,13 @@ function PostCardBase({ post, onDelete }: Props) {
     Alert.alert('Delete this post?', 'It will be removed from the community for everyone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => onDelete(post) },
+    ]);
+
+  // Someone else's post: the menu offers reporting it to the LONI team.
+  const openOptions = () =>
+    Alert.alert('Post options', undefined, [
+      { text: 'Report post', style: 'destructive', onPress: () => setReportOpen(true) },
+      { text: 'Cancel', style: 'cancel' },
     ]);
 
   return (
@@ -65,11 +74,13 @@ function PostCardBase({ post, onDelete }: Props) {
             <HelixaText style={{ fontSize: 14, color: colors.textSecondary }}>{relativeTime(post.created_at)}</HelixaText>
           </View>
         </View>
-        {post.is_mine && (
-          <TouchableOpacity onPress={confirmDelete} hitSlop={12} accessibilityLabel="Delete post" style={{ padding: 4 }}>
-            <Feather name="more-horizontal" size={22} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={post.is_mine ? confirmDelete : openOptions}
+          hitSlop={12}
+          accessibilityLabel={post.is_mine ? 'Delete post' : 'Post options'}
+          style={{ padding: 4 }}>
+          <Feather name="more-horizontal" size={22} color={colors.textSecondary} />
+        </TouchableOpacity>
       </View>
 
       {!!post.body && (
@@ -117,6 +128,10 @@ function PostCardBase({ post, onDelete }: Props) {
       </View>
 
       {commentsOpen && <InlineComments post={post} />}
+
+      {!post.is_mine && reportOpen && (
+        <ReportModal visible={reportOpen} postId={post.id} authorName={post.author.name} onClose={() => setReportOpen(false)} />
+      )}
     </View>
   );
 }

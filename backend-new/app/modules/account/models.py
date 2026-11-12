@@ -24,5 +24,8 @@ class SupportMessage(Base):
     email = Column(String(255), nullable=False)
     subject = Column(String(120), nullable=False)
     message = Column(Text, nullable=False)
+    # open | in_progress | resolved
     status = Column(String(20), nullable=False, default='open', server_default='open')
+    resolved_by = Column(String(12), ForeignKey('staff.id', ondelete='SET NULL'), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
