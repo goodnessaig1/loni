@@ -4,8 +4,27 @@
     {
       "name": "loni-admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "loni-admin", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "loni-admin",
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "loni-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "loni-web",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5173"
+      ],
+      "port": 5173
     }
   ]
 }

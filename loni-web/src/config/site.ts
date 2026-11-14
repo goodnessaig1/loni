@@ -5,6 +5,8 @@ export const SITE = {
   supportEmail: 'support@lonimum.com',
   supportHref: 'mailto:support@lonimum.com',
   downloadHref: '#download',
+  appStoreHref: '#download',
+  playStoreHref: '#download',
   joinDriverHref: '#drivers',
   joinNurseHref: '#nurses',
   talkToNurseHref: '#talk-to-a-nurse',

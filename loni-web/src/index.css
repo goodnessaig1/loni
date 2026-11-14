@@ -5,6 +5,9 @@
 
   --color-brand: #d62d88;
   --color-hero-base: #f7389d;
+  /* The hero's soft blush panel and its deeper accent pink (headline, tag, buttons, stars). */
+  --color-blush: #fcedf4;
+  --color-blush-deep: #c63a85;
 }
 
 @layer base {
