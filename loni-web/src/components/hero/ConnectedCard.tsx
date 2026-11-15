@@ -14,16 +14,16 @@ export function ConnectedCard({ className = '' }: { className?: string }) {
         ease: [0.16, 1, 0.3, 1],
       }}
       whileHover={{ y: -4, scale: 1.02 }}
-      className={`flex w-[15.5rem] gap-2 rounded-2xl bg-white p-2 text-neutral-900 shadow-xl shadow-black/5 lg:w-[17.5rem] ${className}`}
+      className={`flex h-[115px] w-[282px] gap-[23px] rounded-[12px] bg-white py-[7px] pr-[7px] pl-[15px] text-black ${className}`}
     >
-      <div className="flex flex-1 flex-col justify-between py-1.5 pl-2">
-        <p className="max-w-[9rem] text-sm font-semibold leading-snug lg:text-[15px]">Connected through every step</p>
-        <img src={avatars} alt="" className="h-7 w-auto self-start lg:h-8" draggable={false} />
+      <div className="flex flex-1 flex-col justify-between py-[7px]">
+        <p className="font-dm text-[14px] leading-[21px] font-medium">Connected through every step</p>
+        <img src={avatars} alt="" className="h-[30px] w-auto self-start" draggable={false} />
       </div>
       <img
         src={couple}
         alt="A couple expecting, with family"
-        className="size-[5.5rem] shrink-0 rounded-xl object-cover lg:size-[6.25rem]"
+        className="size-[101px] shrink-0 rounded-[10px] object-cover"
         draggable={false}
       />
     </motion.div>
