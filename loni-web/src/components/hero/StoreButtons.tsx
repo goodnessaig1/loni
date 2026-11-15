@@ -17,8 +17,11 @@ function PlayIcon({ className = '' }: { className?: string }) {
   );
 }
 
+// Desktop design: 53 px tall pills, radius 45, padding 25 left / 9 right, 9 px gap, 7 px between the two.
+// Mobile design: the same pills scaled down (41 px tall) so both fit side by side on a phone.
 const base =
-  'group inline-flex h-12 items-center gap-3 rounded-full pl-5 pr-2 text-left leading-tight transition-transform sm:h-[3.25rem]';
+  'group inline-flex h-[41px] items-center gap-[7px] rounded-[45px] pr-[7px] pl-[16px] text-left font-inter text-[10.5px] leading-[13px] font-medium tracking-[-0.1px] whitespace-nowrap transition-transform sm:h-[53px] sm:gap-[9px] sm:pr-[9px] sm:pl-[25px] sm:text-[13px] sm:leading-[17px]';
+const circle = 'grid size-[26px] shrink-0 place-items-center rounded-full sm:size-[33px]';
 
 /** "Download on the App Store" (filled pink) and "Get it on Google Play" (white) pills. */
 export function StoreButtons({ className = '' }: { className?: string }) {
@@ -28,34 +31,34 @@ export function StoreButtons({ className = '' }: { className?: string }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
-      className={`flex flex-wrap gap-3 ${className}`}
+      className={`flex flex-wrap gap-[7px] ${className}`}
     >
       <a
         href={SITE.appStoreHref}
         aria-label="Download LONI on the App Store"
-        className={`${base} bg-blush-deep text-white shadow-lg shadow-blush-deep/20 hover:-translate-y-0.5`}
+        className={`${base} bg-blush-deep text-white hover:-translate-y-0.5`}
       >
-        <span className="text-[13px] font-semibold sm:text-sm">
+        <span className="flex-1">
           Download on the
           <br />
           App Store
         </span>
-        <span className="grid size-8 place-items-center rounded-full bg-white text-blush-deep sm:size-9">
-          <AppleIcon className="size-[18px]" />
+        <span className={`${circle} bg-white text-blush-deep`}>
+          <AppleIcon className="size-[14px] sm:size-[18px]" />
         </span>
       </a>
       <a
         href={SITE.playStoreHref}
         aria-label="Get LONI on Google Play"
-        className={`${base} bg-white text-neutral-900 shadow-lg shadow-black/5 hover:-translate-y-0.5`}
+        className={`${base} w-[128px] bg-white text-black sm:w-[168px] hover:-translate-y-0.5`}
       >
-        <span className="text-[13px] font-semibold sm:text-sm">
+        <span className="flex-1">
           Get it on
           <br />
           Google Play
         </span>
-        <span className="grid size-8 place-items-center rounded-full bg-blush-deep text-white sm:size-9">
-          <PlayIcon className="ml-0.5 size-4" />
+        <span className={`${circle} bg-blush-deep text-white`}>
+          <PlayIcon className="ml-0.5 size-3 sm:size-4" />
         </span>
       </a>
     </motion.div>
