@@ -3,7 +3,8 @@ WebSocket endpoint used for real-time call signaling (Issue 1, 2, 8, 10, 11).
 
 Client connects once per app-foreground session:
 
-    wss://<host>/api/v1/calls/ws?token=<JWT access token>
+    wss://<host>/api/v1/calls/ws?ticket=<60s ticket from POST /calls/ws-ticket>
+    (legacy: ?token=<JWT access token>, still accepted for older app builds)
 
 The server pushes JSON frames shaped like:
 
@@ -25,7 +26,9 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from jose import jwt, JWTError
 
 from app.core.config import settings
-from app.core.security import ALGORITHM
+from app.core.database import AsyncSessionLocal
+from app.core.security import ALGORITHM, WS_TICKET_TYPE
+from app.modules.users.models import AccountStatusEnum, User
 from app.core.ws_manager import manager
 
 logger = logging.getLogger("calls.ws")
@@ -35,17 +38,39 @@ ALLOWED_TOPICS = {"community"}
 router = APIRouter()
 
 
-async def _authenticate(token: str) -> str | None:
+async def _authenticate(ticket: str | None, token: str | None) -> str | None:
+    """Prefer the 60-second ws ticket (POST /calls/ws-ticket). The full access token is still
+    accepted for app builds that predate tickets; drop `token` once those are gone.
+    Either way the account must still exist and not be suspended."""
+    raw = ticket or token
+    if not raw:
+        return None
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("sub")
+        payload = jwt.decode(raw, settings.SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
         return None
+    typ = payload.get("typ")
+    if ticket and typ != WS_TICKET_TYPE:
+        return None
+    if not ticket and typ is not None:
+        return None
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+    try:
+        async with AsyncSessionLocal() as db:
+            user = await db.get(User, user_id)
+    except Exception as e:  # database unreachable: refuse rather than let anyone in
+        logger.warning("WS auth lookup failed: %s", e)
+        return None
+    if not user or user.account_status == AccountStatusEnum.suspended:
+        return None
+    return str(user_id)
 
 
 @router.websocket("/ws")
-async def call_signaling_socket(websocket: WebSocket, token: str = Query(...)):
-    user_id = await _authenticate(token)
+async def call_signaling_socket(websocket: WebSocket, ticket: str | None = Query(None), token: str | None = Query(None)):
+    user_id = await _authenticate(ticket, token)
     if not user_id:
         # Must accept before close per ASGI spec, or reject with a close code.
         await websocket.close(code=4401)

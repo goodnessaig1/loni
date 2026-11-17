@@ -15,8 +15,9 @@
  * or a flicker back to a stale screen.
  */
 import { apiClient } from '../api/client';
-import { useCallStore, ParticipantInfo } from '../store/callStore';
+import { useCallStore, ParticipantInfo, isFinished } from '../store/callStore';
 import { reportConnected, reportCallEnded } from './callKeepService';
+import { reportCallProblem } from './callReport';
 
 export type ServerCallEventType =
   | 'incoming_call'
@@ -56,15 +57,38 @@ function toParticipant(raw: any): ParticipantInfo | null {
   };
 }
 
+/** POST /join, retried briefly on network errors and 5xx (a 4xx means the call is gone: no retry). */
+async function joinWithRetry(callId: number, attempts = 3) {
+  let last: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await apiClient.post(`/calls/${callId}/join`);
+    } catch (e: any) {
+      last = e;
+      const status = e?.response?.status;
+      if (status && status < 500) throw e;
+      if (useCallStore.getState().callId !== callId) throw e;
+      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
 export async function applyServerCallEvent(type: string, data: any) {
   const store = useCallStore.getState();
   const callId = data?.call_id ? Number(data.call_id) : null;
 
   switch (type) {
     case 'incoming_call': {
-      if (callId == null) return;
-      // A brand new incoming call always wins over whatever we were
-      // tracking (there is at most one active call per user in this app).
+      if (callId == null || isFinished(callId)) return;
+      if (store.callId === callId) return; // the same ring delivered twice (WebSocket + push)
+      // Already on (or placing) a call: never drop it for a new one. Unmounting the room would cut
+      // her current call while the server still has it live. Decline the newcomer instead, so the
+      // other side hears straight away rather than ringing out.
+      if (store.status !== 'IDLE') {
+        apiClient.post(`/calls/${callId}/reject`).catch(() => { /* it times out server-side anyway */ });
+        return;
+      }
       store.setIncomingCall(callId, data.room_name, toParticipant(data.caller), {
         kind: data.kind === 'ride' ? 'ride' : 'nurse',
         rideId: data.ride_id != null ? Number(data.ride_id) : null,
@@ -85,7 +109,8 @@ export async function applyServerCallEvent(type: string, data: any) {
       joinInFlight.add(callId);
       store.setAccepted({ remote: toParticipant(data.receiver) });
       try {
-        const res = await apiClient.post(`/calls/${callId}/join`);
+        const res = await joinWithRetry(callId);
+        if (useCallStore.getState().callId !== callId) return; // she hung up meanwhile
         store.setConnecting({
           callId,
           roomToken: res.data.token,
@@ -93,7 +118,14 @@ export async function applyServerCallEvent(type: string, data: any) {
           remote: toParticipant(res.data.participant) ?? toParticipant(data.receiver),
         });
       } catch (e) {
+        // Used to only log, leaving her on "accepted - connecting..." until she cancelled.
         console.error('[callEvents] Failed to join accepted call', e);
+        reportCallProblem(callId, 'join_failed', (e as any)?.response?.status ? `HTTP ${(e as any).response.status}` : e);
+        if (useCallStore.getState().callId === callId) {
+          useCallStore.getState().endCall('FAILED');
+          try { reportCallEnded(callId); } catch { /* CallKeep off */ }
+          apiClient.post(`/calls/${callId}/end`).catch(() => { /* the server sweeps it */ });
+        }
       } finally {
         joinInFlight.delete(callId);
       }

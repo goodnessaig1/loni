@@ -1,6 +1,27 @@
 import { useCallback } from 'react';
 import { useCallStore, ParticipantInfo } from '../store/callStore';
 import { apiClient } from '../api/client';
+import { requestMicrophonePermission } from '../lib/permissions';
+import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
+
+/**
+ * Ask for the microphone BEFORE the call is placed or answered (not after the other side picks up,
+ * which left them talking to silence behind a permission dialog), and - with it granted - start the
+ * Android call foreground service now, while the app is certainly in the foreground.
+ */
+async function prepareForCall(): Promise<void> {
+  try {
+    if ((await requestMicrophonePermission()) === 'granted') {
+      await startCallForegroundService('LONI call', 'Tap to return to your call');
+    }
+  } catch { /* CallModals asks again and shows "Microphone Required" if needed */ }
+}
+
+/** The call never got going (refused, no nurse, already taken): don't leave the service running. */
+function releaseIfNoCall(): void {
+  const s = useCallStore.getState();
+  if (!s.isActive && !s.isOutgoing) stopCallForegroundService();
+}
 import { startOutgoingCall, reportCallEnded } from '../lib/callKeepService';
 
 function toParticipant(raw: any) {
@@ -32,6 +53,7 @@ export const useCall = () => {
     // One call at a time: a second tap while ringing must not start another call.
     if (useCallStore.getState().status !== 'IDLE') return null;
     try {
+      await prepareForCall();
       const response = await apiClient.post('/calls/request', { nurse_id: opts.nurseId, ride_id: opts.rideId });
       const call = response.data;
       setOutgoingCall(call.id, call.room_name, { kind: call.kind ?? 'nurse', rideId: call.ride_id ?? null }, opts.remote ?? null);
@@ -43,12 +65,14 @@ export const useCall = () => {
       return call;
     } catch (error) {
       console.error('Failed to request call', error);
+      releaseIfNoCall();
       throw error;
     }
   }, [setOutgoingCall]);
 
   const acceptCall = useCallback(async (incomingCallId: number) => {
     try {
+      await prepareForCall();
       const response = await apiClient.post(`/calls/${incomingCallId}/accept`);
       setConnecting({
         callId: incomingCallId,
@@ -59,6 +83,7 @@ export const useCall = () => {
       return response.data;
     } catch (error) {
       console.error('Failed to accept call', error);
+      releaseIfNoCall();
       endCall('FAILED');
       throw error;
     }

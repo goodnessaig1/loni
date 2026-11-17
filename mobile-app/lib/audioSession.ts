@@ -1,49 +1,77 @@
-import { Platform } from 'react-native';
+import { DeviceEventEmitter, EmitterSubscription, Platform } from 'react-native';
 import { AudioSession } from '@livekit/react-native';
 
 /**
- * Issue 1 root cause (the actual "no audio transmission" bug):
- * `@livekit/react-native` requires an explicit, separate call to
- * `AudioSession.startAudioSession()` before connecting to a room - this is
- * NOT the same thing as `registerGlobals()` (which only installs the
- * `RTCPeerConnection`/WebRTC JS API surface) and is NOT automatic on
- * Android. Confirmed by reading the SDK's own source
- * (node_modules/@livekit/react-native/src/audio/AudioSession.ts,
- * AudioManager.ts):
+ * Call audio has ONE owner: LiveKit's `AudioSession`.
  *
- *   - `registerGlobals()` calls `setupIOSAudioManagement()` by default,
- *     which DOES automatically start/stop the audio session in reaction to
- *     the native audio engine's playout/recording state - but that
- *     function is a hard no-op on Android
- *     (`if (Platform.OS !== 'ios') { return () => {}; }`).
- *   - On Android there is no automatic equivalent. Nothing in this app
- *     ever called `AudioSession.startAudioSession()`, so the native
- *     AudioManager mode was never set to `inCommunication`, audio focus
- *     was never requested, and the mic/speaker were never actually
- *     activated for a call - even though signaling could succeed (a
- *     LiveKit room can report "connected" purely at the
- *     ICE/DTLS/SRTP transport level without any of this).
+ * `AudioSession.startAudioSession()` must be called explicitly before connecting (it is what sets the
+ * Android AudioManager to `inCommunication` and takes audio focus; `registerGlobals()` does not do
+ * this on Android).
  *
- * This is why the call could show "Connected" on both ends with a
- * completely silent audio pipeline: every layer above the OS audio
- * session (getUserMedia, track creation, publish, subscribe) can succeed
- * while the actual hardware never opens the mic or routes output.
+ * `react-native-incall-manager` used to be started here as well. Its `start()` takes over the same
+ * Android AudioManager (mode, focus, speakerphone, Bluetooth SCO) and the same iOS AVAudioSession,
+ * so the two libraries fought over routing: Bluetooth falling back to the earpiece, speaker toggles
+ * being reverted. It is now used only for what LiveKit does not do: ringtone/ringback sounds and the
+ * proximity sensor (screen off at the ear). It is never `start()`ed during a call.
+ *
+ * Same file in mobile-app and loni-server-app - keep them identical.
  */
 
 const TAG = '[AudioSession]';
 let started = false;
 
-export async function startCallAudioSession(): Promise<boolean> {
-  if (started) {
-    console.log(TAG, 'startCallAudioSession called but session is already active - skipping');
-    return true;
-  }
+/** Highest first: a connected headset always beats the earpiece; the speaker is opt-in. */
+export const OUTPUT_PRIORITY = ['bluetooth', 'headset', 'earpiece', 'speaker'];
+
+let currentOutput: string = 'earpiece';
+let userPicked: string | null = null;
+let proximitySub: EmitterSubscription | null = null;
+
+function inCallManager(): any | null {
   try {
-    // Must be called before starting the session for the config to apply
-    // (per the SDK's own doc comment on AudioSession.configureAudio).
+    return require('react-native-incall-manager').default;
+  } catch {
+    return null;
+  }
+}
+
+function startProximity() {
+  const icm = inCallManager();
+  if (!icm) return;
+  try {
+    icm.setKeepScreenOn(true);
+    icm.startProximitySensor();
+    if (Platform.OS === 'android' && !proximitySub) {
+      // iOS blanks the screen itself once proximity monitoring is on; Android needs telling, and only
+      // when the call is on the earpiece (not with the phone on the table on speaker).
+      proximitySub = DeviceEventEmitter.addListener('Proximity', (e: { isNear?: boolean }) => {
+        if (e?.isNear && currentOutput === 'earpiece') icm.turnScreenOff();
+        else icm.turnScreenOn();
+      });
+    }
+  } catch (e) {
+    console.warn(TAG, 'proximity sensor unavailable', e);
+  }
+}
+
+function stopProximity() {
+  proximitySub?.remove();
+  proximitySub = null;
+  const icm = inCallManager();
+  if (!icm) return;
+  try {
+    icm.stopProximitySensor();
+    icm.turnScreenOn();
+    icm.setKeepScreenOn(false);
+  } catch { /* nothing to undo */ }
+}
+
+export async function startCallAudioSession(): Promise<boolean> {
+  if (started) return true;
+  try {
     await AudioSession.configureAudio({
       android: {
-        preferredOutputList: ['earpiece', 'speaker', 'headset', 'bluetooth'],
+        preferredOutputList: OUTPUT_PRIORITY as any,
         audioTypeOptions: {
           manageAudioFocus: true,
           audioMode: 'inCommunication',
@@ -58,13 +86,14 @@ export async function startCallAudioSession(): Promise<boolean> {
       },
     });
     await AudioSession.startAudioSession();
-    try {
-      const InCallManager = require('react-native-incall-manager').default;
-      InCallManager.start({ media: 'audio' });
-      InCallManager.setForceSpeakerphoneOn(false);
-    } catch (e) {
-      console.error(TAG, 'InCallManager start failed', e);
+    currentOutput = 'earpiece';
+    userPicked = null;
+    if (Platform.OS === 'android') {
+      // A headset already connected wins from the first second (OUTPUT_PRIORITY): reflect that in
+      // the route icon and in the proximity screen-off, which applies to the earpiece only.
+      try { noteAvailableOutputs(await AudioSession.getAudioOutputs()); } catch { /* keep earpiece */ }
     }
+    startProximity();
     started = true;
     console.log(TAG, 'Audio Session Activated (platform=' + Platform.OS + ')');
     return true;
@@ -78,12 +107,7 @@ export async function startCallAudioSession(): Promise<boolean> {
 export async function stopCallAudioSession(): Promise<void> {
   if (!started) return;
   try {
-    try {
-      const InCallManager = require('react-native-incall-manager').default;
-      InCallManager.stop();
-    } catch (e) {
-      console.error(TAG, 'InCallManager stop failed', e);
-    }
+    stopProximity();
     await AudioSession.stopAudioSession();
     console.log(TAG, 'Audio Session Released');
   } catch (e) {
@@ -93,8 +117,6 @@ export async function stopCallAudioSession(): Promise<void> {
   }
 }
 
-/** Issue 6: audio output device management. `startCallAudioSession` must
- * have been called first (per the SDK's own requirement). */
 export async function listAudioOutputs(): Promise<string[]> {
   try {
     return await AudioSession.getAudioOutputs();
@@ -104,28 +126,40 @@ export async function listAudioOutputs(): Promise<string[]> {
   }
 }
 
+/** The route the call is on, as best this app knows it (Android: what was picked, or what LiveKit
+ * auto-selects by OUTPUT_PRIORITY when a device comes or goes). */
+export function currentAudioOutput(): string {
+  return currentOutput;
+}
+
+/**
+ * Keep `currentAudioOutput()` in step when devices change (headset plugged in, Bluetooth connects):
+ * LiveKit then switches to the highest-priority available device unless the user picked one that is
+ * still there. Returns the route now in use.
+ */
+export function noteAvailableOutputs(outputs: string[]): string {
+  if (userPicked && outputs.includes(userPicked)) {
+    currentOutput = userPicked;
+  } else {
+    userPicked = null;
+    currentOutput = OUTPUT_PRIORITY.find((o) => outputs.includes(o)) ?? currentOutput;
+  }
+  return currentOutput;
+}
+
 export async function selectAudioOutput(deviceId: string): Promise<void> {
   try {
     await AudioSession.selectAudioOutput(deviceId);
+    currentOutput = deviceId;
+    userPicked = deviceId;
     console.log(TAG, 'Audio output switched to', deviceId);
-    try {
-      const InCallManager = require('react-native-incall-manager').default;
-      let route = 'EARPIECE';
-      if (deviceId === 'speaker') route = 'SPEAKER_PHONE';
-      else if (deviceId === 'bluetooth') route = 'BLUETOOTH';
-      else if (deviceId === 'headset') route = 'WIRED_HEADSET';
-      InCallManager.chooseAudioRoute(route);
-    } catch (e) {
-      // Ignore if InCallManager is not available
-    }
+    if (deviceId !== 'earpiece') inCallManager()?.turnScreenOn();
   } catch (e) {
     console.error(TAG, 'selectAudioOutput failed', e);
   }
 }
 
-/** iOS only - shows the native route picker (handles Bluetooth/AirPlay/
- * wired selection UI that iOS otherwise doesn't expose granular control
- * over to apps). */
+/** iOS only: the system route picker (speaker / Bluetooth / AirPods). */
 export async function showNativeAudioRoutePicker(): Promise<void> {
   if (Platform.OS !== 'ios') return;
   try {

@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.core.ratelimit import limit
 from app.modules.users.models import User
-from app.modules.calls.schemas import CallRequest, CallResponse, CallActionResponse, CallRatingRequest, CallHistoryFilter, CallStatsResponse
+from app.modules.calls.schemas import CallRequest, CallResponse, CallActionResponse, CallRatingRequest, CallHistoryFilter, CallStatsResponse, CallClientReport
 from app.modules.calls.services.call_service import CallService, _participant_info
 from app.modules.calls.services.livekit_service import LiveKitService
 from app.modules.calls.services.call_stats import get_user_call_stats
@@ -51,7 +51,16 @@ async def request_call(
     return map_call_response(call)
 
 
-@router.post("/{call_id}/accept", response_model=CallActionResponse)
+@router.post("/ws-ticket", dependencies=[Depends(limit("calls.ws_ticket", 30, 60))])
+async def ws_ticket(current_user: User = Depends(get_current_user)):
+    """Short-lived credential for opening /calls/ws (pass it as ?ticket=...). Keeps the long-lived
+    access token out of the socket URL, which proxies and servers write to their logs."""
+    from app.core.security import create_ws_ticket, WS_TICKET_TTL_SECONDS
+    return {"ticket": create_ws_ticket(str(current_user.id)), "expires_in": WS_TICKET_TTL_SECONDS}
+
+
+@router.post("/{call_id}/accept", response_model=CallActionResponse,
+             dependencies=[Depends(limit("calls.accept", 20, 60))])
 async def accept_call(
     call_id: int,
     current_user: User = Depends(get_current_user),
@@ -80,7 +89,8 @@ async def accept_call(
     )
 
 
-@router.post("/{call_id}/join", response_model=CallActionResponse)
+@router.post("/{call_id}/join", response_model=CallActionResponse,
+             dependencies=[Depends(limit("calls.join", 30, 60))])
 async def join_call(
     call_id: int,
     current_user: User = Depends(get_current_user),
@@ -110,7 +120,8 @@ async def join_call(
     )
 
 
-@router.post("/{call_id}/reject", response_model=CallActionResponse)
+@router.post("/{call_id}/reject", response_model=CallActionResponse,
+             dependencies=[Depends(limit("calls.reject", 30, 60))])
 async def reject_call(
     call_id: int,
     current_user: User = Depends(get_current_user),
@@ -120,7 +131,8 @@ async def reject_call(
     return CallActionResponse(success=True, message="Call rejected", call=map_call_response(call))
 
 
-@router.post("/{call_id}/end", response_model=CallActionResponse)
+@router.post("/{call_id}/end", response_model=CallActionResponse,
+             dependencies=[Depends(limit("calls.end", 30, 60))])
 async def end_call(
     call_id: int,
     current_user: User = Depends(get_current_user),
@@ -130,7 +142,7 @@ async def end_call(
     return CallActionResponse(success=True, message="Call ended", call=map_call_response(call))
 
 
-@router.post("/{call_id}/rate")
+@router.post("/{call_id}/rate", dependencies=[Depends(limit("calls.rate", 10, 60))])
 async def rate_call(
     call_id: int,
     request: CallRatingRequest,
@@ -163,6 +175,21 @@ async def get_stats(
 ):
     stats = await get_user_call_stats(db, str(current_user.id))
     return stats
+
+
+@router.post("/{call_id}/client-report", status_code=202,
+             dependencies=[Depends(limit("calls.client_report", 20, 60))])
+async def client_report(
+    call_id: int,
+    report: CallClientReport,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """The phones' side of a failed call (no crash-reporting SDK yet): stored on the call's event
+    trail next to the server's own transitions and LiveKit webhooks, and logged with the call id,
+    so a failed call can be reconstructed end to end."""
+    await CallService.record_client_report(db, call_id, str(current_user.id), report)
+    return {"success": True}
 
 
 @router.get("/{call_id}/state")

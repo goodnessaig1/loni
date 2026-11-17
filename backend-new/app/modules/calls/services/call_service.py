@@ -46,6 +46,36 @@ TERMINAL_STATUSES = {
 }
 
 
+# Account types that may start a nurse call (mothers; `rider` is the legacy name for the same person).
+MOTHER_TYPES = (UserTypeEnum.user, UserTypeEnum.rider)
+
+# A LiveKit token is only handed out once someone has answered and until the call is over.
+JOINABLE_STATUSES = IN_CALL_STATUSES
+
+# Background tasks are kept referenced until they finish: asyncio holds only a weak reference to a
+# task, so a fire-and-forget create_task() can be garbage-collected before it runs.
+_background: set = set()
+
+
+def spawn(coro) -> asyncio.Task:
+    task = asyncio.create_task(coro)
+    _background.add(task)
+
+    def _done(t: asyncio.Task) -> None:
+        _background.discard(t)
+        if not t.cancelled() and t.exception() is not None:
+            logger.error("background call task failed: %r", t.exception())
+
+    task.add_done_callback(_done)
+    return task
+
+
+async def _locked(db: AsyncSession, call_id: int) -> Call | None:
+    """Re-read one call under a row lock (no-op on SQLite), always fresh from the database."""
+    stmt = select(Call).where(Call.id == call_id).with_for_update().execution_options(populate_existing=True)
+    return (await db.execute(stmt)).scalar_one_or_none()
+
+
 def _participant_info(user: User) -> ParticipantInfo:
     """Builds the real caller/receiver payload (Issue 6, Issue 7) by reusing
     enrich_user_data, which already knows how to compute trimester /
@@ -89,7 +119,7 @@ async def _emit(user_id: str, event_type: str, title: str, body: str, data: dict
     """
     delivered_over_ws = await ws_manager.send_to_user(user_id, event_type, data)
     logger.info("emit %s to user=%s (ws_delivered=%s)", event_type, user_id, delivered_over_ws)
-    asyncio.create_task(NotificationService.notify_user(user_id, title, body, {"type": event_type, **data}))
+    spawn(NotificationService.notify_user(user_id, title, body, {"type": event_type, **data}))
 
 
 class CallService:
@@ -114,6 +144,15 @@ class CallService:
 
         # Who will be rung: the named person, or every nurse who can take a call right now.
         if receiver_id:
+            # The person she is calling is already talking to someone: tell her now instead of
+            # ringing over their call (their app would otherwise have to pick one of the two).
+            busy = (await db.execute(select(Call.id).where(
+                Call.status.in_(IN_CALL_STATUSES),
+                or_(Call.caller_id == receiver_id, Call.receiver_id == receiver_id),
+            ))).first()
+            if busy:
+                await db.commit()
+                raise HTTPException(status_code=409, detail="They are on another call right now. Please try again shortly.")
             rung = [receiver_id]
         else:
             rung = await CallService._available_nurses(db, exclude=caller_id)
@@ -158,11 +197,13 @@ class CallService:
             "ride_id": call.ride_id,
         }
 
-        body = f"{caller_info.name} is calling you." if receiver_id else f"{caller_info.name} needs a nurse."
+        # Lock-screen text: first name only, nothing about the pregnancy.
+        first = (caller_info.name or "").split(" ")[0] or "Someone"
+        body = f"{first} is calling you." if receiver_id else f"{first} needs a nurse."
         for uid in rung:
-            asyncio.create_task(_emit(uid, "incoming_call", "Incoming Call", body, payload))
+            spawn(_emit(uid, "incoming_call", "Incoming Call", body, payload))
 
-        asyncio.create_task(CallService._ring_timeout_watchdog(call.id))
+        spawn(CallService._ring_timeout_watchdog(call.id))
 
         return call
 
@@ -211,12 +252,12 @@ class CallService:
         data = {"call_id": str(call.id), "status": status.value}
         for uid in await CallService.rung_ids(db, call):
             if uid != by:
-                asyncio.create_task(_emit(uid, "call_ended" if status == CallStatusEnum.CANCELLED else "call_missed",
+                spawn(_emit(uid, "call_ended" if status == CallStatusEnum.CANCELLED else "call_missed",
                                           "Call ended" if status == CallStatusEnum.CANCELLED else "Missed call",
                                           "The mother ended the request." if status == CallStatusEnum.CANCELLED else "You missed a call.",
                                           data))
         if notify_caller and call.caller_id != by:
-            asyncio.create_task(_emit(call.caller_id, "call_timeout", "No answer", "No one answered your call.", data))
+            spawn(_emit(call.caller_id, "call_timeout", "No answer", "No one answered your call.", data))
 
     @staticmethod
     async def _resolve_receiver(db: AsyncSession, caller_id: str, request: CallRequest) -> tuple[str, str | None]:
@@ -229,6 +270,11 @@ class CallService:
             if ride.status not in RIDE_ACTIVE_STATUSES or not ride.driver_id:
                 raise HTTPException(status_code=400, detail="You can only call during an active ride.")
             return "ride", (ride.driver_id if caller_id == ride.rider_id else ride.rider_id)
+        # Nurse calls are the mothers' service: drivers, nurses, partners and staff cannot ring
+        # the nurse pool (or a named nurse) through this endpoint.
+        caller = await db.get(User, caller_id)
+        if not caller or caller.user_type not in MOTHER_TYPES:
+            raise HTTPException(status_code=403, detail="Only mothers can call a LONI nurse.")
         if request.nurse_id:
             nurse = await db.get(User, request.nurse_id)
             if not nurse or nurse.user_type != UserTypeEnum.nurse:
@@ -332,6 +378,13 @@ class CallService:
             raise HTTPException(status_code=403, detail="This call is not for you.")
         if not call.receiver_id and nurse.user_type != UserTypeEnum.nurse:
             raise HTTPException(status_code=403, detail="Only a LONI nurse can answer this call.")
+        # A nurse must be approved to talk to a mother at all (pending review or suspended: no), and
+        # an open call can only be answered by a nurse it was actually offered to - not by anyone
+        # who guesses its (sequential) id.
+        if nurse.user_type == UserTypeEnum.nurse and nurse.account_status != AccountStatusEnum.active:
+            raise HTTPException(status_code=403, detail="Your account is not approved to take calls yet.")
+        if not call.receiver_id and nurse_id not in await CallService.rung_ids(db, call):
+            raise HTTPException(status_code=403, detail="This call was not offered to you.")
         if nurse_id == call.caller_id:
             raise HTTPException(status_code=400, detail="You cannot answer your own call.")
         busy = (await db.execute(select(Call.id).where(
@@ -386,33 +439,43 @@ class CallService:
         # 2: "do not wait for LiveKit to finish connecting before updating
         # the caller") proceeds independently below and afterward on the
         # client side via its own POST /join call.
-        asyncio.create_task(_emit(
+        spawn(_emit(
             call.caller_id, "call_accepted", "Call Accepted", f"{nurse_info.name} accepted your call.", accepted_data
         ))
         # Everyone else who was rung stops ringing (their apps clear the request on `call_accepted`).
         taken = {"call_id": str(call.id), "status": CallStatusEnum.ACCEPTED.value, "taken": True}
         for uid in await CallService.rung_ids(db, call):
             if uid != nurse_id:
-                asyncio.create_task(_emit(uid, "call_accepted", "Call answered", "Another nurse answered this call.", taken))
+                spawn(_emit(uid, "call_accepted", "Call answered", "Another nurse answered this call.", taken))
+        # ...and so do the answerer's OTHER phones (signed in on two devices): same event, flagged so
+        # the phone that answered ignores it (loni-server-app `answering` set). Nurse/driver app only:
+        # the mother app's call_accepted handler is for calls she placed.
+        if nurse.user_type in (UserTypeEnum.nurse, UserTypeEnum.driver):
+            spawn(_emit(nurse_id, "call_accepted", "Call answered", "You answered this call on another device.",
+                        {**taken, "answered_here": True}))
 
         # --- Step 2: create the LiveKit room (overlaps with the caller
         # processing the notification above and calling POST /join) ---
+        # The call row is unlocked while this awaits, so by the time it returns the caller may
+        # have hung up, or both sides may already be CONNECTED via the webhook. Every write
+        # below re-reads the row and only moves it on from the state we left it in.
         try:
             await LiveKitService.create_room(call.room_name)
         except Exception as e:
             logger.error("Failed to create LiveKit room for call %s: %s", call.id, e)
-            fail_stmt = select(Call).where(Call.id == call_id).with_for_update()
-            fail_result = await db.execute(fail_stmt)
-            call = fail_result.scalar_one_or_none()
-            call.status = CallStatusEnum.FAILED
-            call.ended_at = datetime.now(timezone.utc)
-            db.add(CallEvent(call_id=call.id, event_type="CallFailed", payload={"reason": str(e)}))
-            await db.commit()
-            data = {"call_id": str(call.id), "status": CallStatusEnum.FAILED.value}
-            # Both sides need to hear about this now, since the caller was
-            # already told "accepted" a moment ago.
-            asyncio.create_task(_emit(call.caller_id, "call_failed", "Call Failed", "Could not start the call.", data))
-            asyncio.create_task(_emit(nurse_id, "call_failed", "Call Failed", "Could not start the call.", data))
+            call = await _locked(db, call_id)
+            if call.status in (CallStatusEnum.ACCEPTED, CallStatusEnum.CONNECTING):
+                call.status = CallStatusEnum.FAILED
+                call.ended_at = datetime.now(timezone.utc)
+                db.add(CallEvent(call_id=call.id, event_type="CallFailed", payload={"reason": str(e)[:200]}))
+                await db.commit()
+                data = {"call_id": str(call.id), "status": CallStatusEnum.FAILED.value}
+                # Both sides need to hear about this now, since the caller was
+                # already told "accepted" a moment ago.
+                spawn(_emit(call.caller_id, "call_failed", "Call Failed", "Could not start the call.", data))
+                spawn(_emit(nurse_id, "call_failed", "Call Failed", "Could not start the call.", data))
+            else:
+                await db.commit()
             raise HTTPException(status_code=502, detail="Could not start the call room. Please try again.")
 
         # Issue 4 (state machine): persist CONNECTING for accurate call
@@ -422,13 +485,17 @@ class CallService:
         # very HTTP response below; Mother: from her own POST /join
         # response after processing `call_accepted` above), so a dedicated
         # broadcast here would be a redundant round trip with no UI benefit.
-        connecting_stmt = select(Call).where(Call.id == call_id).with_for_update()
-        connecting_result = await db.execute(connecting_stmt)
-        call = connecting_result.scalar_one_or_none()
-        call.status = CallStatusEnum.CONNECTING
-        db.add(CallEvent(call_id=call.id, event_type="CallConnecting"))
+        call = await _locked(db, call_id)
+        if call.status == CallStatusEnum.ACCEPTED:
+            call.status = CallStatusEnum.CONNECTING
+            db.add(CallEvent(call_id=call.id, event_type="CallConnecting"))
         await db.commit()
         await db.refresh(call)
+        if call.status in TERMINAL_STATUSES:
+            # She hung up while the room was being made: no token for a call that is over, and the
+            # room that was just made is not needed.
+            spawn(LiveKitService.delete_room(call.room_name))
+            raise HTTPException(status_code=409, detail="The call has already ended.")
 
         caller_info = _participant_info(caller) if caller else None
         return call, caller_info
@@ -462,6 +529,9 @@ class CallService:
 
         if call.status in TERMINAL_STATUSES:
             raise HTTPException(status_code=400, detail=f"This call is no longer active ({call.status.value}).")
+        if call.status not in JOINABLE_STATUSES:
+            # Still ringing: nobody has answered, so there is no one to talk to yet.
+            raise HTTPException(status_code=409, detail="The call has not been answered yet.")
 
         other_user = call.receiver if user_id == call.caller_id else call.caller
         other_info = _participant_info(other_user) if other_user else None
@@ -497,7 +567,7 @@ class CallService:
                 call.status = CallStatusEnum.REJECTED
                 call.ended_at = datetime.now(timezone.utc)
                 db.add(CallEvent(call_id=call.id, event_type="CallRejected", payload={"rejected_by": "all"}))
-                asyncio.create_task(_emit(call.caller_id, "call_rejected", "No nurse available",
+                spawn(_emit(call.caller_id, "call_rejected", "No nurse available",
                                           "No nurse could take your call right now.",
                                           {"call_id": str(call.id), "status": CallStatusEnum.REJECTED.value}))
             await db.commit()
@@ -512,7 +582,7 @@ class CallService:
 
             other_id = call.caller_id if user_id == call.receiver_id else call.receiver_id
             data = {"call_id": str(call.id), "status": CallStatusEnum.REJECTED.value}
-            asyncio.create_task(_emit(other_id, "call_rejected", "Call Declined", "The call was declined.", data))
+            spawn(_emit(other_id, "call_rejected", "Call Declined", "The call was declined.", data))
             return call
 
         raise HTTPException(status_code=403, detail="Unauthorized to reject this call")
@@ -525,6 +595,10 @@ class CallService:
 
         if not call:
             raise HTTPException(status_code=404, detail="Call not found")
+
+        # Call ids are sequential: without this anyone signed in could hang up anyone's call.
+        if user_id not in (call.caller_id, call.receiver_id):
+            raise HTTPException(status_code=403, detail="You are not a participant of this call")
 
         if call.status in TERMINAL_STATUSES:
             # Already ended by the other party / webhook race - no-op so
@@ -541,8 +615,8 @@ class CallService:
 
         await CallService._finish(db, call, CallStatusEnum.ENDED, by=user_id)
         await db.commit()
-        await LiveKitService.delete_room(call.room_name)
 
+        # Tell the other side first: deleting the room is a LiveKit round trip that must not delay it.
         other_participant_id = call.receiver_id if user_id == call.caller_id else call.caller_id
         if other_participant_id:
             data = {
@@ -550,9 +624,25 @@ class CallService:
                 "status": call.status.value,
                 "duration_seconds": call.duration_seconds,
             }
-            asyncio.create_task(_emit(other_participant_id, "call_ended", "Call Ended", "The call has ended.", data))
+            spawn(_emit(other_participant_id, "call_ended", "Call Ended", "The call has ended.", data))
+        spawn(LiveKitService.delete_room(call.room_name))
 
         return call
+
+    @staticmethod
+    async def record_client_report(db: AsyncSession, call_id: int, user_id: str, report) -> None:
+        call = await db.get(Call, call_id)
+        if not call:
+            raise HTTPException(status_code=404, detail="Call not found")
+        if user_id not in (call.caller_id, call.receiver_id) and user_id not in await CallService.rung_ids(db, call):
+            raise HTTPException(status_code=403, detail="Not your call")
+        payload = {"by": user_id, "kind": report.kind, "detail": (report.detail or "")[:500],
+                   "platform": report.platform, "app_version": report.app_version,
+                   "call_status": call.status.value}
+        db.add(CallEvent(call_id=call.id, event_type="ClientReport", payload=payload))
+        await db.commit()
+        logger.warning("client report call=%s user=%s kind=%s status=%s platform=%s detail=%s",
+                       call.id, user_id, report.kind, call.status.value, report.platform, (report.detail or "")[:200])
 
     @staticmethod
     async def get_call_state(db: AsyncSession, call_id: int, user_id: str) -> dict:
@@ -581,9 +671,12 @@ class CallService:
         if not call:
             raise HTTPException(status_code=404, detail="Call not found")
 
-        # Allow either participant to rate
-        if user_id not in (call.caller_id, call.receiver_id):
-            raise HTTPException(status_code=403, detail="Unauthorized to rate this call")
+        # The rating is the mother's verdict on the nurse (it feeds the nurse's average), so only
+        # the caller may give it, and only for a call that was actually answered and is over.
+        if user_id != call.caller_id:
+            raise HTTPException(status_code=403, detail="Only the caller can rate this call")
+        if call.status not in TERMINAL_STATUSES or call.answered_at is None:
+            raise HTTPException(status_code=400, detail="Only a finished call can be rated")
 
         call.rating = rating
         call.feedback = feedback

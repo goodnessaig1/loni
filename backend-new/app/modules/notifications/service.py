@@ -74,7 +74,9 @@ class NotificationService:
                 ),
                 apns=messaging.APNSConfig(
                     headers={
-                        "apns-priority": "10",       # immediate delivery, required for time-sensitive pushes
+                        # 10 = immediate, allowed only for visible alerts; Apple requires 5 for
+                        # background (content-available only) pushes and may reject 10 there.
+                        "apns-priority": "10" if firebase_type == "incoming_call" else "5",
                         "apns-push-type": "background" if firebase_type != "incoming_call" else "alert",
                         "apns-expiration": "30",
                     },
@@ -82,6 +84,11 @@ class NotificationService:
                         aps=messaging.Aps(
                             content_available=True,
                             sound="default" if firebase_type == "incoming_call" else None,
+                            # iOS without CallKit/PushKit: a data-only push shows nothing at all,
+                            # so an incoming call is a visible alert the nurse/driver can tap to
+                            # open the app and answer. (Android stays data-only: the app draws
+                            # its own full-screen call notification from the data.)
+                            alert=messaging.ApsAlert(title=title, body=body) if firebase_type == "incoming_call" else None,
                         )
                     ),
                 ),
@@ -106,7 +113,7 @@ class NotificationService:
                 dead_tokens = []
                 for idx, resp in enumerate(responses):
                     if not resp.success:
-                        print(f"Failed to send to token {tokens[idx]}: {resp.exception}")
+                        print(f"Failed to send to token …{tokens[idx][-6:]}: {resp.exception}")
                         # Firebase's "unregistered" condition (app
                         # uninstalled, token rotated, etc.) surfaces either
                         # as a specific exception class or, depending on

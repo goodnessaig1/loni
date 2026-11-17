@@ -37,6 +37,26 @@ export function setSocketUserType(t: string | undefined) {
   currentUserType = t;
 }
 
+let opening = false;
+
+/**
+ * Query string that authenticates the socket. A 60-second ticket from POST /calls/ws-ticket keeps the
+ * long-lived login token out of the URL (URLs end up in server and proxy logs). Only a backend that
+ * predates tickets (404/405) gets the old `token=`; any other failure retries later.
+ */
+async function socketCredential(token: string): Promise<string | null> {
+  try {
+    const { apiClient } = require('./client');
+    const res = await apiClient.post('/calls/ws-ticket');
+    if (res?.data?.ticket) return `ticket=${encodeURIComponent(res.data.ticket)}`;
+  } catch (e: any) {
+    const status = e?.response?.status;
+    if (status === 404 || status === 405) return `token=${encodeURIComponent(token)}`;
+    return null;
+  }
+  return `token=${encodeURIComponent(token)}`;
+}
+
 function wsBaseUrl(): string {
   return API_URL.replace(/^http/, 'ws');
 }
@@ -63,10 +83,23 @@ export async function connectCallSocket(): Promise<void> {
     return;
   }
 
+  if (opening) return;
   const token = await SecureStore.getItemAsync('userToken');
   if (!token) return;
 
-  const url = `${wsBaseUrl()}/calls/ws?token=${encodeURIComponent(token)}`;
+  let credential: string | null;
+  opening = true;
+  try {
+    credential = await socketCredential(token);
+  } finally {
+    opening = false;
+  }
+  if (!credential) {
+    scheduleReconnect();
+    return;
+  }
+  if (manuallyClosed || (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING))) return;
+  const url = `${wsBaseUrl()}/calls/ws?${credential}`;
 
   try {
     socket = new WebSocket(url);

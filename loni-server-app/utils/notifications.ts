@@ -33,7 +33,7 @@ export async function registerForPushNotificationsAsync() {
     token = (
       await Notifications.getDevicePushTokenAsync()
     ).data;
-    console.log('[Push] Native Device Token retrieved:', token);
+    console.log('[Push] Native device token retrieved');
   } catch (e) {
     console.warn('[Push] Error getting push token:', e);
     return null;

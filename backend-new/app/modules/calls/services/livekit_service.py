@@ -1,8 +1,11 @@
+import logging
 from datetime import timedelta
 from livekit import api
 from livekit.api import AccessToken, VideoGrants
 
 from app.core.config import settings
+
+logger = logging.getLogger("livekit_service")
 
 
 class LiveKitConfigError(Exception):
@@ -33,6 +36,9 @@ def _require_server_url() -> str:
     return settings.LIVEKIT_URL
 
 
+TOKEN_TTL_SECONDS = 10 * 60
+
+
 class LiveKitService:
     @staticmethod
     def get_public_url() -> str:
@@ -61,14 +67,16 @@ class LiveKitService:
             room=room_name,
             can_publish=True,
             can_subscribe=True,
+            # Voice calls only: the token cannot publish a camera, screen share or data messages.
+            can_publish_sources=["microphone"],
+            can_publish_data=False,
             room_admin=is_admin
         )
         token.with_grants(grants)
 
-        # Kept short: a call either connects promptly or it's re-requested.
-        # Long-lived tokens for an ephemeral call room are an unnecessary
-        # security exposure if the token leaks (e.g. via logs).
-        token.with_ttl(timedelta(hours=1))
+        # Only long enough to connect. Once in the room, LiveKit keeps refreshing the client's
+        # token itself, so a call can run longer than this; a leaked token is useless soon after.
+        token.with_ttl(timedelta(seconds=TOKEN_TTL_SECONDS))
         return token.to_jwt()
 
     @staticmethod
@@ -116,16 +124,46 @@ class LiveKitService:
             await lkapi.aclose()
 
     @staticmethod
-    async def delete_room(room_name: str):
-        server_url = _require_server_url()
-        api_key, api_secret = _require_credentials()
+    async def room_occupancy(room_name: str) -> int | None:
+        """How many people are in the room right now: 0 if the room does not exist,
+        None if LiveKit could not be asked (so callers never end a call on an outage)."""
+        try:
+            server_url = _require_server_url()
+            api_key, api_secret = _require_credentials()
+        except LiveKitConfigError as e:
+            logger.warning("LiveKit not configured, cannot check room %s: %s", room_name, e)
+            return None
+        lkapi = api.LiveKitAPI(server_url, api_key, api_secret)
+        try:
+            res = await lkapi.room.list_participants(api.ListParticipantsRequest(room=room_name))
+            return len(res.participants)
+        except api.TwirpError as e:
+            if str(getattr(e, "code", "")).lower() in ("not_found", "notfound"):
+                return 0
+            logger.warning("LiveKit occupancy check failed for %s: %s", room_name, e)
+            return None
+        except Exception as e:
+            logger.warning("LiveKit occupancy check failed for %s: %s", room_name, e)
+            return None
+        finally:
+            await lkapi.aclose()
 
+    @staticmethod
+    async def delete_room(room_name: str):
+        """Best effort: never raises (a call has already been ended in the DB when this runs, and
+        LiveKit closes an empty room by itself after empty_timeout)."""
+        try:
+            server_url = _require_server_url()
+            api_key, api_secret = _require_credentials()
+        except LiveKitConfigError as e:
+            logger.warning("LiveKit not configured, cannot delete room %s: %s", room_name, e)
+            return
         lkapi = api.LiveKitAPI(server_url, api_key, api_secret)
         try:
             await lkapi.room.delete_room(
                 api.DeleteRoomRequest(room=room_name)
             )
         except Exception as e:
-            print(f"Warning: Failed to delete room {room_name}: {e}")
+            logger.warning("Failed to delete room %s: %s", room_name, e)
         finally:
             await lkapi.aclose()

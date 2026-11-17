@@ -23,6 +23,9 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        if payload.get("typ") is not None:
+            # A WebSocket ticket (or any other special-purpose token) is not an API credential.
+            raise credentials_exception
     except JWTError:
         raise credentials_exception
         

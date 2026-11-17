@@ -9,11 +9,12 @@ import { useCallStore, ConnectionQuality } from '../store/callStore';
 import { useCall } from '../hooks/useCall';
 import { LiveKitRoom, useRoomContext, useLocalParticipant, useRemoteParticipants, useTrackVolume, useParticipant } from '@livekit/react-native';
 import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, Track, LocalAudioTrack, RemoteAudioTrack } from 'livekit-client';
-import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker } from '../lib/audioSession';
+import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker, noteAvailableOutputs, currentAudioOutput } from '../lib/audioSession';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
 import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import { reportCallProblem, reportDisconnect } from '../lib/callReport';
 import { setActiveRoom, toggleMicrophone as toggleActiveMicrophone } from '../lib/activeRoom';
 import { useRideStore } from '../store/rideStore';
 import { cdnImage } from '../lib/cdnImage';
@@ -79,10 +80,19 @@ function useRoomLifecycle(onOutputs?: (outputs: string[]) => void) {
         setConnected();
       }
     };
-    const onParticipantDisconnected = () => {};
+    // The other person dropped out of the room: show it straight away rather than waiting for the
+    // server's RECONNECTING (which never arrives if our WebSocket is down). ParticipantConnected /
+    // the server's CONNECTED put it back.
+    const onParticipantDisconnected = () => {
+      if (room.remoteParticipants.size === 0 && useCallStore.getState().status === 'CONNECTED') setReconnecting();
+    };
     const onReconnecting = () => setReconnecting();
     const onReconnected = () => setConnected();
-    const onDisconnected = (reason: any) => endCall('ENDED');
+    const onDisconnected = (reason: any) => {
+      reportDisconnect(useCallStore.getState().callId, reason);
+      endCall('ENDED');
+    };
+    const onMediaDevicesError = (e: Error) => reportCallProblem(useCallStore.getState().callId, 'media_devices_error', e);
     const onAudioPlaybackStatusChanged = () => {
       if (!room.canPlaybackAudio) {
         room.startAudio().catch(() => {});
@@ -108,6 +118,7 @@ function useRoomLifecycle(onOutputs?: (outputs: string[]) => void) {
     room.on(RoomEvent.Reconnecting, onReconnecting);
     room.on(RoomEvent.Reconnected, onReconnected);
     room.on(RoomEvent.Disconnected, onDisconnected);
+    room.on(RoomEvent.MediaDevicesError, onMediaDevicesError);
     room.on(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
     room.on(RoomEvent.ConnectionQualityChanged, onQualityChanged);
     room.on(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
@@ -122,6 +133,7 @@ function useRoomLifecycle(onOutputs?: (outputs: string[]) => void) {
       room.off(RoomEvent.Reconnecting, onReconnecting);
       room.off(RoomEvent.Reconnected, onReconnected);
       room.off(RoomEvent.Disconnected, onDisconnected);
+      room.off(RoomEvent.MediaDevicesError, onMediaDevicesError);
       room.off(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
       room.off(RoomEvent.ConnectionQualityChanged, onQualityChanged);
       room.off(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
@@ -141,12 +153,14 @@ function useRoomLifecycle(onOutputs?: (outputs: string[]) => void) {
     return () => clearInterval(checkInterval);
   }, [room, connectedAt, setConnected]);
 
+  // Fallback start of the Android foreground service (type microphone), for a call answered from a
+  // notification. Normally it is already running: useCall starts it when the call is placed or
+  // answered, while the app is in the foreground (Android 12+ refuses to start one from the
+  // background, and Android 14 cuts a background app's microphone without one). It is stopped by
+  // CallModals when the call is over - never on unmount or on a reconnect.
   useEffect(() => {
-    if (status === 'CONNECTED') {
-      startCallForegroundService('Call in progress', `Connected with ${remoteParticipant?.name || 'Nurse'}`);
-    }
-    return () => { stopCallForegroundService(); };
-  }, [status === 'CONNECTED']);
+    startCallForegroundService('LONI call', 'Tap to return to your call');
+  }, []);
 
 }
 
@@ -169,7 +183,7 @@ const ActiveCallUI = () => {
   
   const [duration, setDuration] = useState(0);
   const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
-  const [selectedOutput, setSelectedOutput] = useState<string>('earpiece');
+  const [selectedOutput, setSelectedOutput] = useState<string>(currentAudioOutput());
   const [showOutputPicker, setShowOutputPicker] = useState(false);
 
   const actualRemoteParticipant = remoteParticipants.length > 0 ? remoteParticipants[0] : null;
@@ -182,7 +196,10 @@ const ActiveCallUI = () => {
   const activeVol = Math.max(localVol, remoteVol);
   const scale = 1 + activeVol * 1.5;
 
-  useRoomLifecycle(setAudioOutputs);
+  useRoomLifecycle((outputs) => {
+    setAudioOutputs(outputs);
+    setSelectedOutput(noteAvailableOutputs(outputs));
+  });
 
   useEffect(() => {
     if (!connectedAt) {
@@ -206,6 +223,9 @@ const ActiveCallUI = () => {
   };
 
   const outputIcon = (deviceId: string) => {
+    // iOS routes are chosen in the system picker and this app is not told which one is live, so it
+    // shows a neutral "audio" icon instead of claiming earpiece/speaker.
+    if (Platform.OS === 'ios') return 'volume-1';
     if (deviceId === 'bluetooth') return 'bluetooth';
     if (deviceId === 'headset') return 'headphones';
     if (deviceId === 'speaker') return 'volume-2';
@@ -376,6 +396,11 @@ export const CallModals = () => {
 
   useCallLogger();
 
+  // The call is over (or never started): release the foreground service and its notification.
+  useEffect(() => {
+    if (!isActive && !isOutgoing) stopCallForegroundService();
+  }, [isActive, isOutgoing]);
+
   // Track call ID, nurse name, and connected state while call is active
   if (callId) {
     lastCallId.current = callId;
@@ -500,6 +525,7 @@ export const CallModals = () => {
       const current = useCallStore.getState();
       if (current.callId === callId && current.status !== 'CONNECTED' && current.isActive) {
         setConnectTimedOut(true);
+        reportCallProblem(callId, 'connect_timeout', `no connection after ${CONNECT_TIMEOUT_MS}ms, status=${current.status}`);
       }
     }, CONNECT_TIMEOUT_MS);
     return () => clearTimeout(timer);
@@ -509,8 +535,9 @@ export const CallModals = () => {
     let intervalId: NodeJS.Timeout | null = null;
     try {
       const InCallManager = require('react-native-incall-manager').default;
-      if (status === 'RINGING') {
-        InCallManager.start({ media: 'audio' });
+      // Ringing sounds only - InCallManager is never start()ed: that would take over call audio
+      // routing from LiveKit (see lib/audioSession.ts).
+      if (status === 'RINGING' || status === 'INCOMING') {
         if (isOutgoing) {
           InCallManager.startRingback('_DEFAULT_');
           // On many Android devices, the native _DEFAULT_ ringback plays only once (a single beep).
@@ -613,7 +640,7 @@ export const CallModals = () => {
       <View style={styles.centerContent}>
         <Text style={styles.title}>Call Failed</Text>
         <Text style={styles.statusText}>Could not reach the call server. Please try again.</Text>
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => endCall('FAILED')}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={() => { if (callId) hangupCall(callId); else endCall('FAILED'); }}>
           <Text style={styles.cancelText}>Close</Text>
         </TouchableOpacity>
       </View>
