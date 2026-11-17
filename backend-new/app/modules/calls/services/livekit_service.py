@@ -1,7 +1,12 @@
 import logging
+import ssl
 from datetime import timedelta
+
+import aiohttp
+import certifi
 from livekit import api
 from livekit.api import AccessToken, VideoGrants
+from livekit.api.room_service import RoomService
 
 from app.core.config import settings
 
@@ -37,6 +42,26 @@ def _require_server_url() -> str:
 
 
 TOKEN_TTL_SECONDS = 10 * 60
+
+
+class _LiveKitClient:
+    """What `api.LiveKitAPI` gives us (the room service), but on an HTTP session that verifies TLS
+    against certifi's CA bundle. LiveKitAPI builds its own aiohttp session on the interpreter's
+    default trust store, which python.org builds on macOS do not have - every call to LiveKit
+    Cloud then failed with CERTIFICATE_VERIFY_FAILED, so room creation (and every answered call)
+    failed. certifi is already a backend dependency (Mongo uses it the same way)."""
+
+    _ssl = ssl.create_default_context(cafile=certifi.where())
+
+    def __init__(self, url: str, api_key: str, api_secret: str):
+        self._session = aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(ssl=self._ssl),
+            timeout=aiohttp.ClientTimeout(total=15),
+        )
+        self.room = RoomService(self._session, url, api_key, api_secret)
+
+    async def aclose(self) -> None:
+        await self._session.close()
 
 
 class LiveKitService:
@@ -91,7 +116,7 @@ class LiveKitService:
         server_url = _require_server_url()
         api_key, api_secret = _require_credentials()
 
-        lkapi = api.LiveKitAPI(server_url, api_key, api_secret)
+        lkapi = _LiveKitClient(server_url, api_key, api_secret)
         try:
             room = await lkapi.room.create_room(
                 api.CreateRoomRequest(
@@ -112,7 +137,7 @@ class LiveKitService:
         server_url = _require_server_url()
         api_key, api_secret = _require_credentials()
 
-        lkapi = api.LiveKitAPI(server_url, api_key, api_secret)
+        lkapi = _LiveKitClient(server_url, api_key, api_secret)
         try:
             res = await lkapi.room.list_participants(
                 api.ListParticipantsRequest(room=room_name)
@@ -133,7 +158,7 @@ class LiveKitService:
         except LiveKitConfigError as e:
             logger.warning("LiveKit not configured, cannot check room %s: %s", room_name, e)
             return None
-        lkapi = api.LiveKitAPI(server_url, api_key, api_secret)
+        lkapi = _LiveKitClient(server_url, api_key, api_secret)
         try:
             res = await lkapi.room.list_participants(api.ListParticipantsRequest(room=room_name))
             return len(res.participants)
@@ -158,7 +183,7 @@ class LiveKitService:
         except LiveKitConfigError as e:
             logger.warning("LiveKit not configured, cannot delete room %s: %s", room_name, e)
             return
-        lkapi = api.LiveKitAPI(server_url, api_key, api_secret)
+        lkapi = _LiveKitClient(server_url, api_key, api_secret)
         try:
             await lkapi.room.delete_room(
                 api.DeleteRoomRequest(room=room_name)
