@@ -162,6 +162,30 @@ async def test_only_mothers_can_start_a_nurse_call(person, as_user):
         assert (await (await as_user(who)).post(f"{API}/request", json={"nurse_id": nurse.id})).status_code == 403
 
 
+async def test_only_the_receivers_are_rung_never_the_caller(person, as_user, env):
+    """The phone that places a call rings no one's ringtone: `incoming_call` goes to the receiver(s)
+    only, and the caller hears about the call only as `call_accepted` (with no `answered_here`)."""
+    mum = await person("Amara")
+    named = await person("Joy", UserTypeEnum.nurse, online=True)
+    other = await person("Ada", UserTypeEnum.nurse, online=True)
+
+    named_call = (await (await as_user(mum)).post(f"{API}/request", json={"nurse_id": named.id})).json()
+    rung = [(u, d) for u, e, d in env["sent"] if e == "incoming_call"]
+    assert [u for u, _ in rung] == [named.id]
+    assert rung[0][1]["caller"]["id"] == mum.id and rung[0][1]["call_id"] == str(named_call["id"])
+    await (await as_user(mum)).post(f"{API}/{named_call['id']}/end")
+
+    env["sent"].clear()
+    open_call = (await (await as_user(mum)).post(f"{API}/request", json={})).json()
+    rung = {u for u, e, _ in env["sent"] if e == "incoming_call"}
+    assert mum.id not in rung and rung == {named.id, other.id}
+
+    assert (await (await as_user(named)).post(f"{API}/{open_call['id']}/accept")).status_code == 200
+    to_mum = [(e, d) for u, e, d in env["sent"] if u == mum.id]
+    assert [e for e, _ in to_mum] == ["call_accepted"]
+    assert not to_mum[0][1].get("answered_here")
+
+
 async def test_the_answering_nurses_other_devices_are_told_to_stop_ringing(person, as_user, env):
     mum, nurse, call_id = await _answered_call(person, as_user)
     mine = [d for u, e, d in env["sent"] if u == nurse.id and e == "call_accepted"]

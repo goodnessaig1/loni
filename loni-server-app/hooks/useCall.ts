@@ -1,22 +1,24 @@
 import { useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Alert } from 'react-native';
 import { useCallStore, ParticipantInfo } from '../store/callStore';
 import { apiClient } from '../api/client';
 import { answering } from '../lib/callEvents';
-import { requestMicrophonePermission } from '../lib/permissions';
+import { ensureMicrophoneForCall, MicDecision } from '../lib/micPermission';
 import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
 
 /**
- * Ask for the microphone BEFORE the call is placed or answered (not after the other side picks up,
- * which left them talking to silence behind a permission dialog), and - with it granted - start the
- * Android call foreground service now, while the app is certainly in the foreground.
+ * Settle the microphone BEFORE the call is placed or answered: the OS prompt if it can still be
+ * shown, otherwise an explanation with "Allow" / "Open Settings" / go on muted / cancel
+ * (lib/micPermission.ts). With it allowed, start the Android call foreground service now, while the
+ * app is certainly in the foreground (type "microphone" needs the permission granted).
  */
-async function prepareForCall(): Promise<void> {
-  try {
-    if ((await requestMicrophonePermission()) === 'granted') {
-      await startCallForegroundService('LONI call', 'Tap to return to your call');
-    }
-  } catch { /* CallModals asks again and shows "Microphone Required" if needed */ }
+async function prepareForCall(purpose: 'call' | 'answer'): Promise<MicDecision> {
+  const decision = await ensureMicrophoneForCall(purpose);
+  if (decision === 'granted') {
+    await startCallForegroundService('LONI call', 'Tap to return to your call').catch(() => {});
+  }
+  return decision;
 }
 
 /** The call never got going (refused, no nurse, already taken): don't leave the service running. */
@@ -40,17 +42,24 @@ function toParticipant(raw: any) {
 }
 
 export const useCall = () => {
-  const {
-    isActive, isIncoming, isOutgoing, status,
-    callerName, callId, roomName, remoteParticipant,
-    setOutgoingCall, setConnecting, endCall, removeIncomingCall,
-  } = useCallStore();
+  // Only these fields re-render the caller (not connection quality, mic state, timers...).
+  const { isActive, isIncoming, isOutgoing, status, callerName, callId, roomName, remoteParticipant } = useCallStore(
+    useShallow((s) => ({
+      isActive: s.isActive, isIncoming: s.isIncoming, isOutgoing: s.isOutgoing, status: s.status,
+      callerName: s.callerName, callId: s.callId, roomName: s.roomName, remoteParticipant: s.remoteParticipant,
+    })),
+  );
+  const setOutgoingCall = useCallStore((s) => s.setOutgoingCall);
+  const setConnecting = useCallStore((s) => s.setConnecting);
+  const endCall = useCallStore((s) => s.endCall);
+  const removeIncomingCall = useCallStore((s) => s.removeIncomingCall);
 
   /** Drivers call the passenger of their active ride with `rideId`; the server picks the other party. */
   const requestCall = useCallback(async (opts: { rideId?: number; remote?: ParticipantInfo | null } = {}) => {
     if (useCallStore.getState().status !== 'IDLE') return null;
     try {
-      await prepareForCall();
+      if ((await prepareForCall('call')) === 'cancelled') return null;
+      if (useCallStore.getState().status !== 'IDLE') return null; // a call arrived meanwhile
       const response = await apiClient.post('/calls/request', { ride_id: opts.rideId });
       const call = response.data;
       setOutgoingCall(call.id, call.room_name, { kind: call.kind ?? 'ride', rideId: call.ride_id ?? null }, opts.remote ?? null);
@@ -64,7 +73,8 @@ export const useCall = () => {
 
   const acceptCall = useCallback(async (incomingCallId: number) => {
     try {
-      await prepareForCall();
+      // Cancelled: leave the request waiting - it can still be answered or declined.
+      if ((await prepareForCall('answer')) === 'cancelled') return null;
       answering.add(incomingCallId);
       const response = await apiClient.post(`/calls/${incomingCallId}/accept`).finally(() => answering.delete(incomingCallId));
       setConnecting({

@@ -1,4 +1,4 @@
-import { registerGlobals } from '@livekit/react-native';
+import { registerGlobals, setupIOSAudioManagement } from '@livekit/react-native';
 import { registerRootComponent } from 'expo';
 import { ExpoRoot } from 'expo-router';
 import messaging from '@react-native-firebase/messaging';
@@ -23,7 +23,24 @@ import { Platform } from 'react-native';
  * LiveKit Room during their own import-time side effects) gets a chance
  * to touch LiveKit.
  */
-registerGlobals();
+registerGlobals({ autoConfigureAudioSession: false });
+
+/**
+ * iOS call audio. LiveKit's default (`registerGlobals()` on its own) is tuned for video meetings:
+ * `videoChat` mode, which starts on the LOUDSPEAKER, and `mixWithOthers`, which lets music keep
+ * playing under the call. A phone call wants `voiceChat` (earpiece first, Apple's echo cancellation,
+ * noise suppression and gain control) and to take the audio over while it lasts. `allowBluetooth`
+ * keeps Bluetooth headsets (HFP) usable. Android is configured in lib/audioSession.ts.
+ */
+setupIOSAudioManagement(false, (state) => {
+  if (state.isRecordingEnabled) {
+    return { audioCategory: 'playAndRecord', audioCategoryOptions: ['allowBluetooth'], audioMode: 'voiceChat' };
+  }
+  if (state.isPlayoutEnabled) {
+    return { audioCategory: 'playAndRecord', audioCategoryOptions: ['allowBluetooth'], audioMode: 'voiceChat' };
+  }
+  return { audioCategory: 'soloAmbient', audioCategoryOptions: [], audioMode: 'default' };
+});
 
 /**
  * Issue 4/5 fix, "make it ring like a real phone call no matter what":

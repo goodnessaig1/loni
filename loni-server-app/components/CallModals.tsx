@@ -1,21 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, Image as RNImage, Dimensions, Platform, AppState } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, SafeAreaView, AppState } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
-import { Audio } from 'expo-av';
-import { Feather, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { Feather, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { useCallStore, ConnectionQuality } from '../store/callStore';
+import { LiveKitRoom } from '@livekit/react-native';
+import { useCallStore } from '../store/callStore';
+import { useCallUiStore } from '../store/callUiStore';
 import { useCall } from '../hooks/useCall';
-import { LiveKitRoom, useRoomContext, useLocalParticipant, useRemoteParticipants, useParticipant, useTrackVolume } from '@livekit/react-native';
-import { RoomEvent, ConnectionState, ConnectionQuality as LKConnectionQuality, Track, LocalAudioTrack, RemoteAudioTrack } from 'livekit-client';
-import { startCallAudioSession, stopCallAudioSession, listAudioOutputs, selectAudioOutput, showNativeAudioRoutePicker, noteAvailableOutputs, currentAudioOutput } from '../lib/audioSession';
-import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
-import { PermissionStatus, getMicrophonePermissionStatus, requestMicrophonePermission, openAppSettings } from '../lib/permissions';
+import { startCallAudioSession, stopCallAudioSession } from '../lib/audioSession';
+import { stopCallForegroundService } from '../lib/callForegroundService';
+import { startRingback, stopRingback, startRingtone, stopRingtone } from '../lib/callTones';
+import { useMicGate } from '../lib/micPermission';
 import { router } from 'expo-router';
-import { reportCallProblem, reportDisconnect } from '../lib/callReport';
+import { reportCallProblem } from '../lib/callReport';
 import { callSoundsEnabled } from '../lib/localPrefs';
 import { cdnImage } from '../lib/cdnImage';
+import { ROOM_OPTIONS } from '../lib/roomOptions';
+import { CallRoomLifecycle } from '../hooks/useCallRoomLifecycle';
+import { ActiveCallScreen } from './call/ActiveCallScreen';
+import { FloatingCallPill } from './call/FloatingCallPill';
+import { MicPermissionSheet } from './call/MicPermissionSheet';
 
 const LOG = '[Call/Nurse]';
 const CONNECT_TIMEOUT_MS = 20000;
@@ -35,308 +40,6 @@ function useCallLogger() {
   }, []);
 }
 
-const RemoteMutedBadge = ({ participant }: { participant: any }) => {
-  const { microphonePublication } = useParticipant(participant);
-  if (!microphonePublication || microphonePublication.isMuted) {
-    return (
-      <View style={[styles.specialtyBadge, { backgroundColor: '#ef4444', borderColor: '#ef4444', marginBottom: 8 }]}>
-        <Feather name="mic-off" size={14} color="#FFF" style={{ marginRight: 6 }} />
-        <Text style={styles.specialtyText}>Muted</Text>
-      </View>
-    );
-  }
-  return null;
-};
-
-const ActiveCallUI = () => {
-  const room = useRoomContext();
-  const { localParticipant, isMicrophoneEnabled } = useLocalParticipant();
-  const callId = useCallStore((s) => s.callId);
-  const remoteParticipant = useCallStore((s) => s.remoteParticipant);
-  const connectedAt = useCallStore((s) => s.connectedAt);
-  const status = useCallStore((s) => s.status);
-  const setConnected = useCallStore((s) => s.setConnected);
-  const setReconnecting = useCallStore((s) => s.setReconnecting);
-  const setConnectionQuality = useCallStore((s) => s.setConnectionQuality);
-  const endCall = useCallStore((s) => s.endCall);
-  const { hangupCall } = useCall();
-  
-  const [duration, setDuration] = useState(0);
-  const [audioOutputs, setAudioOutputs] = useState<string[]>([]);
-  const [selectedOutput, setSelectedOutput] = useState<string>(currentAudioOutput());
-  const [showOutputPicker, setShowOutputPicker] = useState(false);
-
-  const remoteParticipants = useRemoteParticipants();
-  const actualRemoteParticipant = remoteParticipants.length > 0 ? remoteParticipants[0] : null;
-  const connectionQuality = useCallStore((s) => s.connectionQuality);
-
-  const localMic = localParticipant?.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
-  const remoteMic = actualRemoteParticipant?.getTrackPublication(Track.Source.Microphone)?.track as RemoteAudioTrack | undefined;
-  const localVol = useTrackVolume(localMic) || 0;
-  const remoteVol = useTrackVolume(remoteMic) || 0;
-  const activeVol = Math.max(localVol, remoteVol);
-  const scale = 1 + activeVol * 1.5;
-
-  useEffect(() => {
-    const onConnected = () => {
-      console.log(LOG, 'Room Connected. sid=', room.localParticipant?.sid);
-      if (room.remoteParticipants.size >= 1) {
-        setConnected();
-      }
-    };
-    const onParticipantConnected = (participant?: any) => {
-      if (room.remoteParticipants.size >= 1 && room.state === ConnectionState.Connected) {
-        setConnected();
-      }
-    };
-    // The other person dropped out of the room: show it straight away rather than waiting for the
-    // server's RECONNECTING (which never arrives if our WebSocket is down). ParticipantConnected /
-    // the server's CONNECTED put it back.
-    const onParticipantDisconnected = () => {
-      if (room.remoteParticipants.size === 0 && useCallStore.getState().status === 'CONNECTED') setReconnecting();
-    };
-    const onReconnecting = () => setReconnecting();
-    const onReconnected = () => setConnected();
-    const onDisconnected = (reason: any) => {
-      reportDisconnect(useCallStore.getState().callId, reason);
-      endCall('ENDED');
-    };
-    const onMediaDevicesError = (e: Error) => reportCallProblem(useCallStore.getState().callId, 'media_devices_error', e);
-    const onAudioPlaybackStatusChanged = () => {
-      if (!room.canPlaybackAudio) {
-        room.startAudio().catch(() => {});
-      }
-    };
-    const onQualityChanged = (quality: LKConnectionQuality, participant: any) => {
-      if (participant?.sid === localParticipant?.sid) {
-        const mapped: ConnectionQuality =
-          quality === LKConnectionQuality.Excellent ? 'excellent' :
-          quality === LKConnectionQuality.Good ? 'good' : 'poor';
-        setConnectionQuality(mapped);
-      }
-    };
-    const onMediaDevicesChanged = () => {
-      if (Platform.OS === 'android') {
-        listAudioOutputs().then((outputs) => {
-          setAudioOutputs(outputs);
-          setSelectedOutput(noteAvailableOutputs(outputs));
-        });
-      }
-    };
-
-    room.on(RoomEvent.Connected, onConnected);
-    room.on(RoomEvent.ParticipantConnected, onParticipantConnected);
-    room.on(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
-    room.on(RoomEvent.Reconnecting, onReconnecting);
-    room.on(RoomEvent.Reconnected, onReconnected);
-    room.on(RoomEvent.Disconnected, onDisconnected);
-    room.on(RoomEvent.MediaDevicesError, onMediaDevicesError);
-    room.on(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
-    room.on(RoomEvent.ConnectionQualityChanged, onQualityChanged);
-    room.on(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
-
-    onParticipantConnected();
-    if (!room.canPlaybackAudio) onAudioPlaybackStatusChanged();
-
-    return () => {
-      room.off(RoomEvent.Connected, onConnected);
-      room.off(RoomEvent.ParticipantConnected, onParticipantConnected);
-      room.off(RoomEvent.ParticipantDisconnected, onParticipantDisconnected);
-      room.off(RoomEvent.Reconnecting, onReconnecting);
-      room.off(RoomEvent.Reconnected, onReconnected);
-      room.off(RoomEvent.Disconnected, onDisconnected);
-      room.off(RoomEvent.MediaDevicesError, onMediaDevicesError);
-      room.off(RoomEvent.AudioPlaybackStatusChanged, onAudioPlaybackStatusChanged);
-      room.off(RoomEvent.ConnectionQualityChanged, onQualityChanged);
-      room.off(RoomEvent.MediaDevicesChanged, onMediaDevicesChanged);
-    };
-  }, [room]);
-
-  // Bulletproof periodic check for room connection state to start the timer,
-  // in case the native SDK fired events too fast or missed them.
-  useEffect(() => {
-    if (connectedAt) return; // Already connected, timer is running
-    const checkInterval = setInterval(() => {
-      if (room.state === ConnectionState.Connected && room.remoteParticipants.size >= 1) {
-        setConnected();
-        clearInterval(checkInterval);
-      }
-    }, 500);
-    return () => clearInterval(checkInterval);
-  }, [room, connectedAt, setConnected]);
-
-  // Fallback start of the Android foreground service (type microphone), for a call answered from a
-  // notification. Normally it is already running: useCall starts it when the call is placed or
-  // answered, while the app is in the foreground (Android 12+ refuses to start one from the
-  // background, and Android 14 cuts a background app's microphone without one). It is stopped by
-  // CallModals when the call is over - never on unmount or on a reconnect.
-  useEffect(() => {
-    startCallForegroundService('LONI call', 'Tap to return to your call');
-  }, []);
-
-  useEffect(() => {
-    if (!connectedAt) {
-      setDuration(0);
-      return;
-    }
-    const tick = () => setDuration(Math.max(0, Math.floor((Date.now() - connectedAt) / 1000)));
-    tick();
-    const interval = setInterval(tick, 1000);
-    return () => clearInterval(interval);
-  }, [connectedAt]);
-
-  const toggleMicrophone = () => {
-    if (localParticipant) {
-      localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
-    }
-  };
-
-  const outputIcon = (deviceId: string) => {
-    // iOS routes are chosen in the system picker and this app is not told which one is live, so it
-    // shows a neutral "audio" icon instead of claiming earpiece/speaker.
-    if (Platform.OS === 'ios') return 'volume-1';
-    if (deviceId === 'bluetooth') return 'bluetooth';
-    if (deviceId === 'headset') return 'headphones';
-    if (deviceId === 'speaker') return 'volume-2';
-    return 'phone-call';
-  };
-
-  const handleOutputPress = async () => {
-    if (Platform.OS === 'ios') {
-      await showNativeAudioRoutePicker();
-      return;
-    }
-    const outputs = await listAudioOutputs();
-    setAudioOutputs(outputs);
-    setShowOutputPicker((v) => !v);
-  };
-
-  const statusLabel =
-    status === 'CONNECTED' ? 'Call Ongoing' :
-    status === 'RECONNECTING' ? 'Reconnecting...' :
-    'Connecting...';
-
-  const m = Math.floor(duration / 60).toString();
-  const s = `:${(duration % 60) < 10 ? '0' : ''}${duration % 60}`;
-
-  const hasTrimester = remoteParticipant?.trimester || remoteParticipant?.pregnancy_week;
-  const specialtyLabel = hasTrimester
-    ? `${remoteParticipant.trimester || ''} ${remoteParticipant.pregnancy_week ? `• Week ${remoteParticipant.pregnancy_week}` : ''}`
-    : remoteParticipant?.hospital_affiliation || 'Patient';
-
-  return (
-    <View style={styles.container}>
-      <StatusBar style='light' />
-      {remoteParticipant?.profile_picture ? (
-        <Image source={{ uri: cdnImage(remoteParticipant.profile_picture, 400) }} style={styles.bgImage} contentFit="cover" />
-      ) : (
-        <View style={[styles.bgImage, { backgroundColor: '#2b2a29' }]} />
-      )}
-
-      <View style={styles.overlay}>
-        <SafeAreaView style={styles.safeArea}>
-
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.badge}>
-              <View style={styles.soundBarsContainer}>
-                {(() => {
-                  const bars = connectionQuality === 'excellent' ? 3 : connectionQuality === 'good' ? 2 : 1;
-                  return (
-                    <>
-                      <View style={[styles.soundBar, { height: 8, opacity: bars >= 1 ? 1 : 0.3 }]} />
-                      <View style={[styles.soundBar, { height: 12, opacity: bars >= 2 ? 1 : 0.3 }]} />
-                      <View style={[styles.soundBar, { height: 16, opacity: bars >= 3 ? 1 : 0.3 }]} />
-                    </>
-                  );
-                })()}
-              </View>
-              <Text style={styles.badgeText}>{statusLabel}</Text>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity style={styles.iconButton} onPress={handleOutputPress}>
-                <Feather name={outputIcon(selectedOutput) as any} size={20} color="#FFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.iconButton, !isMicrophoneEnabled && { backgroundColor: '#ef4444' }]} onPress={toggleMicrophone}>
-                <Feather name={isMicrophoneEnabled ? "mic" : "mic-off"} size={20} color="#FFF" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Center Graphic */}
-          <View style={styles.centerGraphic}>
-            <View style={styles.visualizerContainer}>
-              <View style={[styles.bigBar, { height: 40 * (1 + activeVol * 0.5) }]} />
-              <View style={[styles.bigBar, { height: 60 * (1 + activeVol * 0.8) }]} />
-              <View style={[styles.bigBar, { height: 90 * scale }]} />
-              <View style={[styles.bigBar, { height: 60 * (1 + activeVol * 0.8) }]} />
-              <View style={[styles.bigBar, { height: 40 * (1 + activeVol * 0.5) }]} />
-            </View>
-          </View>
-
-          {/* Participant Info */}
-          <View style={styles.infoContainer}>
-            <View style={styles.timerContainer}>
-              <Text style={styles.timerMinutes}>{m}</Text>
-              <Text style={styles.timerSeconds}>{s}</Text>
-            </View>
-            <Text style={styles.nurseName}>
-              {remoteParticipant?.name ? remoteParticipant.name.replace(' ', '\n') : 'A\nMother'}
-            </Text>
-
-            {actualRemoteParticipant && <RemoteMutedBadge participant={actualRemoteParticipant} />}
-
-            <View style={styles.specialtyBadge}>
-              <Ionicons name={hasTrimester ? "medical" : "business"} size={14} color="#FFF" style={{ marginRight: 6 }} />
-              <Text style={styles.specialtyText}>{specialtyLabel}</Text>
-            </View>
-          </View>
-
-          {/* Android Audio Output Picker */}
-          {showOutputPicker && (
-            <View style={styles.outputPicker}>
-              {audioOutputs.map((deviceId) => (
-                <TouchableOpacity
-                  key={deviceId}
-                  style={[styles.outputOption, selectedOutput === deviceId && styles.outputOptionSelected]}
-                  onPress={async () => {
-                    await selectAudioOutput(deviceId);
-                    setSelectedOutput(deviceId);
-                    setShowOutputPicker(false);
-                  }}
-                >
-                  <Feather name={outputIcon(deviceId) as any} size={18} color="white" />
-                  <Text style={styles.outputOptionText}>{deviceId}</Text>
-                  {selectedOutput === deviceId && <Feather name="check" size={16} color="white" style={{ marginLeft: 'auto' }} />}
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={styles.outputOption} onPress={() => setShowOutputPicker(false)}>
-                <Feather name="x" size={18} color="white" />
-                <Text style={styles.outputOptionText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Footer Actions */}
-          <View style={styles.footer}>
-            <TouchableOpacity style={styles.endCallBtn} onPress={() => {
-                if (callId) hangupCall(callId);
-                else endCall('ENDED');
-            }}>
-              <Feather name="phone-off" size={24} color="#FFF" style={{ marginRight: 12 }} />
-              <Text style={styles.endCallText}>End Call</Text>
-            </TouchableOpacity>
-
-            <Text style={styles.secureText}>This call is confidential and secure</Text>
-          </View>
-
-        </SafeAreaView>
-      </View>
-    </View>
-  );
-};
-
 export const CallModals = () => {
   const isIncoming = useCallStore((s) => s.isIncoming);
   const isOutgoing = useCallStore((s) => s.isOutgoing);
@@ -349,9 +52,10 @@ export const CallModals = () => {
   const livekitUrl = useCallStore((s) => s.livekitUrl);
   const endCall = useCallStore((s) => s.endCall);
   const { acceptCall, rejectCall, hangupCall } = useCall();
-  const [micStatus, setMicStatus] = useState<PermissionStatus>('undetermined');
   const [audioSessionReady, setAudioSessionReady] = useState(false);
   const [connectTimedOut, setConnectTimedOut] = useState(false);
+  const minimised = useCallUiStore((s) => s.minimised);
+  const micGateOpen = useMicGate((s) => s.open);
 
   useCallLogger();
 
@@ -359,6 +63,12 @@ export const CallModals = () => {
   useEffect(() => {
     if (!isActive && !isOutgoing) stopCallForegroundService();
   }, [isActive, isOutgoing]);
+
+  // A finished call never leaves the next one minimised or with a menu open. (After a call the store
+  // can move straight on to the next queued request, so this follows the call id, not just IDLE.)
+  useEffect(() => {
+    useCallUiStore.getState().reset();
+  }, [callId]);
 
   // Remember the call while it is live so its summary can be shown once it ends
   // (Figma "Support session ended successfully"). Only nurse sessions get a summary.
@@ -395,49 +105,34 @@ export const CallModals = () => {
   useEffect(() => {
     if (!ringing) return;
     let stopped = false;
-    let InCallManager: any = null;
     callSoundsEnabled().then((on) => {
-      if (!on || stopped) return;
-      try {
-        InCallManager = require('react-native-incall-manager').default;
-        InCallManager.startRingtone('_DEFAULT_');
-      } catch { /* no ringtone available */ }
+      if (on && !stopped) startRingtone();
     });
     // Never ring longer than the server's 45s ring timeout.
-    const cap = setTimeout(() => { try { InCallManager?.stopRingtone(); } catch {} }, 45_000);
+    const cap = setTimeout(stopRingtone, 45_000);
     return () => {
       stopped = true;
       clearTimeout(cap);
-      try { (InCallManager ?? require('react-native-incall-manager').default).stopRingtone(); } catch {}
+      stopRingtone();
     };
   }, [ringing]);
+
+  // A driver calling the passenger hears a ringback tone (not a ringtone) while it rings.
+  const ringingOut = isOutgoing && !isActive && status === 'RINGING';
+  useEffect(() => {
+    if (!ringingOut) return;
+    startRingback();
+    return () => { stopRingback(); };
+  }, [ringingOut]);
 
   // Nurses pick up open requests from their dashboard card; a call from the passenger of a ride
   // (or one this user is placing) takes the screen so it can be answered or cancelled.
   const visible = isActive || isOutgoing || (isIncoming && kind === 'ride');
-  const micGranted = micStatus === 'granted';
 
+  // Audio session: started as soon as there is a room to join - with or without the microphone
+  // (no permission means joining muted, not failing), released when the call is over.
   useEffect(() => {
     if (!isActive || !roomToken) {
-      setMicStatus('undetermined');
-      return;
-    }
-    let cancelled = false;
-    getMicrophonePermissionStatus().then((status) => {
-      if (cancelled) return;
-      if (status !== 'undetermined') {
-        setMicStatus(status);
-        return;
-      }
-      requestMicrophonePermission()
-        .then((res) => { if (!cancelled) setMicStatus(res); })
-        .catch((e) => { if (!cancelled) setMicStatus('denied'); });
-    });
-    return () => { cancelled = true; };
-  }, [isActive, roomToken]);
-
-  useEffect(() => {
-    if (!micGranted || !isActive || !roomToken) {
       setAudioSessionReady(false);
       return;
     }
@@ -446,12 +141,15 @@ export const CallModals = () => {
       if (!cancelled) setAudioSessionReady(ok);
     });
     return () => { cancelled = true; };
-  }, [micGranted, isActive, roomToken]);
+  }, [isActive, roomToken]);
+
+  useEffect(() => {
+    if (!isActive) stopCallAudioSession();
+  }, [isActive]);
 
   useEffect(() => {
     setConnectTimedOut(false);
     if (!isActive || !roomToken || status === 'CONNECTED') return;
-
     const timer = setTimeout(() => {
       const current = useCallStore.getState();
       if (current.callId === callId && current.status !== 'CONNECTED' && current.isActive) {
@@ -459,27 +157,64 @@ export const CallModals = () => {
         reportCallProblem(callId, 'connect_timeout', `no connection after ${CONNECT_TIMEOUT_MS}ms, status=${current.status}`);
       }
     }, CONNECT_TIMEOUT_MS);
-
     return () => clearTimeout(timer);
   }, [isActive, roomToken, callId, status === 'CONNECTED']);
 
   const handleAccept = () => {
     if (callId) acceptCall(callId);
   };
-
   const handleDecline = () => {
     if (callId) rejectCall(callId);
   };
+  const handleEnd = () => {
+    if (callId) hangupCall(callId); else endCall('ENDED');
+  };
 
-  let content: React.ReactNode;
+  const incomingScreen = visible && isIncoming && !isActive && !!callId;
+  const roomReady = isActive && !!roomToken && !!livekitUrl && audioSessionReady && !connectTimedOut;
 
-  // INCOMING CALL (WhatsApp Style)
-  if (isIncoming && !isActive && callId) {
-    const hasTrimester = remoteParticipant?.trimester || remoteParticipant?.pregnancy_week;
-    const specialtyLabel = kind === 'ride' ? 'Your passenger' : hasTrimester
-      ? `${remoteParticipant.trimester || ''} ${remoteParticipant.pregnancy_week ? `• Week ${remoteParticipant.pregnancy_week}` : ''}`
-      : remoteParticipant?.hospital_affiliation || '';
+  const hasTrimester = remoteParticipant?.trimester || remoteParticipant?.pregnancy_week;
+  const trimesterLabel = hasTrimester
+    ? `${remoteParticipant?.trimester || ''} ${remoteParticipant?.pregnancy_week ? `• Week ${remoteParticipant.pregnancy_week}` : ''}`.trim()
+    : '';
 
+  // ---- The room: mounted ONCE per call. Full screen and minimised are views of the same
+  // <LiveKitRoom>, so switching never disconnects the call or touches the microphone. ----
+  const roomModalVisible = roomReady && !minimised;
+  const room = roomReady ? (
+    <LiveKitRoom serverUrl={livekitUrl!} token={roomToken!} connect audio={false} video={false} options={ROOM_OPTIONS}>
+      <CallRoomLifecycle />
+      <Modal
+        visible={roomModalVisible}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+        navigationBarTranslucent
+        onRequestClose={() => {
+          const ui = useCallUiStore.getState();
+          if (useMicGate.getState().open) useMicGate.getState().finish('cancelled');
+          else if (ui.routeSheetOpen) ui.setRouteSheetOpen(false);
+          else ui.minimise();
+        }}
+      >
+        <ActiveCallScreen
+          fallbackName={kind === 'ride' ? 'Your passenger' : 'A mother'}
+          subtitle={hasTrimester
+            ? { icon: 'heart', label: trimesterLabel }
+            : remoteParticipant?.hospital_affiliation ? { icon: 'briefcase', label: remoteParticipant.hospital_affiliation }
+            : kind === 'ride' ? { icon: 'navigation', label: 'Your passenger' } : null}
+          onEnd={handleEnd}
+        />
+      </Modal>
+    </LiveKitRoom>
+  ) : null;
+
+  // ---- Everything before the room (ringing, connecting, problems). ----
+  let content: React.ReactNode = null;
+  if (!visible || roomReady) {
+    content = null;
+  } else if (incomingScreen) {
+    const specialtyLabel = kind === 'ride' ? 'Your passenger' : trimesterLabel || remoteParticipant?.hospital_affiliation || '';
     content = (
       <View style={styles.incomingContainer}>
         <StatusBar style='light' />
@@ -494,22 +229,18 @@ export const CallModals = () => {
                 )}
               </View>
               <Text style={styles.incomingName}>{remoteParticipant?.name || 'Incoming Call'}</Text>
-              
-              {!!specialtyLabel && (
-                <Text style={styles.incomingSubtitle}>{specialtyLabel}</Text>
-              )}
+              {!!specialtyLabel && <Text style={styles.incomingSubtitle}>{specialtyLabel}</Text>}
             </View>
 
             <View style={styles.incomingActions}>
               <View style={styles.incomingActionWrapper}>
-                <TouchableOpacity style={[styles.incomingBtn, styles.declineBtn]} onPress={handleDecline}>
+                <TouchableOpacity style={[styles.incomingBtn, styles.declineBtn]} onPress={handleDecline} accessibilityRole="button" accessibilityLabel="Decline call">
                   <MaterialIcons name="call-end" size={32} color="white" />
                 </TouchableOpacity>
                 <Text style={styles.incomingActionLabel}>Decline</Text>
               </View>
-
               <View style={styles.incomingActionWrapper}>
-                <TouchableOpacity style={[styles.incomingBtn, styles.acceptBtnUI]} onPress={handleAccept}>
+                <TouchableOpacity style={[styles.incomingBtn, styles.acceptBtnUI]} onPress={handleAccept} accessibilityRole="button" accessibilityLabel="Answer call">
                   <Feather name="phone" size={32} color="white" />
                 </TouchableOpacity>
                 <Text style={styles.incomingActionLabel}>Answer</Text>
@@ -523,83 +254,82 @@ export const CallModals = () => {
     content = (
       <View style={styles.centerContent}>
         <StatusBar style='light' />
+        <TouchableOpacity
+          style={[styles.iconButton, styles.minimiseCorner]}
+          onPress={() => useCallUiStore.getState().minimise()}
+          accessibilityRole="button"
+          accessibilityLabel="Minimise call"
+        >
+          <Feather name="chevron-down" size={24} color="#FFF" />
+        </TouchableOpacity>
         <Text style={styles.title}>
-          {status === 'ACCEPTED' ? 'Connecting…' : `Calling ${remoteParticipant?.name || 'your passenger'}…`}
+          {status === 'ACCEPTED' || status === 'CONNECTING' ? 'Connecting…' : `Calling ${remoteParticipant?.name || 'your passenger'}…`}
         </Text>
         <Text style={styles.statusText}>{kind === 'ride' ? 'Ringing your passenger' : 'Ringing'}</Text>
-        <TouchableOpacity style={styles.cancelBtn} onPress={() => { if (callId) hangupCall(callId); else endCall('CANCELLED'); }}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={() => { if (callId) hangupCall(callId); else endCall('CANCELLED'); }} accessibilityRole="button">
           <Text style={styles.cancelText}>Cancel</Text>
         </TouchableOpacity>
       </View>
     );
+  } else if (isActive && roomToken && !livekitUrl) {
+    content = (
+      <View style={styles.centerContent}>
+        <Text style={styles.title}>Call Failed</Text>
+        <Text style={styles.statusText}>Could not reach the call server. Please try again.</Text>
+        <TouchableOpacity style={styles.cancelBtn} onPress={() => { if (callId) hangupCall(callId); else endCall('FAILED'); }}>
+          <Text style={styles.cancelText}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  } else if (isActive && roomToken && connectTimedOut) {
+    content = (
+      <View style={styles.centerContent}>
+        <Text style={styles.title}>Connection Failed</Text>
+        <Text style={styles.statusText}>Could not establish a connection.</Text>
+        <TouchableOpacity style={styles.cancelBtn} onPress={() => { if (callId) hangupCall(callId); else endCall('FAILED'); }}>
+          <Text style={styles.cancelText}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    );
   } else if (isActive && roomToken) {
-    if (!livekitUrl) {
-      content = (
-        <View style={styles.centerContent}>
-          <Text style={styles.title}>Call Failed</Text>
-          <Text style={styles.statusText}>Could not reach the call server. Please try again.</Text>
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => { if (callId) hangupCall(callId); else endCall('FAILED'); }}>
-            <Text style={styles.cancelText}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    } else if (!micGranted) {
-      content = (
-        <View style={styles.centerContent}>
-          <Text style={styles.title}>Microphone Required</Text>
-          <Text style={styles.statusText}>Please allow microphone access to continue.</Text>
-          {micStatus === 'blocked' && (
-            <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: '#3b82f6' }]} onPress={openAppSettings}>
-              <Text style={styles.cancelText}>Open Settings</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => {
-            if (callId) hangupCall(callId); else endCall('ENDED');
-          }}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    } else if (!audioSessionReady) {
-      content = (
-        <View style={styles.centerContent}>
-          <Text style={styles.title}>Preparing Audio...</Text>
-        </View>
-      );
-    } else if (connectTimedOut) {
-      content = (
-        <View style={styles.centerContent}>
-          <Text style={styles.title}>Connection Failed</Text>
-          <Text style={styles.statusText}>Could not establish a connection.</Text>
-          <TouchableOpacity style={styles.cancelBtn} onPress={() => {
-            if (callId) hangupCall(callId); else endCall('FAILED');
-          }}>
-            <Text style={styles.cancelText}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    } else {
-      content = (
-        <LiveKitRoom
-          serverUrl={livekitUrl}
-          token={roomToken}
-          connect={true}
-          audio={true}
-          video={false}
-          options={{ adaptiveStream: true, dynacast: true }}
-        >
-          <ActiveCallUI />
-        </LiveKitRoom>
-      );
-    }
+    content = (
+      <View style={styles.centerContent}>
+        <Text style={styles.title}>Preparing Audio...</Text>
+      </View>
+    );
   }
 
-  if (!visible) return null;
+  const preRoomVisible = !!content && (incomingScreen || !minimised);
+  const pillVisible = visible && minimised && !incomingScreen;
+  // The permission sheet goes inside whichever call Modal is up; with none (answering from the
+  // dashboard card) it gets its own.
+  const ownGateModal = micGateOpen && !preRoomVisible && !roomModalVisible;
 
   return (
-    <Modal visible animationType="fade" transparent>
-      {content}
-    </Modal>
+    <>
+      {room}
+      {preRoomVisible && (
+        <Modal
+          visible
+          animationType="fade"
+          transparent
+          statusBarTranslucent
+          onRequestClose={() => {
+            if (useMicGate.getState().open) useMicGate.getState().finish('cancelled');
+            else if (!incomingScreen) useCallUiStore.getState().minimise();
+          }}
+        >
+          {content}
+          <MicPermissionSheet />
+        </Modal>
+      )}
+      {pillVisible && <FloatingCallPill />}
+      {ownGateModal && (
+        <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => useMicGate.getState().finish('cancelled')}>
+          <MicPermissionSheet />
+        </Modal>
+      )}
+    </>
   );
 };
 
@@ -613,6 +343,7 @@ const styles = StyleSheet.create({
   soundBarsContainer: { flexDirection: 'row', alignItems: 'center', marginRight: 8 },
   soundBar: { width: 2, backgroundColor: '#FFF', marginHorizontal: 1.5, borderRadius: 2 },
   badgeText: { color: '#FFF', fontSize: 16, fontWeight: '500' },
+  minimiseCorner: { position: 'absolute', top: 56, left: 20 },
   iconButton: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center' },
   centerGraphic: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   visualizerContainer: { flexDirection: 'row', alignItems: 'center' },

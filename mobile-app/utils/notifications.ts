@@ -41,14 +41,22 @@ export async function registerForPushNotificationsAsync() {
   return token;
 }
 
+const CALL_PUSH_TYPES = new Set([
+  'incoming_call', 'call_accepted', 'call_state', 'call_rejected', 'call_ended', 'call_timeout', 'call_missed',
+  'call_failed', 'call_cancelled', 'answered_here', 'call_answered_elsewhere',
+]);
+
 export function setupNotificationHandlers() {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
+    handleNotification: async (notification) => {
+      // With the app open, the call screen is the call UI (and plays the only ring, on the
+      // receiver's phone - lib/callTones.ts). A call push shown here as well made a second sound -
+      // on the caller's phone too, for "accepted" / "ended" updates.
+      const type = (notification.request.content.data as { type?: unknown } | undefined)?.type;
+      if (typeof type === 'string' && CALL_PUSH_TYPES.has(type)) {
+        return { shouldShowAlert: false, shouldPlaySound: false, shouldSetBadge: false, shouldShowBanner: false, shouldShowList: false };
+      }
+      return { shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true, shouldShowBanner: true, shouldShowList: true };
+    },
   });
 }
