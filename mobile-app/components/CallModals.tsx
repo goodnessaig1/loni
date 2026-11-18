@@ -398,7 +398,12 @@ export const CallModals = () => {
           <MicPermissionSheet />
         </Modal>
       )}
-      {pillVisible && <FloatingCallPill />}
+      {pillVisible && (
+        <FloatingCallPill
+          subtitle={remoteParticipant?.hospital_affiliation || (kind === 'ride' ? 'Your driver' : 'Maternal Health Specialist')}
+          onEnd={handleCancel}
+        />
+      )}
       {ownGateModal && (
         <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => useMicGate.getState().finish('cancelled')}>
           <MicPermissionSheet />

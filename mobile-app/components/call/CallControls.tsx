@@ -1,16 +1,22 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { AudioRouteKind } from '../../lib/audioSession';
-import { ROUTE_ICON, ROUTE_LABEL } from './AudioRouteSheet';
+import { ROUTE_LABEL } from './AudioRouteSheet';
 
 /**
- * The call's controls, at the bottom of the screen - away from the earpiece and the top-of-phone
- * microphone, inside the thumb's reach, above the home indicator / navigation bar. 64pt targets
- * (over the 44pt iOS / 48dp Android minimum), spaced so a slightly-off tap hits nothing else.
+ * The call's controls: one dark panel at the bottom of the screen (away from the earpiece and the
+ * top microphone, inside the thumb's reach), WhatsApp-style round buttons:
+ *   off  - dark glass circle, white icon
+ *   on   - solid white circle, black icon   (speaker on, muted, external audio in use)
+ *   end  - solid red circle
  *
- * Audio: with only the phone itself (earpiece + speaker) it is a plain Speaker on/off toggle. Only
- * when the OS reports a Bluetooth or wired device does it become a menu, listing what is there.
+ * NativeWind (jsxImportSource) drops a Pressable `style` given as a function, which is why the
+ * earlier buttons showed no circle at all and an "on" icon turned black on nothing. Buttons here
+ * use TouchableOpacity with plain style arrays.
+ *
+ * Audio: with only the phone itself (earpiece + speaker) it is a Speaker on/off toggle. Only when
+ * the OS reports a Bluetooth or wired device does it become an "Audio" menu, listing what is there.
  *
  * Same file in mobile-app and loni-server-app.
  */
@@ -28,28 +34,36 @@ interface Props {
 }
 
 type FeatherName = React.ComponentProps<typeof Feather>['name'];
+type McName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+type Icon = { feather: FeatherName } | { mc: McName };
 
-function ControlButton({ icon, label, active, danger, onPress, accessibilityLabel, badge }: {
-  icon: FeatherName; label: string; active?: boolean; danger?: boolean; onPress: () => void; accessibilityLabel: string; badge?: boolean;
+const ROUTE_BUTTON_ICON: Record<AudioRouteKind, Icon> = {
+  earpiece: { feather: 'smartphone' },
+  speaker: { mc: 'volume-high' },
+  bluetooth: { mc: 'bluetooth-audio' },
+  headset: { mc: 'headphones' },
+};
+
+function ControlButton({ icon, label, on, danger, onPress, accessibilityLabel, badge }: {
+  icon: Icon; label: string; on?: boolean; danger?: boolean; onPress: () => void; accessibilityLabel: string; badge?: boolean;
 }) {
+  const color = danger ? '#FFF' : on ? '#111' : '#FFF';
   return (
     <View style={styles.control}>
-      <Pressable
+      <TouchableOpacity
         onPress={onPress}
-        hitSlop={8}
-        style={({ pressed }) => [
-          styles.button,
-          active && styles.buttonActive,
-          danger && styles.buttonDanger,
-          pressed && { transform: [{ scale: 0.94 }] },
-        ]}
+        activeOpacity={0.7}
+        hitSlop={6}
+        style={[styles.button, on && styles.buttonOn, danger && styles.buttonDanger]}
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ selected: !!active }}
+        accessibilityState={{ selected: !!on }}
       >
-        <Feather name={icon} size={26} color={active && !danger ? '#0F172A' : '#FFF'} />
+        {'feather' in icon
+          ? <Feather name={icon.feather} size={26} color={color} />
+          : <MaterialCommunityIcons name={icon.mc} size={28} color={color} />}
         {badge && <View style={styles.badge}><Text style={styles.badgeText}>!</Text></View>}
-      </Pressable>
+      </TouchableOpacity>
       <Text style={styles.label} numberOfLines={1}>{label}</Text>
     </View>
   );
@@ -62,51 +76,59 @@ export function CallControls({ available, current, onSelectRoute, onOpenRouteMen
 
   const audio = hasExternal ? (
     <ControlButton
-      icon={current ? ROUTE_ICON[current] : 'volume-1'}
-      label={current ? ROUTE_LABEL[current] : 'Audio'}
-      active={current === 'speaker'}
+      icon={current ? ROUTE_BUTTON_ICON[current] : { mc: 'volume-high' }}
+      label="Audio"
+      // Like WhatsApp: lit whenever sound is NOT coming from the phone's earpiece.
+      on={!!current && current !== 'earpiece'}
       onPress={onOpenRouteMenu}
       accessibilityLabel={`Audio output: ${current ? ROUTE_LABEL[current] : 'unknown'}. Choose output`}
     />
   ) : (
     <ControlButton
-      icon="volume-2"
+      icon={{ mc: 'volume-high' }}
       label="Speaker"
-      active={onSpeaker}
+      on={onSpeaker}
       onPress={() => { if (canToggleSpeaker) onSelectRoute(onSpeaker ? 'earpiece' : 'speaker'); }}
       accessibilityLabel={onSpeaker ? 'Speaker on. Switch to phone earpiece' : 'Speaker off. Switch to loudspeaker'}
     />
   );
 
   return (
-    <View style={styles.row}>
+    <View style={styles.panel}>
       {audio}
       <ControlButton
-        icon={micMuted || micUnavailable ? 'mic-off' : 'mic'}
+        icon={{ mc: micMuted || micUnavailable ? 'microphone-off' : 'microphone' }}
         label={micUnavailable ? 'Mic off' : micMuted ? 'Unmute' : 'Mute'}
-        active={micMuted && !micUnavailable}
+        on={micMuted && !micUnavailable}
         badge={micUnavailable}
         onPress={onToggleMic}
-        accessibilityLabel={micUnavailable ? 'Microphone not allowed. Allow microphone' : micMuted ? 'Unmute microphone' : 'Mute microphone'}
+        accessibilityLabel={micUnavailable ? 'Microphone not allowed. Allow microphone' : micMuted ? 'Muted. Unmute microphone' : 'Mute microphone'}
       />
-      <ControlButton icon="phone-off" label="End" danger onPress={onEnd} accessibilityLabel="End call" />
+      <ControlButton icon={{ mc: 'phone-hangup' }} label="End" danger onPress={onEnd} accessibilityLabel="End call" />
     </View>
   );
 }
 
+/** Height of the panel, so overlays (the audio menu) can sit just above it. */
+export const CALL_CONTROLS_HEIGHT = 128;
+
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-start', width: '100%' },
+  panel: {
+    flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-start', width: '100%',
+    backgroundColor: 'rgba(28,28,30,0.92)', borderRadius: 32, paddingTop: 18, paddingBottom: 14,
+    minHeight: CALL_CONTROLS_HEIGHT,
+  },
   control: { alignItems: 'center', width: 88 },
   button: {
-    width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.18)',
+    width: 68, height: 68, borderRadius: 34, backgroundColor: '#3A3A3C',
     justifyContent: 'center', alignItems: 'center',
   },
-  buttonActive: { backgroundColor: '#FFF' },
-  buttonDanger: { backgroundColor: '#FF3B30' },
-  label: { color: '#FFF', fontSize: 13, marginTop: 8, opacity: 0.9 },
+  buttonOn: { backgroundColor: '#F5F5F5' },
+  buttonDanger: { backgroundColor: '#E5243B' },
+  label: { color: '#FFF', fontSize: 14, marginTop: 8 },
   badge: {
-    position: 'absolute', top: 0, right: 0, width: 20, height: 20, borderRadius: 10, backgroundColor: '#F59E0B',
-    justifyContent: 'center', alignItems: 'center',
+    position: 'absolute', top: -2, right: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: '#F59E0B',
+    justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#1C1C1E',
   },
-  badgeText: { color: '#000', fontSize: 13, fontWeight: '800' },
+  badgeText: { color: '#000', fontSize: 12, fontWeight: '800' },
 });

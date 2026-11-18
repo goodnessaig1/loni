@@ -323,7 +323,12 @@ export const CallModals = () => {
           <MicPermissionSheet />
         </Modal>
       )}
-      {pillVisible && <FloatingCallPill />}
+      {pillVisible && (
+        <FloatingCallPill
+          subtitle={trimesterLabel || (kind === 'ride' ? 'Your passenger' : 'Mother')}
+          onEnd={handleEnd}
+        />
+      )}
       {ownGateModal && (
         <Modal visible transparent animationType="fade" statusBarTranslucent onRequestClose={() => useMicGate.getState().finish('cancelled')}>
           <MicPermissionSheet />

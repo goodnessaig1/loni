@@ -8,10 +8,10 @@ import { create } from 'zustand';
  */
 
 export interface PillPosition {
-  /** Which screen edge the widget is docked to. */
-  side: 'left' | 'right';
   /** Distance from the top of the screen, before safe-area clamping. */
   y: number;
+  /** Pushed off the side of the screen (only a small tab shows), like WhatsApp's call window. */
+  tucked: 'left' | 'right' | null;
 }
 
 interface CallUiState {
@@ -24,17 +24,17 @@ interface CallUiState {
   expand: () => void;
   setRouteSheetOpen: (open: boolean) => void;
   setPill: (pill: PillPosition) => void;
-  /** The call is over: next call starts full screen. The widget keeps its last position. */
+  /** The call is over: next call starts full screen, un-tucked. The widget keeps its height. */
   reset: () => void;
 }
 
 export const useCallUiStore = create<CallUiState>((set) => ({
   minimised: false,
   routeSheetOpen: false,
-  pill: { side: 'right', y: 120 },
+  pill: { y: 0, tucked: null },
   minimise: () => set({ minimised: true, routeSheetOpen: false }),
   expand: () => set({ minimised: false }),
   setRouteSheetOpen: (open) => set({ routeSheetOpen: open }),
   setPill: (pill) => set({ pill }),
-  reset: () => set({ minimised: false, routeSheetOpen: false }),
+  reset: () => set((st) => ({ minimised: false, routeSheetOpen: false, pill: { ...st.pill, tucked: null } })),
 }));

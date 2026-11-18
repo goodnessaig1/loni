@@ -13,7 +13,7 @@ import { useMicPermissionStatus } from '../../hooks/useMicPermissionStatus';
 import { formatCallDuration, useCallDuration } from '../../hooks/useCallDuration';
 import { toggleMicrophone } from '../../lib/activeRoom';
 import { cdnImage } from '../../lib/cdnImage';
-import { CallControls } from './CallControls';
+import { CALL_CONTROLS_HEIGHT, CallControls } from './CallControls';
 import { AudioRouteSheet } from './AudioRouteSheet';
 import { MicPermissionSheet } from './MicPermissionSheet';
 
@@ -137,7 +137,7 @@ export function ActiveCallScreen({ fallbackName, subtitle, fallbackBackground, o
             accessibilityLabel="Minimise call"
             accessibilityHint="Keeps the call going while you use the app"
           >
-            <Feather name="chevron-down" size={26} color="#FFF" />
+            <Feather name="minimize-2" size={22} color="#FFF" />
           </Pressable>
           <StatusBadge />
           <View style={{ width: 48 }} />
@@ -188,12 +188,18 @@ export function ActiveCallScreen({ fallbackName, subtitle, fallbackBackground, o
           current={route.current}
           onSelect={route.select}
           onClose={() => setRouteSheetOpen(false)}
+          // Opens over the Audio button, overlapping the top of the controls panel like WhatsApp.
+          bottom={insets.bottom + 20 + SECURE_LINE_HEIGHT + CALL_CONTROLS_HEIGHT - 40}
+          left={insets.left + 28}
         />
       )}
       <MicPermissionSheet />
     </View>
   );
 }
+
+/** The "confidential and secure" line under the controls (text + its top margin). */
+const SECURE_LINE_HEIGHT = 36;
 
 const shadow = { textShadowColor: 'rgba(0,0,0,0.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 };
 
@@ -227,5 +233,5 @@ const styles = StyleSheet.create({
   },
   micBannerText: { flex: 1, color: '#FFF', fontSize: 14 },
   micBannerAction: { color: '#FDE68A', fontSize: 15, fontWeight: '700' },
-  secure: { color: '#FFF', fontSize: 13, opacity: 0.7, textAlign: 'center', marginTop: 20 },
+  secure: { color: '#FFF', fontSize: 13, lineHeight: 16, opacity: 0.7, textAlign: 'center', marginTop: 20 },
 });

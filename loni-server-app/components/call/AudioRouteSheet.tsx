@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { AudioRouteKind } from '../../lib/audioSession';
 
@@ -27,47 +26,59 @@ interface Props {
   current: AudioRouteKind | null;
   onSelect: (kind: AudioRouteKind) => void;
   onClose: () => void;
+  /** Distance from the bottom of the screen: the menu opens just above the Audio button. */
+  bottom: number;
+  left: number;
 }
 
 /**
- * The audio output menu, shown only when an external device (Bluetooth / wired) is connected.
- * Lists only the routes the OS reports as available. Tapping outside, picking an option, or the
- * Android back button (handled by the call screen's Modal) closes it.
+ * The audio output menu (WhatsApp-style popover over the Audio button), shown only when an
+ * external device (Bluetooth / wired) is connected. Lists only the routes the OS reports as
+ * available, with a tick on the one in use. Tapping outside, picking an option, or the Android
+ * back button (handled by the call screen's Modal) closes it.
+ *
+ * Rows use TouchableOpacity + plain style arrays: NativeWind drops function-form Pressable styles.
  */
-export function AudioRouteSheet({ available, current, onSelect, onClose }: Props) {
-  const insets = useSafeAreaInsets();
-  const slide = useRef(new Animated.Value(0)).current;
+export function AudioRouteSheet({ available, current, onSelect, onClose, bottom, left }: Props) {
+  const pop = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(slide, { toValue: 1, duration: 180, useNativeDriver: true }).start();
-  }, [slide]);
+    Animated.spring(pop, { toValue: 1, useNativeDriver: true, friction: 8, tension: 120 }).start();
+  }, [pop]);
+
+  // Phone first, like the OS pickers: Speaker, Phone, then devices.
+  const order: AudioRouteKind[] = ['speaker', 'earpiece', 'headset', 'bluetooth'];
+  const routes = order.filter((k) => available.includes(k));
 
   return (
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close audio menu" />
       <Animated.View
-        style={[styles.sheet, {
-          paddingBottom: insets.bottom + 16,
-          opacity: slide,
-          transform: [{ translateY: slide.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }],
+        style={[styles.menu, {
+          bottom, left,
+          opacity: pop,
+          transform: [
+            { translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) },
+            { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+          ],
         }]}
         accessibilityViewIsModal
       >
-        <Text style={styles.title}>Audio</Text>
-        {available.map((kind) => {
+        {routes.map((kind, i) => {
           const selected = current === kind;
           return (
-            <Pressable
+            <TouchableOpacity
               key={kind}
-              style={({ pressed }) => [styles.option, selected && styles.optionSelected, pressed && { opacity: 0.7 }]}
+              activeOpacity={0.6}
+              style={[styles.option, i > 0 && styles.divider]}
               onPress={() => { onSelect(kind); onClose(); }}
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={ROUTE_LABEL[kind]}
             >
+              <View style={styles.tick}>{selected && <Feather name="check" size={18} color="#FFF" />}</View>
               <Feather name={ROUTE_ICON[kind]} size={20} color="#FFF" />
-              <Text style={styles.optionText}>{ROUTE_LABEL[kind]}</Text>
-              {selected && <Feather name="check" size={18} color="#4ADE80" style={{ marginLeft: 'auto' }} />}
-            </Pressable>
+              <Text style={[styles.optionText, selected && { fontWeight: '600' }]}>{ROUTE_LABEL[kind]}</Text>
+            </TouchableOpacity>
           );
         })}
       </Animated.View>
@@ -76,13 +87,14 @@ export function AudioRouteSheet({ available, current, onSelect, onClose }: Props
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#1E293B',
-    borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 12, paddingHorizontal: 16,
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
+  menu: {
+    position: 'absolute', minWidth: 230, backgroundColor: 'rgba(44,44,46,0.98)', borderRadius: 22,
+    paddingVertical: 6, elevation: 16,
+    shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
   },
-  title: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: '600', marginBottom: 6, marginLeft: 8 },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 52, paddingHorizontal: 12, borderRadius: 12 },
-  optionSelected: { backgroundColor: 'rgba(255,255,255,0.1)' },
-  optionText: { color: '#FFF', fontSize: 16 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54, paddingLeft: 10, paddingRight: 22 },
+  divider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.12)' },
+  tick: { width: 22, alignItems: 'center' },
+  optionText: { color: '#FFF', fontSize: 17 },
 });
