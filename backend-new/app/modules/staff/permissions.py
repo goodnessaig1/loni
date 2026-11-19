@@ -34,6 +34,7 @@ CATALOGUE: List[Permission] = [
     Permission("community.moderate", "Community", "Moderate community", "Hide posts and comments."),
     Permission("support.manage", "Support", "Handle support", "Read and answer support messages and incidents."),
     Permission("ai_safety.review", "Safety", "Review AI safety events", "Read flagged Loni AI conversations."),
+    Permission("knowledge.manage", "Safety", "Manage AI knowledge base", "Draft, approve and retire the documents Loni may cite."),
     Permission("checkins.manage", "Safety", "Run check-ins", "Preview and trigger proactive check-ins."),
     Permission("analytics.view", "Analytics", "View analytics", "See platform analytics and revenue."),
     Permission("reports.export", "Analytics", "Export reports", "Download data exports."),

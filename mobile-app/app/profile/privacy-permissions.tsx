@@ -21,7 +21,7 @@ export default function PrivacyPermissionsScreen() {
   const forgetAll = async () => {
     try {
       await checkinsApi.forget();
-      queryClient.invalidateQueries({ queryKey: ['checkins'] });
+      queryClient.invalidateQueries({ queryKey: ['checkins'] }); // notes, facts and preferences
       Toast.show({ type: 'success', text1: 'Done', text2: 'Loni has forgotten what you shared.' });
     } catch (e: any) {
       Toast.show({ type: 'error', text1: 'Could not clear it', text2: e?.response?.data?.message || e?.message });
@@ -106,6 +106,15 @@ export default function PrivacyPermissionsScreen() {
             prefs?.remember ?? true,
             () => updatePrefs.mutate({ remember: !(prefs?.remember ?? true) }),
           )}
+          <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/profile/loni-memory' as any)} className="flex-row justify-between items-center p-4 rounded-[14px]" style={{ backgroundColor: colors.elevated }}>
+            <View className="flex-1 pr-4">
+              <HelixaText className="text-[15px] mb-1">See what Loni remembers</HelixaText>
+              <HelixaText className="text-[13px] leading-4" style={{ color: colors.textSecondary }}>Correct, mark as better, or delete each item</HelixaText>
+            </View>
+            <View className="w-8 h-8 rounded-full items-center justify-center" style={{ backgroundColor: colors.surface }}>
+              <Feather name="arrow-right" size={16} color={colors.text} />
+            </View>
+          </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.6} onPress={forgetAll} className="flex-row justify-between items-center p-4 rounded-[14px]" style={{ backgroundColor: colors.elevated }}>
             <View className="flex-1 pr-4">
               <HelixaText className="text-[15px] mb-1">Clear what Loni remembers</HelixaText>

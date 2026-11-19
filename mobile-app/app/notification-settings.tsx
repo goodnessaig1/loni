@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, Switch, ScrollView } from 'react-native';
+import { View, Pressable, Switch, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -51,6 +51,16 @@ export default function NotificationSettingsScreen() {
   // Persisted on the server: it is the switch the daily check-in scheduler obeys.
   const { prefs, update: updatePrefs } = useCheckinPreferences();
   const wellnessCheckins = prefs?.enabled ?? true;
+  const todayIso = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in her timezone
+  const pausedUntil = prefs?.paused_until && prefs.paused_until >= todayIso ? prefs.paused_until : null;
+  const pausedLabel = pausedUntil
+    ? new Date(`${pausedUntil}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })
+    : null;
+  const PAUSES = [
+    { days: 1, label: 'Today' },
+    { days: 3, label: '3 days' },
+    { days: 7, label: '1 week' },
+  ];
 
   return (
     <SafeAreaView className="flex-1" style={{ backgroundColor: colors.bg }}>
@@ -142,6 +152,49 @@ export default function NotificationSettingsScreen() {
               onValueChange={(enabled) => updatePrefs.mutate({ enabled })}
             />
           </View>
+          {wellnessCheckins && (
+            <View style={{ backgroundColor: colors.elevated, padding: 16, borderRadius: 14, marginTop: 12 }}>
+              {pausedLabel ? (
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 pr-4">
+                    <HelixaText className="text-[15px] mb-1" weight="bold">Paused</HelixaText>
+                    <HelixaText className="text-[13px]" style={{ color: colors.textSecondary }}>
+                      No check-ins until after {pausedLabel}. Loni is still here whenever you want to chat.
+                    </HelixaText>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => updatePrefs.mutate({ pause_days: 0 })}
+                    accessibilityRole="button"
+                    accessibilityLabel="Resume check-ins"
+                    style={{ paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#D62D88' }}
+                  >
+                    <HelixaText weight="bold" style={{ color: '#D62D88', fontSize: 13 }}>Resume</HelixaText>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <HelixaText className="text-[15px] mb-1" weight="bold">Need a break?</HelixaText>
+                  <HelixaText className="text-[13px] mb-3" style={{ color: colors.textSecondary }}>
+                    Pause check-ins for a while. Safety messages after a worrying chat are paused too, so reach out to Loni or a nurse if you need us.
+                  </HelixaText>
+                  <View className="flex-row gap-2">
+                    {PAUSES.map((p) => (
+                      <TouchableOpacity
+                        key={p.days}
+                        onPress={() => updatePrefs.mutate({ pause_days: p.days })}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Pause check-ins for ${p.label}`}
+                        className="flex-1 items-center py-2.5 rounded-[12px]"
+                        style={{ backgroundColor: colors.surface }}
+                      >
+                        <HelixaText className="text-[13px]">{p.label}</HelixaText>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              )}
+            </View>
+          )}
         </View>
         </Reveal>
 

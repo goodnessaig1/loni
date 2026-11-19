@@ -3,7 +3,7 @@ The rules for WHETHER a mother gets a hello today. Pure functions: no database, 
 can be tested exactly and the scheduler's dry-run can explain each decision.
 
 The guards, in the order they are checked (cheap first):
-  1. she turned check-ins off
+  1. she turned check-ins off, or paused them until a date
   2. quiet hours / before her preferred hour (in HER timezone)
   3. already sent a daily hello for her local date          <- the "not twice a day" rule
   4. hit the cap on all proactive messages for today
@@ -45,6 +45,7 @@ class Prefs:
     timezone: str = "Africa/Lagos"
     preferred_hour: int = 9
     remember: bool = True
+    paused_until: Optional[date] = None     # no proactive messages through this local date
 
 
 @dataclass
@@ -109,6 +110,8 @@ def decide_daily(now: datetime, prefs: Prefs, category: str, s: Signals, *, defa
 
     if not prefs.enabled:
         return no("disabled")
+    if prefs.paused_until is not None and today <= prefs.paused_until:
+        return no("paused")
     if local.hour >= end_hour:
         return no("quiet_hours")
     if local.hour < prefs.preferred_hour:
@@ -140,6 +143,8 @@ def decide_followup(now: datetime, prefs: Prefs, s: Signals, *, default_tz: str,
 
     if not prefs.enabled:
         return no("disabled")
+    if prefs.paused_until is not None and today <= prefs.paused_until:
+        return no("paused")
     if local.hour >= end_hour:
         return no("quiet_hours")
     if local.hour < min(prefs.preferred_hour, 9):

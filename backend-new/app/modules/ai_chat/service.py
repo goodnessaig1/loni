@@ -6,10 +6,11 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.mongo_db import get_mongo_db
 from app.modules.ai_chat import messages as safe_messages
-from app.modules.ai_chat import classifier, lookup, safety
+from app.modules.ai_chat import classifier, lookup, nigerian, safety
 from app.modules.ai_chat.context import profile_lines, stage_context, stage_text
 from app.modules.ai_chat.prompts import (
-    CHECKIN_DIRECTIVE, CHECKIN_INTENSIVE_EXTRA, CONTEXT_TEMPLATE, EMOTIONAL_FLAG_DIRECTIVE, INFO_ONLY_DIRECTIVE,
+    CHECKIN_DIRECTIVE, CHECKIN_INTENSIVE_EXTRA, CONTEXT_TEMPLATE, EMOTIONAL_FLAG_DIRECTIVE, FACTS_TEMPLATE, INFO_ONLY_DIRECTIVE,
+    KNOWLEDGE_TEMPLATE,
     LOOKUP_NEEDS_PLACE, LOOKUP_NO_RESULTS, LOOKUP_TEMPLATE, LOOKUP_UNAVAILABLE, MEMORY_TEMPLATE, URGENT_DIRECTIVE,
     build_system_prompt,
 )
@@ -49,22 +50,28 @@ def _meta(result: TriageResult) -> dict:
         if a["type"] == "call_emergency":
             a["phone"] = settings.EMERGENCY_PHONE
         actions.append(a)
-    return {"urgency": result.urgency.value, "domain": result.domain, "answer_type": result.answer_type, "actions": actions}
+    return {"urgency": result.urgency.value, "domain": result.domain, "answer_type": result.answer_type, "actions": actions,
+            "rule_ids": list(result.rule_ids)}
 
 
 def build_llm_messages(history: list, user, stage: StageContext, result: TriageResult, origin: dict | None = None,
-                       memory_lines: list | None = None, lookup_block: str | None = None) -> list:
+                       memory_lines: list | None = None, lookup_block: str | None = None, fact_lines: list | None = None,
+                       knowledge_block: str | None = None, user_text: str = "") -> list:
     """System prompt, her profile context, the conversation, and (last, so it carries the most weight) the
     directive for this particular turn."""
     msgs = [
         {"role": "system", "content": build_system_prompt(settings.EMERGENCY_PHONE)},
         {"role": "system", "content": CONTEXT_TEMPLATE.format(lines="\n".join(profile_lines(user, stage)))},
     ]
+    if fact_lines:
+        msgs.append({"role": "system", "content": FACTS_TEMPLATE.format(lines="\n".join(fact_lines))})
     if memory_lines:
         msgs.append({"role": "system", "content": MEMORY_TEMPLATE.format(lines="\n".join(memory_lines))})
     msgs += [{"role": m["role"], "content": m["content"]} for m in history]
     if lookup_block:
         msgs.append({"role": "system", "content": lookup_block})
+    if knowledge_block:
+        msgs.append({"role": "system", "content": KNOWLEDGE_TEMPLATE.format(docs=knowledge_block)})
 
     directives = []
     if result.urgency == Urgency.urgent:
@@ -80,6 +87,9 @@ def build_llm_messages(history: list, user, stage: StageContext, result: TriageR
     pattern = ANSWER_PATTERNS.get(result.answer_type, "")
     if pattern and result.urgency != Urgency.urgent:
         directives.append("RESPONSE PATTERN: " + pattern)
+    local = nigerian.directive(user_text, serious=result.urgency in (Urgency.urgent, Urgency.emergency))
+    if local:
+        directives.append(local)
     if directives:
         msgs.append({"role": "system", "content": "\n\n".join(directives)})
     return msgs
@@ -106,20 +116,33 @@ def _client_and_model():
     return p.client, p.model
 
 
-async def _learn_and_recall(user_id: str, text: str) -> list:
-    """Note what this message tells us about her day, and return short lines about the last week for the AI.
+async def _learn_and_recall(user_id: str, text: str) -> tuple:
+    """Note what this message tells us (day tags + structured facts), and return (day lines, fact lines) for the AI.
     Silent on any failure and does nothing if she turned memory off."""
     try:
-        from app.modules.checkins import memory as mem, service as cs
+        from app.modules.checkins import facts as fx, memory as mem, service as cs
         async with AsyncSessionLocal() as db:
             prefs = await cs.get_preferences(db, user_id)
             if not prefs.remember:
-                return []
+                return [], []
             today = cs.policy.local_now(datetime.now(timezone.utc), cs.policy.safe_zone(prefs.timezone, settings.CHECKIN_DEFAULT_TZ)).date()
             await mem.remember(db, user_id, text, today)
-            return mem.context_lines(await mem.recent_notes(db, user_id, today, days=7), today)
+            await fx.learn(db, user_id, text, today)
+            day_lines = mem.context_lines(await mem.recent_notes(db, user_id, today, days=7), today)
+            return day_lines, fx.context_lines(await fx.list_facts(db, user_id), today)
     except Exception as e:
         print(f"Could not use memory: {e}")
+        return [], []
+
+
+async def _knowledge(text: str, stage: StageContext) -> list:
+    """Approved, unexpired knowledge-base documents that match her question and stage ([] on any failure)."""
+    try:
+        from app.modules.knowledge import service as kb
+        async with AsyncSessionLocal() as db:
+            return await kb.search(db, text, stage.kind, stage.week, datetime.now(timezone.utc).date())
+    except Exception as e:
+        print(f"Could not search the knowledge base: {e}")
         return []
 
 
@@ -189,11 +212,20 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
                 meta = {**meta, "sources": lookup_result.sources()}
 
     # 3d. What she has told Loni lately (tags, not her words) so the chat feels continuous; also learn from this message.
-    memory_lines = await _learn_and_recall(user_id, content)
+    memory_lines, fact_lines = await _learn_and_recall(user_id, content)
+
+    # 3e. Clinician-approved reference notes for this question and stage (only approved, unexpired documents).
+    knowledge_hits = await _knowledge(content, stage)
+    knowledge_block = None
+    if knowledge_hits:
+        from app.modules.knowledge import service as kb
+        knowledge_block = kb.format_for_model(knowledge_hits)
+        meta = {**meta, "sources": [*meta.get("sources", []), *kb.sources(knowledge_hits)]}
 
     # 4. Conversation history for context (last 20 messages; it already contains the message just saved)
     history = (await get_session_messages(session_id))[-20:]
-    openai_messages = build_llm_messages(history, user, stage, result, origin, memory_lines, lookup_block)
+    openai_messages = build_llm_messages(history, user, stage, result, origin, memory_lines, lookup_block,
+                                         fact_lines, knowledge_block, content)
 
     # 5. Urgent: the fixed "get checked today" line goes out before any model text, so it is there even if the model fails.
     full = ""
@@ -344,3 +376,72 @@ async def mark_safety_event_reviewed(event_id: str, admin_id: str, note: str | N
         {"$set": {"reviewed_at": datetime.now(timezone.utc), "reviewed_by": admin_id, "review_note": (note or "").strip() or None}},
     )
     return result.matched_count > 0
+
+
+# ── nurse handoff (she chooses to share a summary with the nurse she calls) ─────────────────────────
+
+async def _handoff_inputs(user, session_id: str | None):
+    from app.modules.checkins import facts as fx, service as cs
+    messages = []
+    if session_id:
+        cutoff = datetime.now(timezone.utc).timestamp() - 24 * 3600
+        messages = [m for m in await get_session_messages(session_id, limit=60)
+                    if (m.get("created_at") is None or _ts(m["created_at"]) >= cutoff)]
+    async with AsyncSessionLocal() as db:
+        prefs = await cs.get_preferences(db, user.id)
+        today = cs.policy.local_now(datetime.now(timezone.utc), cs.policy.safe_zone(prefs.timezone, settings.CHECKIN_DEFAULT_TZ)).date()
+        facts = await fx.list_facts(db, user.id) if prefs.remember else []
+    return messages, facts, today
+
+
+def _ts(dt) -> float:
+    return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).timestamp()
+
+
+async def preview_handoff(user, session_id: str | None, include_messages: bool) -> dict:
+    from app.modules.ai_chat import handoff
+    messages, facts, today = await _handoff_inputs(user, session_id)
+    return handoff.build_summary(user, messages, facts, today, include_messages)
+
+
+async def share_handoff(user, session_id: str | None, include_messages: bool) -> dict:
+    from app.modules.ai_chat import audit, handoff
+    summary = await preview_handoff(user, session_id, include_messages)
+    rec = handoff.new_record(user.id, session_id, summary, include_messages)
+    await get_mongo_db()["nurse_handoffs"].insert_one(dict(rec))
+    await audit.record("handoff.shared", actor=user.id, subject=user.id, handoff_id=rec["id"], includes_messages=include_messages)
+    return handoff.public(rec)
+
+
+async def my_handoffs(user_id: str) -> list:
+    cursor = get_mongo_db()["nurse_handoffs"].find({"user_id": user_id}).sort("created_at", -1).limit(20)
+    return [{k: v for k, v in d.items() if k != "_id"} for d in await cursor.to_list(length=20)]
+
+
+async def withdraw_handoff(user_id: str, handoff_id: str) -> bool:
+    from app.modules.ai_chat import audit
+    db = get_mongo_db()
+    found = await db["nurse_handoffs"].find({"id": handoff_id, "user_id": user_id}).to_list(length=1)
+    if not found:
+        return False
+    await db["nurse_handoffs"].delete_many({"id": handoff_id, "user_id": user_id})
+    await audit.record("handoff.withdrawn", actor=user_id, subject=user_id, handoff_id=handoff_id)
+    return True
+
+
+async def handoffs_for_nurse(nurse_id: str, mother_id: str) -> list:
+    """Only shared, unexpired summaries; the router has already checked the nurse is on a call with her."""
+    from app.modules.ai_chat import audit
+    now = datetime.now(timezone.utc)
+    db = get_mongo_db()
+    docs = await db["nurse_handoffs"].find({"user_id": mother_id}).sort("created_at", -1).limit(5).to_list(length=5)
+    out = []
+    for d in docs:
+        if d.get("expires_at") and _ts(d["expires_at"]) < now.timestamp():
+            continue
+        if d.get("status") == "awaiting_nurse":
+            await db["nurse_handoffs"].update_one({"id": d["id"]}, {"$set": {"status": "viewed_by_nurse", "viewed_by": nurse_id, "viewed_at": now}})
+            d.update(status="viewed_by_nurse", viewed_by=nurse_id, viewed_at=now)
+        await audit.record("handoff.viewed", actor=nurse_id, subject=mother_id, handoff_id=d["id"])
+        out.append({k: v for k, v in d.items() if k != "_id"})
+    return out

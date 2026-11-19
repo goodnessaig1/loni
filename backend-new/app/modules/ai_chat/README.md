@@ -25,7 +25,13 @@ message ─► save ─► triage (rules, deterministic) ─► [classifier: can
 | `lookup.py` | Finds a facility's hours, address and phone (Google Places, optional web search); detects the question; builds the source line |
 | `context.py` | Name + stage handed to the model (nothing else from her profile) |
 | `safety.py` | Post-checks on the model's answer: reassurance on a red flag, doses, "stop your medicine", invented bookings, and the short "not medical advice" reminder every health answer must carry |
+| `nigerian.py` | Nigerian English / Pidgin glossary → per-turn hint (likely meaning; ask ONE clarifying question when vague; humour only when she jokes and nothing is serious). Never changes urgency |
+| `handoff.py` | Nurse handoff summary built deterministically (stage, flagged danger signs, allergies/meds/concerns with provenance). Shared only with her consent; `awaiting_nurse` until the nurse on her call opens it |
+| `audit.py` | `ai_audit_log`: who did what to which record (memory edits, handoffs, KB changes), never health text |
+| `../checkins/facts.py` | Structured memory: kind, provenance (user_reported / clinician_confirmed / ai_inferred), last mentioned; staleness computed at read time; list / correct / resolve / delete |
+| `../knowledge/` | Curated knowledge base: draft → approved (named reviewer + expiry) → retired; any edit returns it to draft. Only approved, unexpired, stage-matched docs reach the model |
 | `tests/triage_cases.py` | The gold set. Add a line whenever a real message is mis-triaged |
+| `tests/test_loni_scenarios.py` | The spec's 10 scenarios (deterministic; fake model). `tests/live/` = LLM-graded tone eval (`LONI_LIVE_EVAL=1`) |
 
 ## Human review
 
@@ -39,13 +45,15 @@ mark them reviewed at `POST .../{id}/review`. Opening a conversation is an admin
 2. Every message in `messages.py`, including the first-aid lines (seizure: left side, nothing in the mouth; newborn: keep warm).
 3. The Nigerian Pidgin phrases (needs a native speaker) and the emergency number (`EMERGENCY_PHONE`, default 112).
 4. `tests/triage_cases.py`: expected urgency for each case.
+5. The `serious_infection` emergency rule (fever + confusion / fast breathing / fainting / foul postpartum discharge).
+6. `nigerian.py` meanings (native speaker) and the handoff summary format (a LONI nurse).
 
 ## Known limits (be honest about these)
 
 - Keyword rules cannot recognise every phrasing. On an unseen set of paraphrases they caught about half of the emergencies
   before the classifier layer existed, which is why the classifier (and the clinician-reviewed gold set) are required.
-- No clinical knowledge base / retrieval is wired in yet: answers rely on the model plus the safety rules.
-  A versioned, clinician-approved KB is the next step.
+- The knowledge base is wired in but EMPTY: no document has been approved. Until clinicians add and approve documents
+  (`/api/v1/knowledge/docs`, permission `knowledge.manage`), answers rely on the model plus the safety rules.
 - Triage is English-centred. Yoruba, Igbo and Hausa are not covered; the classifier may help but is untested.
 - It cannot see whether a nurse, driver or hospital is available, so it never claims one is.
 

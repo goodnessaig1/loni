@@ -17,6 +17,7 @@ import app.modules.account.models  # noqa: F401
 import app.modules.calls.models  # noqa: F401
 import app.modules.care.models  # noqa: F401
 import app.modules.checkins.models  # noqa: F401
+import app.modules.knowledge.models  # noqa: F401
 import app.modules.subscriptions.models  # noqa: F401
 import app.modules.community.models  # noqa: F401
 import app.modules.driver_training.models  # noqa: F401

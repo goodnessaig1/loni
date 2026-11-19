@@ -213,6 +213,15 @@ RULES: Tuple[Rule, ...] = (
     R("needs_ambulance", U.urgent, "pregnancy", template="transport", source="LONI care access", groups=((
         r"(?:need|get me|call|send|want|require|order) (?:an |a |the )?(?:ambulance|emergency ride|emergency driver)", r"ambulance (?:now|please|urgent|needed|quick)",
     ),)),
+    # Fever WITH signs that the body is not coping can be sepsis: emergency, not "get checked today".
+    R("serious_infection", U.emergency, "pregnancy", source="WHO: maternal sepsis warning signs (needs clinician review)", groups=((
+        r"\bfever\b|feverish|febrile|high temp(?:erature)?|burning up|body (?:is )?(?:very )?hot|body dey hot|chills|shivering|shaking (?:all over|uncontrollably)",
+    ), (
+        r"confus\w*|disoriented|not making sense|talking nonsense|(?:very|so|extremely) (?:drowsy|sleepy)|hard to wake|can'?t (?:stay awake|wake (?:her|me) up)|unresponsive",
+        r"breath(?:ing)? (?:very |so |too )?fast|fast breathing|rapid breathing|struggling to breathe",
+        r"(?:faint(?:ed|ing)?|passed out|collapsed)", r"cold (?:and )?clammy|(?:skin|lips) (?:is |are |look |looks )?(?:blue|grey|gray|mottled)",
+        r"(?:smelly|foul|offensive|bad[- ]smelling) (?:discharge|lochia|blood)(?:.{0,40})(?:after (?:birth|delivery)|since (?:i )?(?:gave birth|delivered))",
+    ))),
     R("fever", U.urgent, "pregnancy", source="WHO: fever in pregnancy/postnatal", groups=((
         r"(?:\bfever\b|feverish|febrile|high temp(?:erature)?|hot (?:body|all over)|burning up|body (?:is )?(?:very )?hot|temperature (?:of |is |was |at |reads? |reading )?(?:3[7-9]\.?\d?|4\d\.?\d?|10[0-9]|99|10[0-5])|chills (?:and|with) (?:fever|shaking)|shivering and (?:hot|sweating)|body dey hot)",
     ),)),
@@ -271,13 +280,15 @@ _ANSWER_TYPES: Tuple[Tuple[str, str], ...] = (
     ("newborn_care", r"\b(?:newborn|new born|infant|breastfe|breast feed|breast-?feeding|latch|formula|colic|cord stump|umbilical|diaper|nappy|swaddl|jaundice|baby'?s? (?:sleep|feed|poo|stool|weight|skin|cry)|weaning|immunis|immuniz|vaccin|bcg|opv|baby (?:is|isn'?t|not|won'?t|has|hasn'?t|keeps?|cries|crying|sleeps|feeds)|my baby|my son|my daughter|\d+[- ]?(?:day|week|month)s?[- ]old)"),
     ("decision_support", r"\b(?:when (?:should|do|must|can) i (?:go|head|leave|call|rush|come)(?: to)?(?: the)?(?: hospital| clinic| maternity)?|should i (?:go|head|come)(?: to)? (?:the )?(?:hospital|clinic|maternity|labou?r ward)|which hospital|what hospital|choos(?:e|ing) (?:a |the )?(?:hospital|clinic|facility|maternity|doctor|midwife)|where should i (?:deliver|give birth|have)|birth (?:preferences?|choices?|options?)|home birth|natural (?:birth|delivery)|(?:c-?section|caesarean|cesarean) or|vaginal (?:birth|delivery) or|private (?:or|vs)|public (?:or|vs)|teaching hospital|general hospital|primary health ?(?:care|centre|center)|phc\b|traditional birth attendant|tba\b|should i (?:book|register)|is it (?:time|too early|too late) to go)"),
     ("partner_family", r"\b(?:my (?:husband|partner|boyfriend|fianc[eé]|man|mum|mom|mother|mother-in-law|in-?laws?|family|sister|friend)|husband|partner|in-?laws?|family|relatives?)\b.{0,60}\b(?:involve|tell|share|support|help|understand|know|invite|include|talk|attend|come|visit|see my|access|view|go with)|\b(?:involve|tell|share with|invite|include|how (?:can|do) i (?:get|ask)) (?:my )?(?:husband|partner|family|mum|mom|mother|in-?laws?|relatives?)|support (?:partner|circle|system)|add (?:a )?(?:support )?partner"),
-    ("emotional_support", r"\b(?:anxi(?:ous|ety)|worr(?:y|ied|ies)|scared|afraid|fear|frighten|nervous|stress(?:ed)?|overwhelm|sad|depress|lonely|alone|cry(?:ing)?|crying|tearful|mood|miscarriage|stillbirth|lost (?:my|the) baby|grie(?:f|ving)|panic|can'?t cope|exhaust|tired of|isolated|husband|partner|in-?laws?|mother-in-law|family (?:pressure|is)|pressure|relationship|ashamed|shame|guilt|unwanted|unplanned|didn'?t plan|overwhelmed|bonding|baby blues|postpartum depression|ppd)"),
+    ("emotional_support", r"\b(?:anxi(?:ous|ety)|worr(?:y|ied|ies)|scared|afraid|fear|frighten|nervous|stress(?:ed)?|overwhelm|sad|depress|lonely|alone|cry(?:ing)?|crying|tearful|mood|miscarriage|stillbirth|lost (?:my|the) baby|grie(?:f|ving)|panic|can'?t cope|exhaust|tired of|isolated|husband|partner|in-?laws?|mother-in-law|family (?:pressure|is)|pressure|relationship|ashamed|shame|guilt|unwanted|unplanned|didn'?t plan|overwhelmed|bonding|baby blues|postpartum depression|ppd|(?:not a good|bad|terrible|useless|horrible|failing as a|failure as a|worst) (?:mother|mum|mom|wife)|(?:pregnancy|baby|this thing|everything) (?:is |dey )?(?:dealing with|finishing|tiring|wearing) me|dealing with me)"),
     ("birth_preparation", r"\b(?:labou?r|deliver(?:y|ing)|birth plan|giving birth|hospital bag|c-?section|caesarean|cesarean|epidural|induc(?:e|tion)|contractions?|water breaking|due date|overdue|breech|push(?:ing)?|episiotomy|perineal|stitches|post-?partum|after (?:delivery|birth)|recover(?:y|ing)|lochia|afterpains?|vbac)"),
     ("nutrition", r"\b(?:eat(?:ing)?|food|foods|diet|nutrition|meal|snack|drink(?:ing)?|water|hydrat|fruit|vegetable|protein|rice|beans?|garri|eba|pap|akamu|ogi|yam|plantain|fish|meat|eggs?|milk|coffee|tea|caffeine|alcohol|craving|cravings|appetite|weight gain|vitamin|iron-rich|safe to eat|can i eat|cannot eat|raw|undercooked|pawpaw|papaya|pineapple|suya|pepper|spicy|zobo|kunu|malt|soup)"),
     ("care_navigation", r"\b(?:find (?:a )?(?:nurse|doctor|hospital|clinic|midwife|maternity)|book(?:ing)? (?:a )?(?:nurse|appointment|ride|driver|doctor)|hospital near|clinic near|nearest hospital|ambulance|driver|ride\b|transport|pick me up|talk to (?:a )?nurse|speak to (?:a )?nurse|call (?:a )?nurse|see a (?:doctor|nurse|midwife)|antenatal (?:clinic|booking|registration)|where (?:can|do) i (?:go|deliver|register)|how much (?:does|is|will)|cost of|can'?t afford|no money|too expensive|afford)"),
-    ("symptom_guidance", r"\b(?:pain|ache|aching|cramp(?:s|ing)?|nausea|nauseous|vomit|sick|dizzy|dizziness|faint|swell(?:ing|en)|itch(?:ing|y)?|rash|discharge|spotting|bleed|burning|heartburn|indigestion|constipat|diarrh|cough|cold|flu|sore|numb|tingl|contraction|braxton|leg (?:cramps?|pain)|back ?pain|backache|pelvic|headache|fever|tired|fatigue|exhaust|insomnia|can'?t sleep|short of breath|breath(?:less|ing)|palpitat|heart (?:racing|pounding)|movement|kick(?:s|ing)?|symptom|feel(?:ing)? (?:weird|strange|off|unwell|sick|bad)|something (?:is )?(?:wrong|not right|off)|normal\?)"),
+    ("symptom_guidance", r"\b(?:pain|ache|aching|cramp(?:s|ing)?|nausea|nauseous|vomit|sick|dizzy|dizziness|faint|swell(?:ing|en)|itch(?:ing|y)?|rash|discharge|spotting|bleed|burning|heartburn|indigestion|constipat|diarrh|cough|cold|flu|sore|numb|tingl|contraction|braxton|leg (?:cramps?|pain)|back ?pain|backache|pelvic|headache|fever|tired|fatigue|exhaust|insomnia|can'?t sleep|short of breath|breath(?:less|ing)|palpitat|heart (?:racing|pounding)|movement|kick(?:s|ing)?|symptom|feel(?:ing)? (?:weird|strange|off|unwell|sick|bad)|something (?:is )?(?:wrong|not right|off)|normal\?|belle|waist (?:is |dey )?(?:pain|paining|hurt)|paining me|doing (?:me )?somehow|(?:body|belle|belly|stomach) (?:dey|is) (?:weak|doing|turning|somehow)|no fit sleep)"),
     ("pregnancy_education", r"\b(?:week|weeks|trimester|developing|development|growth|size of|milestone|what (?:happens|to expect)|how big|baby'?s? (?:size|growth|development)|gestation|conception|ovulat|trying to (?:conceive|get pregnant)|fertil|early signs|am i pregnant|antenatal|prenatal|check-?ups?|appointment|booking visit|schedule)"),
 )
+
+_ANSWER_TYPES_DICT = dict(_ANSWER_TYPES)
 
 ANSWER_PATTERNS = {
     "symptom_guidance": "Symptom question: first check for danger signs in what she wrote; give safe self-care only if no warning sign is present; say clearly when she should contact a clinician; ask at most one focused question.",
@@ -423,6 +434,9 @@ def triage(text: str, stage: Optional[StageContext] = None) -> TriageResult:
     stage = stage or StageContext()
     t = _normalise(text or "")
     answer_type = classify_answer_type(t)
+    if answer_type == "newborn_care" and stage.kind == "pregnancy" and not _NEWBORN_STRICT.search(t):
+        # While pregnant, "my baby" is the unborn baby: a pain question is a symptom question, not newborn care.
+        answer_type = "symptom_guidance" if re.search(_ANSWER_TYPES_DICT["symptom_guidance"], t) else "pregnancy_education"
 
     fired: List[Tuple[Rule, Urgency]] = [(r, _effective_urgency(r, stage)) for r in RULES if _rule_fires(r, t, stage)]
 

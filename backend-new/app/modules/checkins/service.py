@@ -12,8 +12,8 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from app.core.config import settings
 from app.modules.ai_chat.context import first_name, stage_context
-from app.modules.checkins import content, memory, policy
-from app.modules.checkins.models import CheckinLog, CheckinPreference, WellbeingNote
+from app.modules.checkins import content, facts, memory, policy
+from app.modules.checkins.models import CheckinLog, CheckinPreference, MemoryFact, WellbeingNote
 from app.modules.notifications.models import NotificationLog
 from app.modules.notifications.service import NotificationService
 from app.modules.rides.models import Ride, TERMINAL_STATUSES
@@ -46,6 +46,7 @@ def effective_prefs(row: Optional[CheckinPreference]) -> policy.Prefs:
         timezone=(row.timezone if row and row.timezone else settings.CHECKIN_DEFAULT_TZ),
         preferred_hour=(row.preferred_hour if row and row.preferred_hour is not None else settings.CHECKIN_DEFAULT_HOUR),
         remember=True if row is None else bool(row.remember),
+        paused_until=row.paused_until if row is not None else None,
     )
 
 
@@ -54,7 +55,7 @@ async def get_preferences(db, user_id: str) -> policy.Prefs:
 
 
 async def save_preferences(db, user_id: str, enabled: Optional[bool], tz: Optional[str], hour: Optional[int],
-                           remember: Optional[bool] = None) -> policy.Prefs:
+                           remember: Optional[bool] = None, pause_until: Optional[date] = None, resume: bool = False) -> policy.Prefs:
     row = await db.get(CheckinPreference, user_id)
     if row is None:
         row = CheckinPreference(user_id=user_id, enabled=True)
@@ -67,6 +68,10 @@ async def save_preferences(db, user_id: str, enabled: Optional[bool], tz: Option
         row.preferred_hour = hour
     if remember is not None:
         row.remember = remember
+    if resume:
+        row.paused_until = None
+    elif pause_until is not None:
+        row.paused_until = pause_until
     await db.commit()
     return effective_prefs(row)
 
@@ -132,6 +137,15 @@ async def _logs_for(db, user_ids: List[str], now: datetime) -> Dict[str, List[Ch
     return out
 
 
+async def _facts_for(db, user_ids: List[str]) -> Dict[str, List[MemoryFact]]:
+    rows = (await db.execute(select(MemoryFact).where(MemoryFact.user_id.in_(user_ids), MemoryFact.status == "active",
+                                                      MemoryFact.kind.in_(facts.FOLLOWUP_KINDS)))).scalars().all()
+    out: Dict[str, List[MemoryFact]] = {}
+    for r in rows:
+        out.setdefault(r.user_id, []).append(r)
+    return out
+
+
 async def _notes_for(db, user_ids: List[str], now: datetime) -> Dict[str, List[WellbeingNote]]:
     since = (now - timedelta(days=9)).date()
     rows = (await db.execute(select(WellbeingNote).where(WellbeingNote.user_id.in_(user_ids), WellbeingNote.day >= since)
@@ -143,10 +157,30 @@ async def _notes_for(db, user_ids: List[str], now: datetime) -> Dict[str, List[W
 
 
 def choose_template(category: str, week: Optional[int], last_key: Optional[str], logs: List[CheckinLog],
-                    notes: List[WellbeingNote], today: date, remembers: bool):
-    """(template, symptom). What she told Loni lately beats a generic hello; a milestone beats nothing; otherwise rotate."""
+                    notes: List[WellbeingNote], today: date, remembers: bool, user_facts: Optional[List[MemoryFact]] = None):
+    """(template, symptom). See choose_with_fact, which the scheduler uses."""
+    t, s, _ = choose_with_fact(category, week, last_key, logs, notes, today, remembers, user_facts)
+    return t, s
+
+
+def choose_with_fact(category: str, week: Optional[int], last_key: Optional[str], logs: List[CheckinLog],
+                     notes: List[WellbeingNote], today: date, remembers: bool, user_facts: Optional[List[MemoryFact]] = None):
+    """(template, symptom, fact). An unresolved concern she raised beats everything; then what she told Loni lately;
+    a milestone beats nothing; otherwise rotate."""
+    fact = facts.follow_up_fact(user_facts or [], today) if remembers else None
+    if fact is not None:
+        if fact.kind == "concern":
+            return content.CONCERN_TEMPLATES.get(fact.key, content.FOLLOW_UP_CONCERN), None, fact
+        if fact.key == "trouble sleeping":
+            return content.FOLLOW_UP_SLEEP, None, fact
+        return content.FOLLOW_UP_SYMPTOM, fact.key, fact
+    t, s = _choose(category, week, last_key, logs, notes, today, remembers)
+    return t, s, None
+
+
+def _choose(category, week, last_key, logs, notes, today, remembers):
     topic = memory.follow_up_topic(notes, today) if remembers else None
-    if topic and last_key not in ("fu_symptom", "fu_lowmood", "fu_better"):
+    if topic and last_key not in content.FOLLOW_UP_KEYS:
         if topic["kind"] == "symptom":
             return content.FOLLOW_UP_SYMPTOM, topic["symptom"]
         if topic["kind"] == "low_mood":
@@ -241,6 +275,7 @@ async def run_cycle(session_factory, mongo, now: Optional[datetime] = None, *, d
             logs = await _logs_for(db, ids, now)
             riding = await _riders_in_a_ride(db, ids)
             notes = await _notes_for(db, ids, now)
+            user_facts = await _facts_for(db, ids)
 
             for user, pref_row in batch:
                 if limit is not None and report.considered >= limit:
@@ -266,8 +301,8 @@ async def run_cycle(session_factory, mongo, now: Optional[datetime] = None, *, d
                     report.skipped[decision.reason] += 1
                     continue
 
-                template, symptom = choose_template(category, stage.week, sig.last_template_key, logs.get(user.id, []), user_notes,
-                                                    local.date(), prefs.remember)
+                template, symptom, fact = choose_with_fact(category, stage.week, sig.last_template_key, logs.get(user.id, []), user_notes,
+                                                           local.date(), prefs.remember, user_facts.get(user.id, []))
                 if dry_run:
                     report.would_send.append({"user_id": user.id, "category": category, "level": decision.level, "template": template.key})
                     continue
@@ -278,6 +313,8 @@ async def run_cycle(session_factory, mongo, now: Optional[datetime] = None, *, d
                     continue
                 ok = await _deliver(db, mongo, user, log_id, template=template, chips=content.CHIPS, category=category,
                                     level=decision.level, kind="daily", stage_week=stage.week, now=now, symptom=symptom)
+                if ok and fact is not None:
+                    await facts.mark_followed_up(db, fact.id, now)   # each concern is asked about once until she raises it again
                 report.sent += int(ok)
                 report.failed += int(not ok)
     return report

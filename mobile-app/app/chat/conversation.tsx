@@ -244,7 +244,7 @@ export default function ConversationScreen() {
                 {msg.content}
               </Markdown>
             )}
-            {!msg.isStreaming || msg.content ? <SafetyActions meta={msg.meta} /> : null}
+            {!msg.isStreaming || msg.content ? <SafetyActions meta={msg.meta} sessionId={sessionId} /> : null}
             {index === 0 && !isLoading && msg.meta?.suggestions?.length ? (
               <QuickReplies suggestions={msg.meta.suggestions} onReply={(text) => sendMessage(text)} onNurse={() => router.push('/nurse/connecting')} />
             ) : null}

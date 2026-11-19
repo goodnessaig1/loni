@@ -25,6 +25,11 @@ No device does NOT use up the day, so she still gets one when she installs the a
 **Duplicate protection**: `checkin_logs` has UNIQUE(user_id, dedupe_key) ("daily:<her local date>", "followup:<safety event id>").
 A message is sent only by the process whose INSERT succeeded, so racing schedulers, retries and restarts cannot double-send.
 
+**Concern follow-ups**: an open concern she raised 1-3 days ago (structured memory, `facts.py`: a symptom, trouble sleeping,
+fear of childbirth, "not a good mother", feeling overwhelmed) opens the next hello, once per mention (`followed_up_at`).
+
+**Pause**: `PUT /checkins/preferences {"pause_days": N}` pauses all proactive messages through N days (`0` resumes); `enabled=false` stops them.
+
 **Follow-ups**: 20-48h after an urgent/emergency or mental-health AI conversation she gets one gentle "how are you now?" (once per event).
 
 ## Turning it on

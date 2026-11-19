@@ -27,6 +27,12 @@ _CLAIMS_BOOKING = re.compile(
     r"(?:a |an |the |your )(?:nurse|driver|ride|ambulance|doctor|car) (?:is|are|will be|has been|have been) (?:on (?:the|their) way|coming|dispatched|booked|arranged|assigned|available|waiting|confirmed)|"
     r"(?:booking|ride|appointment|request) (?:is |has been |was )?(?:confirmed|successful|booked|made|done))", re.I)
 
+# Loni cannot know what a nurse or doctor has done: it must never say a clinician reviewed, approved or will call.
+_CLAIMS_CLINICIAN = re.compile(
+    r"(?:(?:a |the |your |our )?(?:loni )?(?:nurse|doctor|midwife|clinician|medical team)s? (?:has|have|had)? ?(?:already )?(?:reviewed|seen|read|checked|looked (?:at|over)|approved|confirmed|gone through|been notified|been informed)(?: \w+)?? (?:this|it|that|your|you|the (?:chat|conversation|summary|notes?|messages?)|what you|our (?:chat|conversation))\b"
+    r"|(?:a |the |your )?(?:loni )?(?:nurse|doctor|midwife) (?:will|is going to|'ll) (?:call|contact|reach out to|ring) you"
+    r"|i(?:'ve| have)? (?:shared|sent|forwarded|passed) (?:this|it|your \w+|the \w+) (?:to|with) (?:a |the |your )?(?:nurse|doctor|midwife))", re.I)
+
 _STOP_MEDS = re.compile(r"\b(?:you (?:can|may|should|could) (?:safely )?(?:stop|skip|discontinue|quit)|(?:stop|skip|discontinue) (?:taking )?(?:your|the) (?:medic|tablet|pill|drug|treatment|prescri))", re.I)
 
 
@@ -62,6 +68,9 @@ def validate(urgency: Urgency, text: str, answer_type: str = "other", looked_up:
         notes.append("I can't tell you a dose. Please don't start, stop or change any medicine without your doctor or pharmacist.")
     elif _STOP_MEDS.search(text):
         notes.append("Please don't stop or change a prescribed medicine without speaking to your doctor or pharmacist first.")
+    if _CLAIMS_CLINICIAN.search(text):
+        notes.append("To be clear: no nurse or doctor has seen this conversation. If you'd like one to, tap **Talk to a Nurse** "
+                     "and you can choose to share a short summary with them.")
     if _CLAIMS_BOOKING.search(text):
         notes.append("I can't confirm bookings or arrivals from this chat. Please use the buttons in the app and wait for the confirmation there.")
     # Phone numbers and opening hours must come from a lookup, never from the model's memory.
