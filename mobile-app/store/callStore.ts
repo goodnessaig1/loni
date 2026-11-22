@@ -98,6 +98,17 @@ interface CallState {
   isStale: (callId: number) => boolean;
 }
 
+// Calls this app has finished with. A late or re-delivered event for one of them (including a
+// delayed `incoming_call` push) is ignored instead of re-opening the call screen.
+const finishedCallIds: number[] = [];
+function markFinished(callId: number) {
+  if (!finishedCallIds.includes(callId)) finishedCallIds.push(callId);
+  if (finishedCallIds.length > 50) finishedCallIds.shift();
+}
+export function isFinished(callId: number): boolean {
+  return finishedCallIds.includes(callId);
+}
+
 const initial = {
   status: 'IDLE' as CallStatus,
   callId: null,
@@ -123,9 +134,10 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   isStale: (callId: number) => {
     const current = get().callId;
-    // Once we've moved on to a different (or no) call, ignore late events
-    // for the old one instead of letting them resurrect stale UI.
-    return current !== null && current !== callId;
+    // Events only ever apply to the call we are tracking. With no call (IDLE, after hanging up) a
+    // late `call_state CONNECTED` or a duplicate `call_accepted` (FCM arriving after the WebSocket)
+    // used to be applied anyway and brought back a "Connected" screen with no room behind it.
+    return current === null || current !== callId || isFinished(callId);
   },
 
   setIncomingCall: (callId, roomName, remote, meta) => set({
@@ -199,8 +211,9 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   setRemoteParticipant: (info) => set({ remoteParticipant: info, callerName: info.name }),
 
-  endCall: (status = 'ENDED') => set({
-    ...initial,
-    lastEventStatus: status,
-  }),
+  endCall: (status = 'ENDED') => {
+    const id = get().callId;
+    if (id != null) markFinished(id);
+    set({ ...initial, lastEventStatus: status });
+  },
 }));

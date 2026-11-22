@@ -13,7 +13,7 @@ export function NurseHero() {
         'LONI instantly connects mothers with verified and experienced nurses through voice calls, giving them',
         'access to human support when an AI answer isn’t enough.',
       ]}
-      photo={heroPhoto}
+      photo={heroPhoto.src}
       primary={{ label: 'Join LONI as a Nurse', href: SITE.nurseSignupHref }}
       secondary={{ label: 'How it works', href: SITE.nurseHowItWorksHref }}
       layout="bottom"

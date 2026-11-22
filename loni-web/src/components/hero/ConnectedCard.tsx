@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import avatars from '../../assets/avatars.webp';
 import couple from '../../assets/couple.webp';
@@ -18,10 +20,10 @@ export function ConnectedCard({ className = '' }: { className?: string }) {
     >
       <div className="flex flex-1 flex-col justify-between py-[7px]">
         <p className="font-dm text-[14px] leading-[21px] font-medium">Connected through every step</p>
-        <img src={avatars} alt="" className="h-[30px] w-auto self-start" draggable={false} />
+        <img src={avatars.src} alt="" className="h-[30px] w-auto self-start" draggable={false} />
       </div>
       <img
-        src={couple}
+        src={couple.src}
         alt="A couple expecting, with family"
         className="size-[101px] shrink-0 rounded-[10px] object-cover"
         draggable={false}

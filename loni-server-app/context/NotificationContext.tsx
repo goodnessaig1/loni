@@ -258,11 +258,7 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
       if (!initial) return;
       const data = initial.notification.data as any;
       if (data?.type === 'incoming_call') {
-        applyServerCallEvent('incoming_call', {
-          call_id: data.call_id,
-          room_name: data.room_name,
-          caller: data.caller ? JSON.parse(data.caller) : { id: '', name: data.caller_name },
-        });
+        require('../lib/callSync').ringIfStillRinging(data);
       }
     });
   }, []);
@@ -276,7 +272,10 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     const handleOpen = (remoteMessage: any) => {
       const t = remoteMessage?.data?.type;
-      if (t === 'account_approved') {
+      if (t === 'incoming_call') {
+        // iOS: the visible incoming-call alert was tapped (no CallKit yet).
+        require('../lib/callSync').ringIfStillRinging(remoteMessage.data);
+      } else if (t === 'account_approved') {
         handleAccountApproved();
       } else if (userTypeRef.current === 'partner') {
         // Partners open her ride / updates, never the driver's trip screen.

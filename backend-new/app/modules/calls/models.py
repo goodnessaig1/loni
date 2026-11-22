@@ -73,3 +73,14 @@ class CallEvent(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     call = sa_relationship("Call", back_populates="events")
+
+
+class LiveKitWebhookEvent(Base):
+    """Every LiveKit webhook delivery we have applied, by LiveKit's event id: a retried or replayed
+    delivery is recognised and skipped instead of being applied twice."""
+    __tablename__ = 'livekit_webhook_events'
+
+    id = Column(String(64), primary_key=True)
+    event_type = Column(String(50), nullable=False)
+    room_name = Column(String(255), nullable=True)
+    received_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

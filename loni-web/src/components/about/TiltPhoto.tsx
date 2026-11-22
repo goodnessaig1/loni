@@ -1,3 +1,5 @@
+'use client';
+
 import { useRef } from 'react';
 import { MotionConfig, motion, useReducedMotion, useScroll, useSpring, useTransform } from 'framer-motion';
 import taxi from '../../assets/about/taxi.webp';
@@ -33,7 +35,7 @@ export function TiltPhoto() {
             }
           >
             <img
-              src={taxi}
+              src={taxi.src}
               alt="A pregnant mother in a patterned dress checks her phone in the back of a taxi in a busy city street"
               width={1413}
               height={586}

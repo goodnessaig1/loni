@@ -1,7 +1,9 @@
+'use client';
+
 import { useEffect, useRef } from 'react';
 import { MotionConfig, motion, useInView, useReducedMotion } from 'framer-motion';
 import poster from '../../assets/about/mother-ball-poster.webp';
-import clip from '../../assets/about/mother-ball.mp4';
+const clip = '/media/mother-ball.mp4';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -37,7 +39,7 @@ export function VideoBanner() {
           <video
             ref={videoRef}
             src={clip}
-            poster={poster}
+            poster={poster.src}
             muted
             loop
             playsInline

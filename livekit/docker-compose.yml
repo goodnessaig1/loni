@@ -19,8 +19,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    # No published port: LiveKit reaches it as redis:6379 on the compose network. Publishing 6379
+    # on the host exposed an unauthenticated Redis to the internet on any VPS.
     command: redis-server --save 60 1 --loglevel warning
 
   coturn:

@@ -64,6 +64,9 @@ interface CallState {
   connectedAt: number | null;
   // Array of multiple incoming requests
   incomingRequests: Array<{ callId: number; roomName: string; remote: ParticipantInfo | null; kind?: CallKind }>;
+  /** Mirrors the local LiveKit mic so UI outside the room (the floating call widget) can show it. */
+  micMuted: boolean;
+  setMicMuted: (muted: boolean) => void;
   /** 'nurse' = a mother asking a nurse; 'ride' = the mother and her driver during an emergency ride. */
   kind: CallKind;
   rideId: number | null;
@@ -104,6 +107,7 @@ const initial = {
   connectionQuality: 'unknown' as const,
   connectedAt: null,
   incomingRequests: [],
+  micMuted: false,
   kind: 'nurse' as CallKind,
   rideId: null,
   lastEventCallId: null,
@@ -233,6 +237,8 @@ export const useCallStore = create<CallState>((set, get) => ({
     connectedAt: s.connectedAt ?? (connectedAtMs ?? Date.now()),
     lastEventStatus: 'CONNECTED',
   })),
+
+  setMicMuted: (muted) => set({ micMuted: muted }),
 
   setReconnecting: () => set({ status: 'RECONNECTING', lastEventStatus: 'RECONNECTING' }),
 

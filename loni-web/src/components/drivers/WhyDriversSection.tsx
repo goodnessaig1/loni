@@ -21,7 +21,7 @@ export function WhyDriversSection() {
         { title: ['Earn through', 'LONI'], text: ['Complete trips and receive payment', 'directly from LONI admin.'] },
       ]}
       photo={{
-        src: nightDriver,
+        src: nightDriver.src,
         alt: 'A LONI driver at night, city lights reflected in the car window',
         width: 1408,
         height: 1145,

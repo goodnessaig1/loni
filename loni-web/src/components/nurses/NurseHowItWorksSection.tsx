@@ -18,7 +18,7 @@ export function NurseHowItWorksSection() {
         { title: 'Talk with mother', text: 'Have a real voice conversation and provide appropriate support.' },
       ]}
       card={{
-        src: appHome,
+        src: appHome.src,
         alt: "The LONI nurse app home screen: a verified nurse is online and sees her incoming requests",
       }}
       canvas={{

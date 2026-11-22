@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties, ReactNode } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { CarFront, HeartHandshake, UsersRound } from 'lucide-react';
@@ -22,7 +24,7 @@ interface Point {
 
 const AI: Point = {
   title: ['AI when you need answers'],
-  text: 'LUMA offers immediate guidance for the questions that come up at any hour.',
+  text: 'Loni AI offers immediate guidance for the questions that come up at any hour.',
   icon: <AiBadgeIcon />,
 };
 const NURSES: Point = {

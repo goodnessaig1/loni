@@ -11,7 +11,6 @@ export const useRegister = () => {
   return useMutation({
     mutationFn: async (data: any) => {
       const res = await apiClient.post('/auth/register', data);
-      console.log(res.data)
       return res.data;
     }
   });

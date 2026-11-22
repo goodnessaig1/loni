@@ -55,6 +55,8 @@ import certifi
 
 @app.on_event("startup")
 async def startup_db_client():
+    from app.core.secrets_check import enforce_production_secrets
+    enforce_production_secrets()
     # First, before any background job touches the new tables. A failure stops the deploy.
     await run_migrations()
 

@@ -12,12 +12,13 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.leader import leader
-from app.modules.calls.models import Call, CallStatusEnum
+from app.core.ws_manager import manager as ws_manager
+from app.modules.calls.models import Call, CallStatusEnum, LiveKitWebhookEvent
 from app.modules.calls.services import call_service
 from app.modules.calls.services.call_service import CallService
 from app.modules.calls.services.livekit_service import LiveKitService
@@ -30,6 +31,7 @@ logger = logging.getLogger("timeouts")
 LOCK_KEY = 7_340_021
 GRACE = 5                      # let the in-process timer win when it is alive
 CONNECT_DEADLINE = 120         # answered but nobody ever got into the room
+WEBHOOK_LEDGER_KEEP_SECONDS = 7 * 24 * 3600
 
 _task: Optional[asyncio.Task] = None
 
@@ -45,7 +47,7 @@ async def _locked_call(db, call_id: int) -> Optional[Call]:
 
 
 async def sweep_once(session_factory=AsyncSessionLocal) -> dict:
-    done = {"calls_timed_out": 0, "calls_dropped": 0, "calls_never_connected": 0, "rides_no_drivers": 0, "rides_redispatched": 0}
+    done = {"calls_timed_out": 0, "calls_dropped": 0, "calls_never_connected": 0, "calls_stale_ended": 0, "calls_stale_reconnecting": 0, "rides_no_drivers": 0, "rides_redispatched": 0}
     async with session_factory() as db:
         # 1. Calls still ringing past the ring timeout.
         ids = (await db.execute(select(Call.id).where(
@@ -83,6 +85,53 @@ async def sweep_once(session_factory=AsyncSessionLocal) -> dict:
                     await call_service._emit(uid, event, "Call ended", "The call was disconnected.", data)
             await LiveKitService.delete_room(call.room_name)
             done[key] += 1
+
+        # 2b. Connected calls nobody has touched for a while. A lost `room_finished` /
+        #     `participant_left` webhook (deploy, outage) would otherwise leave both people "on a
+        #     call" for ever: she gets "already on a call", the nurse is never rung again. Ask LiveKit
+        #     who is actually in the room (outside the row lock), then act on what it says.
+        rows = (await db.execute(select(Call.id, Call.room_name, Call.started_at).where(
+            Call.status == CallStatusEnum.CONNECTED,
+            Call.updated_at < _cut(db, settings.CALL_STALE_CHECK_SECONDS),
+        ))).all()
+        now = datetime.now(timezone.utc)
+        for cid, room_name, started_at in rows:
+            if started_at is not None and started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            too_long = started_at is not None and (now - started_at).total_seconds() > settings.CALL_MAX_SECONDS
+            occupancy = None if too_long else await LiveKitService.room_occupancy(room_name)
+            call = await _locked_call(db, cid)
+            if not call or call.status != CallStatusEnum.CONNECTED:
+                await db.commit()
+                continue
+            if too_long or occupancy == 0:
+                await CallService._finish(db, call, CallStatusEnum.ENDED, by=None)
+                await db.commit()
+                data = {"call_id": str(call.id), "status": call.status.value, "duration_seconds": call.duration_seconds}
+                for uid in (call.caller_id, call.receiver_id):
+                    if uid:
+                        await call_service._emit(uid, "call_ended", "Call ended", "The call was disconnected.", data)
+                await LiveKitService.delete_room(call.room_name)
+                done["calls_stale_ended"] += 1
+            elif occupancy == 1:
+                # One of them is gone: the normal reconnect grace applies (step 2 ends it, a
+                # rejoin webhook brings it back to CONNECTED).
+                call.status = CallStatusEnum.RECONNECTING
+                call.updated_at = now
+                await db.commit()
+                for uid in (call.caller_id, call.receiver_id):
+                    if uid:
+                        await ws_manager.send_to_user(uid, "call_state", {"call_id": str(call.id), "status": "RECONNECTING"})
+                done["calls_stale_reconnecting"] += 1
+            else:
+                # Both still there (or LiveKit could not be asked): check again later.
+                call.updated_at = now
+                await db.commit()
+
+        # 2c. The webhook ledger only has to outlive LiveKit's retries; keep a week for debugging.
+        await db.execute(delete(LiveKitWebhookEvent).where(
+            LiveKitWebhookEvent.received_at < _cut(db, WEBHOOK_LEDGER_KEEP_SECONDS)))
+        await db.commit()
 
         # 4. Rides still searching. `updated_at` is when the search (re)started (request, or a driver
         #    backing out). Past every dispatch round: give up and tell her. Otherwise, if nobody is

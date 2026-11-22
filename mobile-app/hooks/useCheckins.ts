@@ -41,3 +41,19 @@ export function useSyncTimezone() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs?.timezone]);
 }
+
+const FACTS_KEY = ['checkins', 'facts'] as const;
+
+/** Everything Loni remembers about her, with where it came from. Every change refreshes the list. */
+export function useMemoryFacts() {
+  const { user } = useAuth();
+  const query = useQuery({ queryKey: FACTS_KEY, queryFn: checkinsApi.facts, enabled: !!user });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: FACTS_KEY });
+  const correct = useMutation({
+    mutationFn: (v: { id: number; key?: string; status?: 'active' | 'resolved' }) => checkinsApi.correctFact(v.id, { key: v.key, status: v.status }),
+    onSettled: refresh,
+  });
+  const remove = useMutation({ mutationFn: checkinsApi.deleteFact, onSettled: refresh });
+  const add = useMutation({ mutationFn: checkinsApi.addFact, onSettled: refresh });
+  return { facts: query.data ?? [], isLoading: query.isLoading, refetch: query.refetch, correct, remove, add };
+}

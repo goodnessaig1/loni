@@ -1,3 +1,5 @@
+'use client';
+
 import { useRef } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { SITE } from '../../config/site';

@@ -49,3 +49,31 @@ export async function reconcileCall(): Promise<void> {
     running = false;
   }
 }
+
+/**
+ * Show an incoming call that arrived as a push (tapped on iOS, or the Android full-screen
+ * notification that cold-started the app) - but only if the server says it is still ringing.
+ * A push can land late (the call was answered by another nurse, cancelled or timed out), and the
+ * backend, not the push, decides whether a call is still valid.
+ */
+export async function ringIfStillRinging(data: any): Promise<boolean> {
+  const callId = Number(data?.call_id);
+  if (!callId) return false;
+  const st = await stateOf(callId);
+  if (!st || !['REQUESTED', 'RINGING'].includes(st.status) || st.answered_by_other) {
+    try { require('@notifee/react-native').default.cancelNotification(`incoming-${callId}`).catch(() => {}); } catch { /* notifee unavailable */ }
+    return false;
+  }
+  let caller: any = data.caller;
+  if (typeof caller === 'string') {
+    try { caller = JSON.parse(caller); } catch { caller = null; }
+  }
+  await applyServerCallEvent('incoming_call', {
+    call_id: String(callId),
+    room_name: data.room_name,
+    caller: caller || { id: '', name: data.caller_name },
+    kind: data.kind,
+    ride_id: data.ride_id,
+  });
+  return true;
+}

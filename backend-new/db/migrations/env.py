@@ -25,6 +25,7 @@ import app.modules.community.models
 import app.modules.subscriptions.models
 import app.modules.care.models
 import app.modules.checkins.models
+import app.modules.knowledge.models
 import app.modules.account.models
 import app.modules.staff.models
 import app.modules.admin.models

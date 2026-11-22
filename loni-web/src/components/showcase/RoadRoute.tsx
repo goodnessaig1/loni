@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import { box, px } from './designUnits';
 import { fadeVariants, labelVariants, roadVariants } from './motionPresets';

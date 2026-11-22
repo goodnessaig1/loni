@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import heartHands from '../../assets/intro/heart-hands.webp';
 import silhouette from '../../assets/intro/silhouette.webp';
@@ -59,8 +61,8 @@ export function IntroHeading() {
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
       className="mx-auto max-w-[48rem] bg-[linear-gradient(111deg,#e2027a_30.6%,#c36598_99.3%)] bg-clip-text text-center text-[2rem] font-semibold leading-[1.3] text-transparent text-balance sm:text-[2.5rem] lg:text-[3.1rem]"
     >
-      A clear <ChipPill src={heartHands} delay={0.3} /> entry to the<br className="hidden sm:inline" /> ever-changing{' '}
-      <ChipPair first={silhouette} second={babyHands} delay={0.45} /> world of<br className="hidden sm:inline" /> pregnancy support
+      A clear <ChipPill src={heartHands.src} delay={0.3} /> entry to the<br className="hidden sm:inline" /> ever-changing{' '}
+      <ChipPair first={silhouette.src} second={babyHands.src} delay={0.45} /> world of<br className="hidden sm:inline" /> pregnancy support
     </motion.h2>
   );
 }

@@ -139,6 +139,18 @@ FOLLOW_UP_SYMPTOM = Template("fu_symptom", "How's the {symptom}, {name}?", "Hi {
 FOLLOW_UP_LOW_MOOD = Template("fu_lowmood", "Thinking of you, {name}", "Hi {name} 💜 I've been thinking about you since we last spoke. How are you feeling today?")
 FOLLOW_UP_GOOD_NEWS = Template("fu_better", "Good to hear from you", "Hi {name} 💜 Last time you sounded a bit better. How are you today?")
 
+# Follow-ups for an open concern she raised (structured memory, facts.py). One per concern, never repeated unless she
+# brings it up again. Wording needs review by a maternal-health professional.
+FOLLOW_UP_SLEEP = Template("fu_sleep", "How did you sleep, {name}?", "Hi {name} 💜 You said sleep has been hard lately. How was last night?")
+FOLLOW_UP_BIRTH_FEAR = Template("fu_birthfear", "Thinking of you, {name}",
+                                "Hi {name} 💜 You mentioned feeling scared about the birth. How are you feeling about it today? We can talk it through whenever you like.")
+FOLLOW_UP_MOTHER = Template("fu_mother", "Thinking of you, {name}",
+                            "Hi {name} 💜 You were being hard on yourself when we last spoke. I just wanted to check in. How are you doing today?")
+FOLLOW_UP_CONCERN = Template("fu_concern", "Thinking of you, {name}",
+                             "Hi {name} 💜 Things sounded heavy when we last spoke. How are you feeling today?")
+CONCERN_TEMPLATES = {"fear_of_childbirth": FOLLOW_UP_BIRTH_FEAR, "not_good_mother": FOLLOW_UP_MOTHER}
+FOLLOW_UP_KEYS = ("fu_symptom", "fu_lowmood", "fu_better", "fu_sleep", "fu_birthfear", "fu_mother", "fu_concern")
+
 
 
 _T.update(_WOMEN_TEMPLATES)
@@ -183,7 +195,8 @@ def pick(category: str, last_key: Optional[str], rng: Optional[random.Random] = 
 
 def all_templates() -> List[Template]:
     return ([t for ts in _T.values() for t in ts] + [FOLLOWUP_URGENT, FOLLOWUP_MENTAL]
-            + list(MILESTONES.values()) + [FOLLOW_UP_SYMPTOM, FOLLOW_UP_LOW_MOOD, FOLLOW_UP_GOOD_NEWS])
+            + list(MILESTONES.values()) + [FOLLOW_UP_SYMPTOM, FOLLOW_UP_LOW_MOOD, FOLLOW_UP_GOOD_NEWS, FOLLOW_UP_SLEEP,
+                                              FOLLOW_UP_BIRTH_FEAR, FOLLOW_UP_MOTHER, FOLLOW_UP_CONCERN])
 
 
 def chip_for_message(text: str) -> Optional[Chip]:

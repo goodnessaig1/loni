@@ -1,3 +1,6 @@
+'use client';
+
+import Image from 'next/image';
 import { motion, MotionConfig } from 'framer-motion';
 import lonibot from '../../assets/lonibot.png';
 import lonibotMobile from '../../assets/lonibot-mobile.webp';
@@ -23,7 +26,7 @@ function TestedBadge({ mobile = false, className = '' }: { mobile?: boolean; cla
       style={{ fontSize: mobile ? '3.7cqw' : 'max(1.17cqw, 10px)', gap: mobile ? '1.6cqw' : '1.26cqw' }}
     >
       <img
-        src={avatars}
+        src={avatars.src}
         alt=""
         draggable={false}
         className="w-auto shrink-0"
@@ -141,7 +144,7 @@ export function LoniBotSection() {
                 card sits on the photo and the badge in the notch. */}
             <div className="@container relative mx-auto max-w-[34rem] lg:hidden">
               <img
-                src={lonibotMobile}
+                src={lonibotMobile.src}
                 alt={BANNER_ALT}
                 width={396}
                 height={364}
@@ -155,11 +158,11 @@ export function LoniBotSection() {
 
             {/* ≥ lg: the wide banner. `@container` so the badge scales with it (cqw units). */}
             <div className="@container relative hidden lg:block">
-              <img
+              {/* A 1.1 MB PNG at source: next/image serves it resized as AVIF/WebP (alpha kept for the notch). */}
+              <Image
                 src={lonibot}
                 alt={BANNER_ALT}
-                width={1348}
-                height={410}
+                sizes="(min-width: 1536px) 1400px, 92vw"
                 loading="lazy"
                 decoding="async"
                 draggable={false}

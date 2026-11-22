@@ -81,15 +81,19 @@ async def test_notes_merge_through_the_day_and_the_latest_mood_wins(make_user, s
 async def test_memory_off_means_nothing_is_kept_and_forgetting_erases_everything(make_user, as_user, session_factory):
     u = await make_user("Ada One")
     c = await as_user(u)
+    # The endpoint shows the last 30 days of HER local calendar, so the note must be dated relative to the real clock
+    # (a fixed date silently fell out of the window once it was more than 30 days old).
+    from zoneinfo import ZoneInfo
+    today = datetime.now(ZoneInfo("Africa/Lagos")).date()
     async with session_factory() as db:
-        await memory.remember(db, u.id, "I have a headache", TODAY)
+        await memory.remember(db, u.id, "I have a headache", today)
     mem = (await c.get("/api/v1/checkins/memory")).json()["data"]
     assert mem["remember"] is True and mem["notes"][0]["symptoms"] == ["headache"]
     assert set(mem["notes"][0]) == {"day", "mood", "symptoms", "topics"}      # tags only: there is no text field to leak
 
     assert (await c.put("/api/v1/checkins/preferences", json={"remember": False})).json()["data"]["remember"] is False
     async with session_factory() as db:
-        assert await memory.remember(db, u.id, "my back hurts", TODAY - timedelta(days=1)) is None
+        assert await memory.remember(db, u.id, "my back hurts", today - timedelta(days=1)) is None
     assert len((await c.get("/api/v1/checkins/memory")).json()["data"]["notes"]) == 1
 
     r = await c.delete("/api/v1/checkins/memory")

@@ -14,7 +14,7 @@ export function PartnerHero() {
         'sidelines. Stay connected, support her milestones and be',
         'there when she needs you.',
       ]}
-      photo={heroPhoto}
+      photo={heroPhoto.src}
       lightCta={{ label: 'Join LONI', href: SITE.partnerJoinHref }}
       layout="split"
       focusX="50%"

@@ -1,6 +1,11 @@
+'use client';
+
 import type { CSSProperties } from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 import mother from '../../assets/hero-mother.webp';
+
+const MotionImage = motion.create(Image);
 
 /**
  * The hero artwork, rebuilt from the Figma layers ("Frame 2147226884", 931 × 1065).
@@ -69,12 +74,13 @@ export function HeroArt({ className = '' }: { className?: string }) {
       </motion.div>
 
       {/* "IMG_6387 1": 716 × 1065 at (215, 0). */}
-      <motion.img
+      <MotionImage
         src={mother}
         alt=""
-        width={1028}
-        height={1529}
+        // LCP element: preloaded, and sized to its rendered width (≈ 51vw on desktop, up to 115vw on phones).
+        preload
         fetchPriority="high"
+        sizes="(min-width: 1024px) 51vw, min(115vw, 765px)"
         draggable={false}
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}

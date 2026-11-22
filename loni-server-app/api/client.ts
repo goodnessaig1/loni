@@ -5,7 +5,8 @@ import { markOffline, markOnline } from '../lib/connectivity';
 
 // Use your machine's local IP for physical devices, or 10.0.2.2 for Android emulator
 // Local development: this Mac's LAN address (scripts/update-lan-ip.sh rewrites it).
-const LAN_API_URL = 'http://192.168.100.192:8000/api/v1';
+const LAN_API_URL = 'https://dissipative-yeastily-brittni.ngrok-free.dev/api/v1';
+// const LAN_API_URL = 'http://192.168.100.217:8000/api/v1';
 // Staging / production builds set EXPO_PUBLIC_API_URL (e.g. https://api.lonimum.com/api/v1).
 export const API_URL = process.env.EXPO_PUBLIC_API_URL || LAN_API_URL;
 

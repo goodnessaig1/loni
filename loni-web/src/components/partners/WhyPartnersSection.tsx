@@ -30,7 +30,7 @@ export function WhyPartnersSection() {
         },
       ]}
       photo={{
-        src: together,
+        src: together.src,
         alt: 'An expectant couple smiling together outdoors',
         width: 359,
         height: 302,

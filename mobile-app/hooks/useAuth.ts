@@ -10,9 +10,7 @@ export const useAuth = () => {
 export const useRegister = () => {
   return useMutation({
     mutationFn: async (data: any) => {
-      console.log(data)
       const res = await apiClient.post('/auth/register', data);
-      console.log(res.data)
       return res.data;
     }
   });

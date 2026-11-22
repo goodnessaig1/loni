@@ -19,6 +19,7 @@ class CheckinPreference(Base):
     timezone = Column(String(64), nullable=True)          # IANA name, e.g. "Africa/Lagos"; null = deployment default
     preferred_hour = Column(Integer, nullable=True)       # local hour she is first eligible; null = deployment default
     remember = Column(Boolean, nullable=False, default=True, server_default='1')   # may Loni keep short notes of what she shares
+    paused_until = Column(Date, nullable=True)            # check-ins paused through this local date (she asked for a break)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
@@ -64,3 +65,30 @@ class WellbeingNote(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     __table_args__ = (UniqueConstraint('user_id', 'day', name='uq_wellbeing_user_day'),)
+
+
+class MemoryFact(Base):
+    """One thing Loni knows about her, with where it came from. Structured on purpose: a fixed `kind`, a short canonical
+    `key` from fixed lists (or a sanitised short phrase for allergies / preferred name), never a copy of her message.
+
+    provenance: user_reported (she said it) | clinician_confirmed (a nurse/doctor confirmed it) | ai_inferred (Loni guessed).
+    "Stale" is not stored: it is worked out at read time from `last_noted` so an old symptom is never presented as current.
+    She can list, correct, resolve and delete every fact."""
+    __tablename__ = 'memory_facts'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(String(12), ForeignKey('users.id'), nullable=False, index=True)
+    kind = Column(String(20), nullable=False)             # symptom | concern | medication | allergy | appointment | condition | preference
+    key = Column(String(60), nullable=False)              # e.g. "headache", "fear_of_childbirth", "folic acid", "antenatal visit"
+    detail = Column(String(80), nullable=True)            # e.g. preferred name
+    event_date = Column(Date, nullable=True)              # appointments: the day it is / was
+    provenance = Column(String(24), nullable=False, default='user_reported')
+    status = Column(String(12), nullable=False, default='active')   # active | resolved
+    source = Column(String(12), nullable=False, default='chat')     # chat | user (edited in the app) | clinician
+    first_noted = Column(Date, nullable=False)
+    last_noted = Column(Date, nullable=False)
+    followed_up_at = Column(DateTime(timezone=True), nullable=True)  # when a check-in last asked about it
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    __table_args__ = (UniqueConstraint('user_id', 'kind', 'key', name='uq_memory_fact_user_kind_key'),)

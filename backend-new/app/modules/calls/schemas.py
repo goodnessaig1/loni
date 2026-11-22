@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.modules.calls.models import CallStatusEnum, ParticipantRoleEnum
@@ -13,8 +13,8 @@ class CallRequest(BaseModel):
 
 
 class CallRatingRequest(BaseModel):
-    rating: int
-    feedback: Optional[str] = None
+    rating: int = Field(ge=1, le=5)
+    feedback: Optional[str] = Field(default=None, max_length=1000)
 
 
 class CallParticipantSchema(BaseModel):
@@ -75,6 +75,16 @@ class CallActionResponse(BaseModel):
     # depends on who's asking, so this is resolved server-side per request
     # rather than trying to eagerly nest both sides on every Call row.
     participant: Optional[ParticipantInfo] = None
+
+
+class CallClientReport(BaseModel):
+    """A problem a phone hit during a call (LiveKit connect timeout, disconnect reason, mic error).
+    Free text is truncated and must never contain names or medical details - the apps send SDK
+    error codes/messages only."""
+    kind: str = Field(min_length=1, max_length=40)
+    detail: Optional[str] = Field(default=None, max_length=500)
+    platform: Optional[str] = Field(default=None, max_length=20)
+    app_version: Optional[str] = Field(default=None, max_length=40)
 
 
 class CallHistoryFilter(BaseModel):

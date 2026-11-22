@@ -1,3 +1,5 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 
@@ -35,7 +37,7 @@ function LegalSection({ section, last }: { section: LegalSectionContent; last: b
       className="relative grid gap-5 py-12 lg:grid-cols-[46.2%_1fr] lg:gap-0 lg:py-20"
     >
       <h2 className="text-[1.1rem] font-normal leading-snug tracking-[-0.02em] text-brand lg:text-[1.125rem]">
-        <span className="mr-[0.7em] font-semibold italic tracking-[-0.12em]">//</span>
+        <span className="mr-[0.7em] font-semibold italic tracking-[-0.12em]">{'//'}</span>
         {section.title}
       </h2>
 

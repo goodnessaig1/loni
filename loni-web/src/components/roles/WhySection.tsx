@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import avatar1 from '../../assets/drivers/avatars/avatar-1.svg';
@@ -13,7 +15,7 @@ import { WordReveal } from '../drivers/WordReveal';
 // Slow, soft easing: these sections are meant to feel unhurried.
 const EASE = [0.22, 1, 0.36, 1] as const;
 
-const AVATARS = [avatar1, avatar2, avatar3, avatar4];
+const AVATARS = [avatar1.src, avatar2.src, avatar3.src, avatar4.src];
 
 export interface ValueCardContent {
   title: string[];

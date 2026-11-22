@@ -1,0 +1,134 @@
+diff --git a/node_modules/@livekit/react-native/android/src/main/java/com/livekit/reactnative/LivekitReactNativeModule.kt b/node_modules/@livekit/react-native/android/src/main/java/com/livekit/reactnative/LivekitReactNativeModule.kt
+index f78e728..152001d 100644
+--- a/node_modules/@livekit/react-native/android/src/main/java/com/livekit/reactnative/LivekitReactNativeModule.kt
++++ b/node_modules/@livekit/react-native/android/src/main/java/com/livekit/reactnative/LivekitReactNativeModule.kt
+@@ -133,6 +133,18 @@ class LivekitReactNativeModule(reactContext: ReactApplicationContext) : ReactCon
+         promise.resolve(Arguments.makeNativeArray(deviceIds))
+     }
+ 
++    /** LONI patch: the route audio is actually playing on, and what is available right now. */
++    @ReactMethod
++    fun getAudioRoute(promise: Promise) {
++        val available = audioManager.availableAudioDevices()
++            .mapNotNull { device -> AudioDeviceKind.fromAudioDevice(device)?.typeName }
++        val current = audioManager.selectedAudioDevice()?.let { AudioDeviceKind.fromAudioDevice(it)?.typeName }
++        val result = Arguments.createMap()
++        result.putArray("available", Arguments.makeNativeArray(available))
++        if (current != null) result.putString("current", current) else result.putNull("current")
++        promise.resolve(result)
++    }
++
+     @ReactMethod
+     fun selectAudioOutput(deviceId: String, promise: Promise) {
+         audioManager.selectAudioOutput(AudioDeviceKind.fromTypeName(deviceId))
+diff --git a/node_modules/@livekit/react-native/ios/LiveKitReactNativeModule.swift b/node_modules/@livekit/react-native/ios/LiveKitReactNativeModule.swift
+index e85be6e..7d29f29 100644
+--- a/node_modules/@livekit/react-native/ios/LiveKitReactNativeModule.swift
++++ b/node_modules/@livekit/react-native/ios/LiveKitReactNativeModule.swift
+@@ -147,6 +147,68 @@ public class LivekitReactNativeModule: RCTEventEmitter {
+         resolve(nil)
+     }
+ 
++    /// LONI patch: the route audio is actually playing on, and the routes that exist right now.
++    private static func routeKind(_ port: AVAudioSession.Port) -> String? {
++        switch port {
++        case .builtInReceiver: return "earpiece"
++        case .builtInSpeaker: return "speaker"
++        case .bluetoothHFP, .bluetoothA2DP, .bluetoothLE: return "bluetooth"
++        case .headphones, .headsetMic, .usbAudio, .lineOut: return "headset"
++        case .carAudio: return "bluetooth"
++        default: return nil
++        }
++    }
++
++    @objc(getAudioRouteWithResolver:withRejecter:)
++    public func getAudioRoute(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
++        let session = AVAudioSession.sharedInstance()
++        var available: [String] = []
++        if UIDevice.current.userInterfaceIdiom == .phone { available.append("earpiece") }
++        available.append("speaker")
++        for input in session.availableInputs ?? [] {
++            if let kind = LivekitReactNativeModule.routeKind(input.portType), kind != "earpiece", !available.contains(kind) {
++                available.append(kind)
++            }
++        }
++        var current: String? = nil
++        for output in session.currentRoute.outputs {
++            if let kind = LivekitReactNativeModule.routeKind(output.portType) {
++                current = kind
++                if !available.contains(kind) { available.append(kind) }
++                break
++            }
++        }
++        resolve(["available": available, "current": current ?? NSNull()])
++    }
++
++    /// LONI patch: route the call to "earpiece", "speaker", "bluetooth" or "headset".
++    @objc(selectAudioRoute:withResolver:withRejecter:)
++    public func selectAudioRoute(_ kind: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
++        let session = AVAudioSession.sharedInstance()
++        do {
++            if kind == "speaker" {
++                try session.overrideOutputAudioPort(.speaker)
++            } else {
++                try session.overrideOutputAudioPort(.none)
++                let wanted: (AVAudioSession.Port) -> Bool = { port in
++                    switch kind {
++                    case "earpiece": return port == .builtInMic
++                    case "bluetooth": return port == .bluetoothHFP || port == .bluetoothLE
++                    case "headset": return port == .headsetMic || port == .usbAudio
++                    default: return false
++                    }
++                }
++                if let input = (session.availableInputs ?? []).first(where: { wanted($0.portType) }) {
++                    try session.setPreferredInput(input)
++                }
++            }
++        } catch {
++            reject("selectAudioRoute error", error.localizedDescription, error)
++            return
++        }
++        resolve(nil)
++    }
++
+     @objc(setAppleAudioConfiguration:withResolver:withRejecter:)
+     public func setAppleAudioConfiguration(_ configuration: NSDictionary, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+         let session = RTCAudioSession.sharedInstance()
+diff --git a/node_modules/@livekit/react-native/ios/LivekitReactNativeModule.m b/node_modules/@livekit/react-native/ios/LivekitReactNativeModule.m
+index dfe83d6..fac7881 100644
+--- a/node_modules/@livekit/react-native/ios/LivekitReactNativeModule.m
++++ b/node_modules/@livekit/react-native/ios/LivekitReactNativeModule.m
+@@ -15,6 +15,11 @@ RCT_EXTERN_METHOD(setDefaultAudioTrackVolume:(nonnull NSNumber *) volume)
+ RCT_EXTERN_METHOD(showAudioRoutePicker)
+ RCT_EXTERN_METHOD(getAudioOutputsWithResolver:(RCTPromiseResolveBlock)resolve
+                   withRejecter:(RCTPromiseRejectBlock)reject)
++RCT_EXTERN_METHOD(getAudioRouteWithResolver:(RCTPromiseResolveBlock)resolve
++                  withRejecter:(RCTPromiseRejectBlock)reject)
++RCT_EXTERN_METHOD(selectAudioRoute:(NSString *)kind
++                  withResolver:(RCTPromiseResolveBlock)resolve
++                  withRejecter:(RCTPromiseRejectBlock)reject)
+ RCT_EXTERN_METHOD(selectAudioOutput:(NSString *)deviceId
+                   withResolver:(RCTPromiseResolveBlock)resolve
+                   withRejecter:(RCTPromiseRejectBlock)reject)
+diff --git a/node_modules/@livekit/react-native/lib/typescript/src/index.d.ts b/node_modules/@livekit/react-native/lib/typescript/src/index.d.ts
+index 5ab7b62..ec840e3 100644
+--- a/node_modules/@livekit/react-native/lib/typescript/src/index.d.ts
++++ b/node_modules/@livekit/react-native/lib/typescript/src/index.d.ts
+@@ -40,4 +40,5 @@ export * from './audio/AudioManagerLegacy';
+ export * from './audio/MediaRecorder';
+ export { AudioSession, AudioDeviceModule, AudioEngineMuteMode, AudioEngineAvailability, audioDeviceModuleEvents, RNE2EEManager, RNKeyProvider, AndroidAudioTypePresets, };
+ export type { AudioConfiguration, AndroidAudioTypeOptions, AppleAudioCategory, AppleAudioCategoryOption, AppleAudioConfiguration, AppleAudioMode, AudioTrackState, LogLevel, SetLogLevelOptions, RNKeyProviderOptions, };
++export { setupIOSAudioManagement } from './audio/AudioManager';
+ //# sourceMappingURL=index.d.ts.map
+\ No newline at end of file
+diff --git a/node_modules/@livekit/react-native/src/index.tsx b/node_modules/@livekit/react-native/src/index.tsx
+index 3d5ed53..5b3eece 100644
+--- a/node_modules/@livekit/react-native/src/index.tsx
++++ b/node_modules/@livekit/react-native/src/index.tsx
+@@ -191,3 +191,6 @@ export type {
+   SetLogLevelOptions,
+   RNKeyProviderOptions,
+ };
++
++// LONI patch: setupIOSAudioManagement is public so the app can choose a voice-call configuration.
++export { setupIOSAudioManagement };

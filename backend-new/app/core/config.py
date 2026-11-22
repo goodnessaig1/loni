@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = ""
     
+    # "production" turns the startup secret checks (app/core/secrets_check.py) into a hard stop.
+    APP_ENV: str = "development"
+
     # Security
     SECRET_KEY: str = "super_secret_key_change_in_production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8  # 8 days
@@ -114,6 +117,7 @@ class Settings(BaseSettings):
     EMERGENCY_PHONE: str = "112"
     # A second, narrow model call that can only RAISE the urgency found by the keyword rules (never lower it).
     AI_TRIAGE_CLASSIFIER: bool = True
+    AI_ROUTE_SMALL_TALK: bool = True      # greetings / small talk answered by the fast (cheaper) model
 
     # --- Proactive wellness check-ins ("hello" from Loni) ---
     # OFF by default so a dev/staging database with real device tokens never messages anyone by accident.
@@ -172,6 +176,11 @@ class Settings(BaseSettings):
     DRIVER_LOCATION_PERSIST_METERS: int = 50
     # Safety-net sweep for call/ride timeouts that survive restarts and deploys.
     TIMEOUT_SWEEP_SECONDS: int = 15
+    # A CONNECTED call untouched this long is checked against LiveKit (who is really in the room),
+    # so a lost "room finished" webhook can never leave two people marked busy for ever.
+    CALL_STALE_CHECK_SECONDS: int = 300
+    # Hard ceiling on one call, whatever LiveKit says.
+    CALL_MAX_SECONDS: int = 4 * 60 * 60
     RATE_LIMITS_ENABLED: bool = True
 
     # ---- Admin portal (staff accounts, RBAC, 2FA; app/modules/staff) ------------------------

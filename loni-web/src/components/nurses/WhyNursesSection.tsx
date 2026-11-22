@@ -30,7 +30,7 @@ export function WhyNursesSection() {
         },
       ]}
       photo={{
-        src: nurseOnCall,
+        src: nurseOnCall.src,
         alt: 'A smiling LONI nurse in blue scrubs taking a call on a headset',
         width: 359,
         height: 302,

@@ -32,3 +32,14 @@ def get_password_hash(password: str) -> str:
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
+
+
+WS_TICKET_TTL_SECONDS = 60
+WS_TICKET_TYPE = "ws"
+
+
+def create_ws_ticket(user_id: str) -> str:
+    """A 60-second, WebSocket-only credential. It goes in the socket URL instead of the
+    8-day access token, so URLs that end up in proxy/server logs carry nothing reusable."""
+    expire = datetime.now(timezone.utc) + timedelta(seconds=WS_TICKET_TTL_SECONDS)
+    return jwt.encode({"exp": expire, "sub": str(user_id), "typ": WS_TICKET_TYPE}, settings.SECRET_KEY, algorithm=ALGORITHM)

@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties, ReactNode } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';

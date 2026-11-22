@@ -21,7 +21,7 @@ export const PlusBanner = ({ onPress }: { onPress: () => void }) => {
         <View style={{ flex: 1 }}>
           <HelixaText weight="bold" style={{ fontSize: 15, color: '#1F2937' }}>Try LONI Plus free for {days} days</HelixaText>
           <HelixaText style={{ fontSize: 12, lineHeight: 18, color: '#6B7280', marginTop: 4 }}>
-            Unlimited Luma, recent nurses, multiple emergency contacts, priority dispatch.
+            Unlimited Loni AI, recent nurses, multiple emergency contacts, priority dispatch.
           </HelixaText>
         </View>
       </View>

@@ -339,7 +339,7 @@ async def test_preferences_api_validates_and_persists(make_user, as_user, sessio
     assert base["enabled"] is True and base["timezone"] == "Africa/Lagos" and base["preferred_hour"] == 9 and base["quiet_from_hour"] == 20 and base["remember"] is True
 
     ok = await c.put("/api/v1/checkins/preferences", json={"enabled": False, "timezone": "Europe/London", "preferred_hour": 10})
-    assert ok.json()["data"] == {"enabled": False, "timezone": "Europe/London", "preferred_hour": 10, "remember": True, "quiet_from_hour": 20}
+    assert ok.json()["data"] == {"enabled": False, "timezone": "Europe/London", "preferred_hour": 10, "remember": True, "quiet_from_hour": 20, "paused_until": None}
     assert (await c.get("/api/v1/checkins/preferences")).json()["data"]["enabled"] is False
     assert (await c.put("/api/v1/checkins/preferences", json={"timezone": "Mars/Base"})).status_code == 400
     assert (await c.put("/api/v1/checkins/preferences", json={"preferred_hour": 21})).status_code == 400   # inside quiet hours

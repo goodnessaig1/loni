@@ -1,3 +1,5 @@
+'use client';
+
 import { MotionConfig, motion } from 'framer-motion';
 import { TagBadge } from '../ui/TagBadge';
 import { PricingPanel } from './PricingPanel';

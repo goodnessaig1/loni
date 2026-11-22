@@ -1,3 +1,5 @@
+'use client';
+
 import { MotionConfig, motion } from 'framer-motion';
 import { SITE } from '../../config/site';
 import { ArrowPillButton } from '../ui/ArrowPillButton';

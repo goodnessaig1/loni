@@ -1,5 +1,8 @@
+'use client';
+
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { NavLinkItem } from './navLinks';
 
 interface Props {
@@ -12,7 +15,7 @@ interface Props {
   children?: ReactNode;
 }
 
-/** Renders a router link for in-app routes, a plain anchor for in-page / external ones. */
+/** Renders a Next.js link for in-app routes, a plain anchor for in-page / external ones. */
 export function NavItem({
   item,
   className = '',
@@ -21,16 +24,20 @@ export function NavItem({
   onClick,
   children,
 }: Props) {
+  const pathname = usePathname();
+
   if (item.to) {
+    // Exact match, like react-router's <NavLink end>.
+    const isActive = pathname === item.to;
     return (
-      <NavLink
-        to={item.to}
-        end
+      <Link
+        href={item.to}
         onClick={onClick}
-        className={({ isActive }) => `${className} ${isActive ? activeClassName : inactiveClassName}`}
+        aria-current={isActive ? 'page' : undefined}
+        className={`${className} ${isActive ? activeClassName : inactiveClassName}`}
       >
         {children ?? item.label}
-      </NavLink>
+      </Link>
     );
   }
 

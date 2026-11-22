@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
 import feature from '../../assets/emergency/feature.webp';
@@ -31,7 +33,7 @@ export function EmergencyFeature({ className = '' }: { className?: string }) {
       >
         {/* Phones use the design's own taller crop (391 × 240); md+ the wide one. */}
         <img
-          src={featureMobile}
+          src={featureMobile.src}
           alt={ALT}
           width={391}
           height={240}
@@ -40,7 +42,7 @@ export function EmergencyFeature({ className = '' }: { className?: string }) {
           className="block h-auto w-full select-none md:hidden"
         />
         <img
-          src={feature}
+          src={feature.src}
           alt={ALT}
           width={1347}
           height={402}

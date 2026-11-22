@@ -176,8 +176,10 @@ async def test_cancel_and_answer_stop_every_other_nurse_ringing(person, as_user,
     _no_livekit.clear()
     assert (await (await as_user(a)).post(f"{API}/{second['id']}/accept")).status_code == 200
     taken = [(u, d) for u, ev, d in _no_livekit if ev == "call_accepted"]
-    assert {u for u, _ in taken} == {mum.id, b.id}
+    assert {u for u, _ in taken} == {mum.id, b.id, a.id}
     assert [d.get("taken") for u, d in taken if u == b.id] == [True]
+    # a's own other devices are told too, flagged so the phone that answered ignores it
+    assert [d.get("answered_here") for u, d in taken if u == a.id] == [True]
     assert (await (await as_user(b)).post(f"{API}/{second['id']}/accept")).status_code == 400
 
 

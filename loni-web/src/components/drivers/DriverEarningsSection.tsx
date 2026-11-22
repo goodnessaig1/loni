@@ -21,7 +21,7 @@ export function DriverEarningsSection() {
         { title: 'Added to driver earnings', text: 'Payment is added to your driver earnings account.' },
       ]}
       card={{
-        src: earningsCard,
+        src: earningsCard.src,
         alt: "The LONI driver app's Payment Details screen asking for account name, bank name and account number",
       }}
       canvas={{

@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { useMediaQuery } from '../../hooks/useMediaQuery';

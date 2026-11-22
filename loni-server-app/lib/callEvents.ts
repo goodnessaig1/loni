@@ -31,6 +31,10 @@ export type ServerCallEventType =
 // WS and FCM both deliver `call_accepted`; only one POST /join per call.
 const joinInFlight = new Set<number>();
 
+// Calls THIS phone is answering right now. The server also tells the answerer's other phones
+// (`call_accepted` with `answered_here`) so they stop ringing; this phone must ignore that event.
+export const answering = new Set<number>();
+
 function toParticipant(raw: any): ParticipantInfo | null {
   if (!raw) return null;
   return {
@@ -53,7 +57,13 @@ function toParticipant(raw: any): ParticipantInfo | null {
  * tree at all when a background notification action fires.
  */
 export async function acceptCallDirect(callId: number) {
-  const res = await apiClient.post(`/calls/${callId}/accept`);
+  answering.add(callId);
+  let res;
+  try {
+    res = await apiClient.post(`/calls/${callId}/accept`);
+  } finally {
+    answering.delete(callId);
+  }
   useCallStore.getState().setConnecting({
     callId,
     roomToken: res.data.token,
@@ -108,6 +118,7 @@ export async function applyServerCallEvent(type: string, data: any) {
 
     case 'call_accepted': {
       if (callId == null) return;
+      if (data?.answered_here && answering.has(callId)) return; // this phone is the one answering
       if (store.callId === callId && (store.status === 'CONNECTING' || store.status === 'CONNECTED')) return;
       // A call this user started (a driver calling the passenger) was answered: fetch a room token.
       if (store.isOutgoing && store.callId === callId) {

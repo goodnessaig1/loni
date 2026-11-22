@@ -1,10 +1,11 @@
 import React from 'react';
-import { Linking, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, TouchableOpacity, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { HelixaText } from '../HelixaText';
 import { useTheme } from '../../context/ThemeContext';
 import type { ChatMeta } from '../../hooks/useAIChat';
+import { handoffApi } from '../../api/handoff';
 
 const ICONS: Record<string, React.ComponentProps<typeof Feather>['name']> = {
   request_ride: 'truck',
@@ -18,7 +19,7 @@ const ICONS: Record<string, React.ComponentProps<typeof Feather>['name']> = {
  * request a ride, talk to a nurse, call emergency services); this just renders them. Emergencies and urgent
  * replies also get a coloured strip so they cannot be mistaken for ordinary advice.
  */
-export const SafetyActions = ({ meta }: { meta?: ChatMeta }) => {
+export const SafetyActions = ({ meta, sessionId }: { meta?: ChatMeta; sessionId?: string | null }) => {
   const router = useRouter();
   const { colors, isDark } = useTheme();
   if (!meta || meta.actions.length === 0) return null;
@@ -27,11 +28,31 @@ export const SafetyActions = ({ meta }: { meta?: ChatMeta }) => {
   const urgent = meta.urgency === 'urgent';
   const accent = emergency ? '#DC2626' : urgent ? '#D97706' : '#D62D88';
 
+  const go = (route?: string) => {
+    if (route) router.push(route as any);
+  };
+
   const run = (a: ChatMeta['actions'][number]) => {
     if (a.type === 'call_emergency') {
       if (a.phone) Linking.openURL(`tel:${a.phone}`);
-    } else if (a.route) {
-      router.push(a.route as any);
+    } else if (a.type === 'talk_to_nurse' && !emergency) {
+      // Ask before sharing anything. In an emergency we never add a step: the call starts straight away.
+      Alert.alert(
+        'Share a summary with the nurse?',
+        "Loni can send the nurse a short summary: your stage, any warning signs from this chat, and allergies, medicines or concerns you've told Loni. Your messages are not included. No nurse has reviewed it yet.",
+        [
+          { text: "Don't share", style: 'cancel', onPress: () => go(a.route) },
+          {
+            text: 'Share',
+            onPress: () => {
+              handoffApi.share(sessionId).catch(() => {}); // sharing must never block reaching a nurse
+              go(a.route);
+            },
+          },
+        ],
+      );
+    } else {
+      go(a.route);
     }
   };
 

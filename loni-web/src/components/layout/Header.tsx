@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useId, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Menu, X } from 'lucide-react';

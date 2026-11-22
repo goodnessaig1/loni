@@ -1,6 +1,31 @@
 import { useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useCallStore, ParticipantInfo } from '../store/callStore';
 import { apiClient } from '../api/client';
+import { ensureMicrophoneForCall, MicDecision } from '../lib/micPermission';
+import { startCallForegroundService, stopCallForegroundService } from '../lib/callForegroundService';
+
+/**
+ * Settle the microphone BEFORE the call is placed or answered (not after the other side picks up,
+ * which left them talking to silence behind a permission dialog): the OS prompt if it can still be
+ * shown, otherwise an explanation with "Allow" / "Open Settings" / go on muted / cancel
+ * (lib/micPermission.ts). With the microphone allowed, start the Android call foreground service
+ * now, while the app is certainly in the foreground (Android 12+ refuses to start one from the
+ * background; type "microphone" needs the permission granted).
+ */
+async function prepareForCall(purpose: 'call' | 'answer'): Promise<MicDecision> {
+  const decision = await ensureMicrophoneForCall(purpose);
+  if (decision === 'granted') {
+    await startCallForegroundService('LONI call', 'Tap to return to your call').catch(() => {});
+  }
+  return decision;
+}
+
+/** The call never got going (refused, no nurse, already taken): don't leave the service running. */
+function releaseIfNoCall(): void {
+  const s = useCallStore.getState();
+  if (!s.isActive && !s.isOutgoing) stopCallForegroundService();
+}
 import { startOutgoingCall, reportCallEnded } from '../lib/callKeepService';
 
 function toParticipant(raw: any) {
@@ -18,11 +43,16 @@ function toParticipant(raw: any) {
 }
 
 export const useCall = () => {
-  const {
-    isActive, isIncoming, isOutgoing, status,
-    callerName, callId, roomName, remoteParticipant,
-    setOutgoingCall, setConnecting, endCall,
-  } = useCallStore();
+  // Only these fields re-render the caller (not connection quality, mic state, timers...).
+  const { isActive, isIncoming, isOutgoing, status, callerName, callId, roomName, remoteParticipant } = useCallStore(
+    useShallow((s) => ({
+      isActive: s.isActive, isIncoming: s.isIncoming, isOutgoing: s.isOutgoing, status: s.status,
+      callerName: s.callerName, callId: s.callId, roomName: s.roomName, remoteParticipant: s.remoteParticipant,
+    })),
+  );
+  const setOutgoingCall = useCallStore((s) => s.setOutgoingCall);
+  const setConnecting = useCallStore((s) => s.setConnecting);
+  const endCall = useCallStore((s) => s.endCall);
 
   /**
    * Start a call. No options rings every online nurse; `nurseId` rings one nurse;
@@ -32,8 +62,17 @@ export const useCall = () => {
     // One call at a time: a second tap while ringing must not start another call.
     if (useCallStore.getState().status !== 'IDLE') return null;
     try {
+      if ((await prepareForCall('call')) === 'cancelled') return null;
+      if (useCallStore.getState().status !== 'IDLE') return null; // a call arrived meanwhile
       const response = await apiClient.post('/calls/request', { nurse_id: opts.nurseId, ride_id: opts.rideId });
       const call = response.data;
+      // Someone called her in the second her own call was being placed: hers wins, theirs is
+      // declined (so their phone stops ringing at once) instead of the two screens colliding.
+      const crossed = useCallStore.getState();
+      if (crossed.status === 'INCOMING' && crossed.callId != null && crossed.callId !== call.id) {
+        apiClient.post(`/calls/${crossed.callId}/reject`).catch(() => { /* it times out server-side */ });
+        crossed.endCall('REJECTED');
+      }
       setOutgoingCall(call.id, call.room_name, { kind: call.kind ?? 'nurse', rideId: call.ride_id ?? null }, opts.remote ?? null);
       // Native outgoing-call UI (Issue 5): on iOS this gives a real
       // system ringback tone via CallKit for free - no bundled audio file
@@ -43,12 +82,16 @@ export const useCall = () => {
       return call;
     } catch (error) {
       console.error('Failed to request call', error);
+      releaseIfNoCall();
       throw error;
     }
   }, [setOutgoingCall]);
 
   const acceptCall = useCallback(async (incomingCallId: number) => {
     try {
+      // Cancelled: leave it ringing - they can still answer or decline.
+      if ((await prepareForCall('answer')) === 'cancelled') return null;
+      if (useCallStore.getState().callId !== incomingCallId) return null; // the caller hung up meanwhile
       const response = await apiClient.post(`/calls/${incomingCallId}/accept`);
       setConnecting({
         callId: incomingCallId,
@@ -59,6 +102,7 @@ export const useCall = () => {
       return response.data;
     } catch (error) {
       console.error('Failed to accept call', error);
+      releaseIfNoCall();
       endCall('FAILED');
       throw error;
     }

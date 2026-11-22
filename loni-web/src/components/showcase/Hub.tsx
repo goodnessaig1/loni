@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import hubOuter from '../../assets/showcase/roads/hub-outer.svg';
 import hubInner from '../../assets/showcase/roads/hub-inner.svg';
@@ -9,9 +11,9 @@ import { hubVariants } from './motionPresets';
 export function Hub() {
   return (
     <motion.div aria-hidden="true" variants={hubVariants} style={box(578.59, 304.52, 309.119, 309.119)}>
-      <img src={hubOuter} alt="" draggable={false} className="absolute inset-0 size-full max-w-none" />
+      <img src={hubOuter.src} alt="" draggable={false} className="absolute inset-0 size-full max-w-none" />
       <img
-        src={hubInner}
+        src={hubInner.src}
         alt=""
         draggable={false}
         className="absolute max-w-none"
@@ -26,7 +28,7 @@ export function Hub() {
           borderRadius: px(55.043),
         }}
       >
-        <img src={hubBolt} alt="" draggable={false} className="max-w-none" style={{ width: px(56.421), height: px(66.012) }} />
+        <img src={hubBolt.src} alt="" draggable={false} className="max-w-none" style={{ width: px(56.421), height: px(66.012) }} />
       </div>
     </motion.div>
   );
