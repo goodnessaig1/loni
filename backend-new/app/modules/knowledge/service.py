@@ -134,6 +134,10 @@ async def approve(db, doc: KnowledgeDoc, reviewer: str, expires_on: Optional[dat
         raise ValueError("A named reviewer is required")
     if expires_on is None and doc.expires_on is None:
         raise ValueError("Set a review-by (expiry) date")
+    if (expires_on or doc.expires_on) < date.today():
+        raise ValueError("The review-by date has already passed")
+    if doc.week_from is not None and doc.week_to is not None and doc.week_from > doc.week_to:
+        raise ValueError("week_from is after week_to")
     doc.status, doc.reviewer, doc.reviewed_at = "approved", reviewer.strip()[:120], datetime.now(timezone.utc)
     if expires_on is not None:
         doc.expires_on = expires_on

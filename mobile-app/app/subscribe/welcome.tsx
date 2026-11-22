@@ -28,7 +28,7 @@ export default function WelcomeToPlusScreen() {
           </Reveal>
           <Reveal index={2}>
           <HelixaText style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 22, textAlign: 'center', marginTop: 12, paddingHorizontal: 12 }}>
-            Your {subscription?.plan ? '7-day ' : ''}free trial has started. Unlimited Luma, recent nurses, priority dispatch, it&apos;s all yours.
+            Your {subscription?.plan ? '7-day ' : ''}free trial has started. Unlimited Loni AI, recent nurses, priority dispatch, it&apos;s all yours.
           </HelixaText>
           </Reveal>
           <Reveal index={3}>

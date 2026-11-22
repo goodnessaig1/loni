@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 from app.core.mongo_db import get_mongo_db
 from app.modules.ai_chat import messages as safe_messages
-from app.modules.ai_chat import classifier, lookup, nigerian, safety
+from app.modules.ai_chat import classifier, investigation, lookup, nigerian, safety, signals
 from app.modules.ai_chat.context import profile_lines, stage_context, stage_text
 from app.modules.ai_chat.prompts import (
     CHECKIN_DIRECTIVE, CHECKIN_INTENSIVE_EXTRA, CONTEXT_TEMPLATE, EMOTIONAL_FLAG_DIRECTIVE, FACTS_TEMPLATE, INFO_ONLY_DIRECTIVE,
@@ -14,7 +14,7 @@ from app.modules.ai_chat.prompts import (
     LOOKUP_NEEDS_PLACE, LOOKUP_NO_RESULTS, LOOKUP_TEMPLATE, LOOKUP_UNAVAILABLE, MEMORY_TEMPLATE, URGENT_DIRECTIVE,
     build_system_prompt,
 )
-from app.modules.ai_chat.triage import ANSWER_PATTERNS, StageContext, TriageResult, Urgency, triage
+from app.modules.ai_chat.triage import ANSWER_PATTERNS, StageContext, TriageResult, Urgency, is_personal, triage
 
 async def generate_and_update_title(session_id: str, user_id: str, content: str, client, model: str):
     try:
@@ -56,7 +56,7 @@ def _meta(result: TriageResult) -> dict:
 
 def build_llm_messages(history: list, user, stage: StageContext, result: TriageResult, origin: dict | None = None,
                        memory_lines: list | None = None, lookup_block: str | None = None, fact_lines: list | None = None,
-                       knowledge_block: str | None = None, user_text: str = "") -> list:
+                       knowledge_block: str | None = None, user_text: str = "", investigation_note: str | None = None) -> list:
     """System prompt, her profile context, the conversation, and (last, so it carries the most weight) the
     directive for this particular turn."""
     msgs = [
@@ -87,6 +87,8 @@ def build_llm_messages(history: list, user, stage: StageContext, result: TriageR
     pattern = ANSWER_PATTERNS.get(result.answer_type, "")
     if pattern and result.urgency != Urgency.urgent:
         directives.append("RESPONSE PATTERN: " + pattern)
+    if investigation_note and result.urgency not in (Urgency.urgent, Urgency.emergency):
+        directives.append(investigation_note)
     local = nigerian.directive(user_text, serious=result.urgency in (Urgency.urgent, Urgency.emergency))
     if local:
         directives.append(local)
@@ -95,8 +97,10 @@ def build_llm_messages(history: list, user, stage: StageContext, result: TriageR
     return msgs
 
 
-async def _record_safety_event(db, user_id: str, session_id: str, result: TriageResult, llm_called: bool, notes: list):
-    """What was decided and why. Never the message text: health details stay out of the audit trail."""
+async def _record_safety_event(db, user_id: str, session_id: str, result: TriageResult, llm_called: bool, notes: list,
+                               quality_signals: list | None = None, inv=None):
+    """What was decided and why, plus implicit quality signals (she corrected Loni, asked again, said thanks).
+    Never the message text: health details stay out of the audit trail."""
     try:
         high_risk = result.urgency in (Urgency.emergency, Urgency.urgent) or result.domain == "mental_health"
         await db["ai_safety_events"].insert_one({
@@ -104,10 +108,20 @@ async def _record_safety_event(db, user_id: str, session_id: str, result: Triage
             "user_id": user_id, "session_id": session_id, "urgency": result.urgency.value,
             "domain": result.domain, "answer_type": result.answer_type, "rule_ids": result.rule_ids,
             "info_only": result.info_only, "llm_called": llm_called, "validator_notes": len(notes),
+            "signals": quality_signals or [],
+            "investigation": ({"id": inv.id, "turn": inv.turns + 1, "ready": inv.ready} if inv else None),
             "created_at": datetime.now(timezone.utc),
         })
     except Exception as e:  # auditing must never break a chat
         print(f"Could not record safety event: {e}")
+
+
+def choose_model(result: TriageResult, main: str, fast: str) -> str:
+    """Cheapest model that is good enough: greetings and small talk with no health content use the fast model.
+    Anything with a symptom, a medicine, a test, emotion or any urgency stays on the main model."""
+    if settings.AI_ROUTE_SMALL_TALK and result.answer_type == "greeting" and result.urgency == Urgency.educational and not result.rule_ids:
+        return fast
+    return main
 
 
 def _client_and_model():
@@ -117,22 +131,27 @@ def _client_and_model():
 
 
 async def _learn_and_recall(user_id: str, text: str) -> tuple:
-    """Note what this message tells us (day tags + structured facts), and return (day lines, fact lines) for the AI.
-    Silent on any failure and does nothing if she turned memory off."""
+    """Note what this message tells us (day tags + structured facts), and return (day lines, fact lines, earlier
+    symptom notes) for the AI. Silent on any failure and does nothing if she turned memory off.
+
+    Earlier symptom notes are (symptom key, description) for symptoms first noted BEFORE today, so a repeated
+    complaint ("my head is hurting again") is recognised without mistaking today's first mention for history."""
     try:
         from app.modules.checkins import facts as fx, memory as mem, service as cs
         async with AsyncSessionLocal() as db:
             prefs = await cs.get_preferences(db, user_id)
             if not prefs.remember:
-                return [], []
+                return [], [], []
             today = cs.policy.local_now(datetime.now(timezone.utc), cs.policy.safe_zone(prefs.timezone, settings.CHECKIN_DEFAULT_TZ)).date()
             await mem.remember(db, user_id, text, today)
             await fx.learn(db, user_id, text, today)
             day_lines = mem.context_lines(await mem.recent_notes(db, user_id, today, days=7), today)
-            return day_lines, fx.context_lines(await fx.list_facts(db, user_id), today)
+            facts = await fx.list_facts(db, user_id)
+            earlier = [(f.key, fx.describe(f, today)) for f in facts if f.kind == "symptom" and f.first_noted and f.first_noted < today]
+            return day_lines, fx.context_lines(facts, today), earlier
     except Exception as e:
         print(f"Could not use memory: {e}")
-        return [], []
+        return [], [], []
 
 
 async def _knowledge(text: str, stage: StageContext) -> list:
@@ -212,7 +231,7 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
                 meta = {**meta, "sources": lookup_result.sources()}
 
     # 3d. What she has told Loni lately (tags, not her words) so the chat feels continuous; also learn from this message.
-    memory_lines, fact_lines = await _learn_and_recall(user_id, content)
+    memory_lines, fact_lines, earlier_symptoms = await _learn_and_recall(user_id, content)
 
     # 3e. Clinician-approved reference notes for this question and stage (only approved, unexpired documents).
     knowledge_hits = await _knowledge(content, stage)
@@ -224,8 +243,17 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
 
     # 4. Conversation history for context (last 20 messages; it already contains the message just saved)
     history = (await get_session_messages(session_id))[-20:]
+
+    # 4b. A symptom she reports (not an emergency, not urgent): what Loni still needs to find out, warning signs first,
+    #     so it investigates like a nurse instead of replying "see a nurse". Carries on across turns via the saved meta.
+    inv = None
+    if result.urgency in (Urgency.routine, Urgency.educational) and not result.info_only:
+        inv = investigation.assess(content, stage, history, earlier_symptoms, personal=is_personal(content))
+    saved_meta = {**meta, "investigation": investigation.meta(inv)} if inv else meta
+
     openai_messages = build_llm_messages(history, user, stage, result, origin, memory_lines, lookup_block,
-                                         fact_lines, knowledge_block, content)
+                                         fact_lines, knowledge_block, content,
+                                         investigation.directive(inv) if inv else None)
 
     # 5. Urgent: the fixed "get checked today" line goes out before any model text, so it is there even if the model fails.
     full = ""
@@ -234,8 +262,10 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
         full += header
         yield _sse({"content": header})
 
-    # 6. Stream the model. If the main model is overloaded or down before it says anything, the fast one answers.
+    # 6. Stream the model. Small talk goes to the fast (cheaper) model; everything health-related to the main one.
+    #    If the main model is overloaded or down before it says anything, the fast one answers.
     backup = get_provider().classifier_model
+    model = choose_model(result, model, backup)
     models = [model] + ([backup] if backup != model else [])
     model_text = ""
     for i, m in enumerate(models):
@@ -265,7 +295,8 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
 
     # 7. Check what the model said before it is saved as the final answer.
     notes = safety.validate(result.urgency, model_text, result.answer_type,
-                            lookup_result.allowed_numbers() if lookup_result is not None else None)
+                            lookup_result.allowed_numbers() if lookup_result is not None else None,
+                            reminded_recently=safety.reminded_recently(history))
     for note in notes:
         extra = f"\n\n{note}"
         full += extra
@@ -276,8 +307,9 @@ async def stream_chat_message(session_id: str, user_id: str, content: str, user=
         yield _sse({"content": footer})
 
     yield "data: [DONE]\n\n"
-    await _save_assistant(db, session_id, full, meta)
-    await _record_safety_event(db, user_id, session_id, result, True, notes)
+    await _save_assistant(db, session_id, full, saved_meta)
+    await _record_safety_event(db, user_id, session_id, result, True, notes,
+                               signals.detect(content, history), inv)
 
 
 async def create_chat_session(user_id: str, title: str = "New Chat"):
@@ -346,6 +378,26 @@ async def get_session_messages(session_id: str, limit: int = 1000, skip: int = 0
     return messages
 
 
+
+
+# ── explicit feedback on an answer ("was this helpful?") ─────────────────────────────────────────────
+
+async def record_feedback(user_id: str, session_id: str, message_id: str, helpful: bool, reason: str | None) -> bool:
+    """One rating per answer (a new rating replaces the old). Stores what Loni decided for that answer (urgency,
+    question type, investigation pathway), not the words, so patterns can be studied without health text."""
+    db = get_mongo_db()
+    found = await db["messages"].find({"id": message_id, "session_id": session_id, "role": "assistant"}).to_list(length=1)
+    if not found:
+        return False
+    m = found[0].get("meta") or {}
+    doc = {
+        "id": str(uuid.uuid4()), "user_id": user_id, "session_id": session_id, "message_id": message_id,
+        "helpful": bool(helpful), "reason": reason, "urgency": m.get("urgency"), "answer_type": m.get("answer_type"),
+        "investigation": (m.get("investigation") or {}).get("id"), "created_at": datetime.now(timezone.utc),
+    }
+    await db["ai_feedback"].delete_many({"message_id": message_id, "user_id": user_id})
+    await db["ai_feedback"].insert_one(doc)
+    return True
 
 
 # ── human review of high-risk conversations (admins only; see router) ───────────────────────────────

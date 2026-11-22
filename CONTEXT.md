@@ -12,7 +12,7 @@
 
 | Pillar | What it is |
 | --- | --- |
-| **Loni AI** (also called "Luma" / "LONI Bot") | A 24/7 AI companion for women's health: pregnancy, postpartum, periods, contraception, fertility, menopause, sexual and breast health, wellbeing. Has emergency triage, memory, hospital look-ups and proactive daily check-ins. Not a doctor. |
+| **Loni AI** (formerly "Luma" / "LONI Bot") | A 24/7 AI companion for women's health: pregnancy, postpartum, periods, contraception, fertility, menopause, sexual and breast health, wellbeing. Has emergency triage, memory, hospital look-ups and proactive daily check-ins. Not a doctor. |
 | **Human nurses** | Verified nurses take **voice calls** from mothers (LiveKit) when an AI answer is not enough. |
 | **Emergency rides** | A mother requests an **emergency ride**; verified **drivers** nearby are offered the trip, first to accept wins; live tracking; her emergency contacts can follow. |
 | **Partners & family** | A mother invites a **support partner** (husband, relative). The partner gets their own dashboard (her journey, shared updates, emergency alerts, live ride location). She controls what is shared. |
@@ -388,5 +388,5 @@ React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. De
 
 - **Mother / woman** = a `user_type=user` account. **Partner** = support partner/relative. **Nurse**, **Driver**, **Admin** as above.
 - **Triage** = the deterministic danger-sign check before the AI answers. **Check-in** = a proactive "hello" from Loni. **Care level** = standard / enhanced / intensive. **Memory** = tags Loni keeps about her days.
-- **LONI Plus** = paid tier (7-day trial). **Luma** = alternate name for the AI in parts of the UI. **WAT** = Africa/Lagos timezone.
+- **LONI Plus** = paid tier (7-day trial). **Loni AI** = the AI companion (the old name "Luma" has been retired everywhere). **WAT** = Africa/Lagos timezone.
 - **PushKit / VoIP push** = Apple's only guaranteed way to wake a killed app for a call. **CallKeep** = native call UI library. **LiveKit** = WebRTC voice infrastructure.

@@ -117,6 +117,7 @@ class Settings(BaseSettings):
     EMERGENCY_PHONE: str = "112"
     # A second, narrow model call that can only RAISE the urgency found by the keyword rules (never lower it).
     AI_TRIAGE_CLASSIFIER: bool = True
+    AI_ROUTE_SMALL_TALK: bool = True      # greetings / small talk answered by the fast (cheaper) model
 
     # --- Proactive wellness check-ins ("hello" from Loni) ---
     # OFF by default so a dev/staging database with real device tokens never messages anyone by accident.

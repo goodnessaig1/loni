@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
 
-export const LumaIcon = ({ size = 24, color = '#D62D88' }) => {
+export const LoniAiIcon = ({ size = 24, color = '#D62D88' }) => {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <Path 

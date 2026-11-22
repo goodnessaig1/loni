@@ -43,6 +43,24 @@ async def get_messages(
     messages = await service.get_session_messages(session_id, limit=limit, skip=skip)
     return {"success": True, "data": {"messages": messages}}
 
+@router.post("/sessions/{session_id}/messages/{message_id}/feedback", response_model=schemas.StandardChatResponse)
+async def message_feedback(
+    session_id: str,
+    message_id: str,
+    data: schemas.MessageFeedback,
+    current_user: User = Depends(get_current_user)
+):
+    """'Was this helpful?' on one of Loni's answers. Stores the rating and a fixed reason code, never text."""
+    if data.reason is not None and data.reason not in schemas.FEEDBACK_REASONS:
+        raise HTTPException(status_code=422, detail="Unknown reason")
+    sessions = await service.get_user_sessions(current_user.id)
+    if not any(s["id"] == session_id for s in sessions):
+        raise HTTPException(status_code=403, detail="Not authorized to access this session")
+    if not await service.record_feedback(current_user.id, session_id, message_id, data.helpful, data.reason):
+        raise HTTPException(status_code=404, detail="Message not found")
+    return {"success": True, "message": "Thanks for the feedback"}
+
+
 @router.delete("/sessions/{session_id}", response_model=schemas.StandardChatResponse)
 async def delete_session(
     session_id: str,
@@ -161,7 +179,7 @@ async def withdraw_handoff(handoff_id: str, current_user: User = Depends(get_cur
 
 @router.get("/handoffs/patient/{mother_id}")
 async def nurse_reads_handoff(mother_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """For the nurse on a call with her (in the last 24h) only. Opening it marks it viewed."""
+    """For a nurse who was on a call with her (either direction) in the last 24h only. Opening it marks it viewed."""
     from datetime import datetime, timedelta, timezone
     from sqlalchemy import select
     from app.modules.calls.models import Call
@@ -169,8 +187,10 @@ async def nurse_reads_handoff(mother_id: str, current_user: User = Depends(get_c
     if current_user.user_type != UserTypeEnum.nurse:
         raise HTTPException(status_code=403, detail="Nurses only")
     since = datetime.now(timezone.utc) - timedelta(hours=24)
-    call = (await db.execute(select(Call.id).where(Call.caller_id == mother_id, Call.receiver_id == current_user.id,
-                                                   Call.created_at >= since).limit(1))).first()
+    from sqlalchemy import and_, or_
+    on_call = or_(and_(Call.caller_id == mother_id, Call.receiver_id == current_user.id),
+                  and_(Call.caller_id == current_user.id, Call.receiver_id == mother_id))   # she called, or the nurse called back
+    call = (await db.execute(select(Call.id).where(on_call, Call.created_at >= since).limit(1))).first()
     if call is None:
         raise HTTPException(status_code=403, detail="Only the nurse on her call can read this")
     return {"success": True, "data": {"handoffs": await service.handoffs_for_nurse(current_user.id, mother_id)}}

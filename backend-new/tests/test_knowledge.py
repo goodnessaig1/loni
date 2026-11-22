@@ -6,7 +6,7 @@ import pytest
 from app.modules.knowledge import service as kb
 
 pytestmark = pytest.mark.anyio
-TODAY = date(2026, 11, 18)
+TODAY = date.today()
 DOC = {"title": "Sleep in the third trimester", "body": "Many women sleep badly late in pregnancy. Sleeping on your side "
        "with pillows can help. Tell your midwife if you also have headaches or swelling.", "source": "NHS / WHO (test)",
        "stages": ["pregnancy"], "week_from": 28, "week_to": 42, "tags": ["sleep", "insomnia"]}

@@ -12,7 +12,7 @@ const SECTIONS: LegalSectionContent[] = [
   {
     title: 'AI guidance vs professional care',
     paragraphs: [
-      "LUMA is an AI companion that offers guidance and information. It does not replace your doctor, nurse or emergency medical care. We're always clear about the difference between AI guidance and professional care.",
+      "Loni AI is an AI companion that offers guidance and information. It does not replace your doctor, nurse or emergency medical care. We're always clear about the difference between AI guidance and professional care.",
     ],
   },
   {

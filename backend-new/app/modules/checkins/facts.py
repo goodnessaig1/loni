@@ -61,17 +61,19 @@ MEDICATIONS: Dict[str, str] = {
 }
 _MED_CUE = re.compile(r"(?:i'?m|i am|i'?ve been|i have been|been) (?:taking|on|using)|\bi (?:take|use|started)\b|prescribed|(?:doctor|nurse|clinic|hospital|midwife) (?:gave|put|placed|started) me", re.I)
 
+_HER_HISTORY = r"(?<!family )(?<!no )(?<!any )(?<!not )history of"
+_I_HAD = r"(?:i (?:have |'ve |'d )?had|i've had)"
 CONDITIONS: Dict[str, str] = {
-    "high blood pressure": r"(?:i have|i'?ve got|diagnosed with|i was told i have|history of) (?:high blood pressure|hypertension|\bhbp\b)",
-    "pre-eclampsia (before)": r"(?:had|history of) (?:pre-?eclampsia|eclampsia)",
-    "diabetes": r"(?:i have|i'?ve got|diagnosed with|history of) (?:gestational )?diabetes",
+    "high blood pressure": r"(?:i have|i'?ve got|i was diagnosed with|i was told i have|" + _HER_HISTORY + r") (?:high blood pressure|hypertension|\bhbp\b)",
+    "pre-eclampsia (before)": _I_HAD + r" (?:pre-?eclampsia|eclampsia)|" + _HER_HISTORY + r" (?:pre-?eclampsia|eclampsia)",
+    "diabetes": r"(?:i have|i'?ve got|i was diagnosed with|" + _HER_HISTORY + r") (?:gestational )?diabetes",
     "sickle cell": r"(?:i have|i'?m|i am|i'?ve got|my genotype is) (?:sickle cell|ss\b|sc\b)",
-    "asthma": r"(?:i have|i'?ve got|diagnosed with) asthma",
-    "fibroids": r"(?:i have|i'?ve got|diagnosed with) fibroids?",
-    "pcos": r"(?:i have|i'?ve got|diagnosed with) (?:pcos|polycystic)",
-    "previous c-section": r"(?:had|have had) (?:a |an )?(?:c-?section|caesarean|cesarean|cs) (?:before|last time|previously|in my last)|previous (?:c-?section|caesarean|cesarean)",
-    "previous miscarriage": r"(?:had|have had) (?:a |\d )?miscarriages?|lost (?:a|my) (?:previous )?pregnancy",
-    "hiv": r"(?:i'?m|i am|i have|i'?ve got) (?:hiv|living with hiv)|hiv positive",
+    "asthma": r"(?:i have|i'?ve got|i was diagnosed with) asthma",
+    "fibroids": r"(?:i have|i'?ve got|i was diagnosed with) fibroids?",
+    "pcos": r"(?:i have|i'?ve got|i was diagnosed with) (?:pcos|polycystic)",
+    "previous c-section": _I_HAD + r" (?:a |an )?(?:c-?section|caesarean|cesarean|cs) (?:before|last time|previously|in my last)|my previous (?:c-?section|caesarean|cesarean)|i had (?:a |an )?(?:c-?section|caesarean|cesarean)",
+    "previous miscarriage": _I_HAD + r" (?:a |\d |two |three )?miscarriages?|i (?:have )?lost (?:a|my) (?:previous |last |first )?pregnancy",
+    "hiv": r"(?:i'?m|i am|i have|i'?ve got) (?:hiv|living with hiv)|(?:i'?m|i am) hiv positive",
 }
 
 APPOINTMENT_KINDS = (
@@ -89,7 +91,18 @@ _RESOLVED_BEFORE = re.compile(r"(?:no more|no longer (?:have|having|get|feel)|do
 _ALLERGY = re.compile(r"(?:i'?m|i am) allergic to ([a-z][a-z \-]{1,40})|(?:my )?allerg(?:y|ies) (?:is|are|to) ([a-z][a-z \-]{1,40})", re.I)
 _CALL_ME = re.compile(r"(?:please )?call me ([A-Za-z][A-Za-z'\-]{1,20})\b|my name is ([A-Za-z][A-Za-z'\-]{1,20})\b", re.I)
 _SHORT = re.compile(r"(?:keep (?:it|your answers|replies) (?:short|brief)|short(?:er)? (?:answers|replies)|too long|be brief)", re.I)
+_DETAILED = re.compile(r"(?:i (?:like|prefer|want) (?:more )?detail(?:ed)?|(?:give|tell) me (?:more|the full) detail|explain (?:things )?(?:in detail|fully|properly)|i like (?:long|full|thorough) (?:answers|explanations))", re.I)
+# "my cycle is usually 28 days" / "I have a 30 day cycle" / "my period comes every 26 days"
+_CYCLE = re.compile(r"(?:(?:my )?cycle (?:is |lasts |runs )?(?:usually |normally |about |around |always )*(\d{2}) ?days?|(\d{2})[- ]day cycles?|"
+                    r"period (?:usually |normally )?comes? (?:every|after) (?:about |around )?(\d{2}) days)", re.I)
+# "my last period started on 3 November" / "my LMP was 12/10"
+_LMP = re.compile(r"(?:my )?(?:last (?:menstrual )?period|lmp)\b[^.?!]{0,20}?\b(?:was|started|start(?:ed)? on|began|came|on)\b", re.I)
 _ASKING = re.compile(r"\b(?:remember|recall|do you know|did i (?:tell|say)|when (?:is|was)|what (?:is|was|did))\b|\?\s*$", re.I)
+# A question about a medicine or condition ("can I take paracetamol?", "do I have diabetes?") is not news about her.
+_QUESTION_CLAUSE = re.compile(r"\?\s*$|^\W*(?:do|does|can|could|should|would|will|is|are|am|may|might|what|which|how|why|when|if)\b", re.I)
+_NO_ALLERGY = {"nothing", "anything", "none", "no", "nothing really", "not sure", "i don't know", "anything really"}
+_WEEKDAY_WORDS = {d.lower() for d in calendar.day_name} | {m.lower() for m in calendar.month_name if m}
+_REQUEST_BEFORE_CALL = re.compile(r"\b(?:nurse|doctor|midwife|someone|somebody|anybody|anyone|they|he|she|him|her|will|would|could|should|to|pls|please|can (?:the|a|my|somebody|someone))\s*$", re.I)
 _STOP = {"and", "but", "so", "the", "a", "an", "my", "it", "is", "please", "too", "also", "since"}
 _NOT_A_NAME = {"back", "later", "tomorrow", "today", "tonight", "now", "when", "if", "again", "asap", "sometime", "anytime",
                "please", "soon", "first", "quickly", "maybe", "the", "a", "an", "me", "you", "admin", "system", "loni"}
@@ -166,18 +179,24 @@ def extract(text: str, today: date) -> Tuple[List[Found], List[str]]:
         if any(re.search(p, t) for p in pats):
             found.append(Found("concern", key))
 
-    if _MED_CUE.search(t):
+    statements = [c for c in re.split(r"(?<=[.?!;\n])", t) if c.strip() and not _QUESTION_CLAUSE.search(c.strip())]
+    for clause in statements:
+        cue = _MED_CUE.search(clause)
+        if not cue:
+            continue
+        after = clause[cue.end():]           # "I'm taking folic acid" (the medicine comes after the cue)
         for key, pat in MEDICATIONS.items():
-            if re.search(pat, t) and not (key == "antimalarial" and any(f.key == "antimalarial (IPTp/SP)" for f in found)):
+            if re.search(pat, after) and not any(f.kind == "medication" and f.key == key for f in found) \
+                    and not (key == "antimalarial" and any(f.key == "antimalarial (IPTp/SP)" for f in found)):
                 found.append(Found("medication", key))
 
     for key, pat in CONDITIONS.items():
-        if re.search(pat, t):
+        if any(re.search(pat, c) for c in statements):
             found.append(Found("condition", key))
 
     for m in _ALLERGY.finditer(t):
         name = _clean_phrase(m.group(1) or m.group(2))
-        if name:
+        if name and name not in _NO_ALLERGY and not name.startswith(("nothing", "anything", "none")):
             found.append(Found("allergy", name))
 
     asking = _ASKING.search(t)   # "do you remember my appointment?" is a question, not news of an appointment
@@ -189,10 +208,24 @@ def extract(text: str, today: date) -> Tuple[List[Found], List[str]]:
     m = _CALL_ME.search(text or "")
     if m:
         name = (m.group(1) or m.group(2) or "").strip()
-        if name and name.lower() not in _STOP | _NOT_A_NAME:
+        before = (text or "")[:m.start()]
+        if name and name.lower() not in _STOP | _NOT_A_NAME | _WEEKDAY_WORDS and not name.lower().endswith("ly") \
+                and not (m.group(1) and _REQUEST_BEFORE_CALL.search(before)):
             found.append(Found("preference", "preferred_name", detail=name[:20].capitalize()))
     if _SHORT.search(t):
         found.append(Found("preference", "short_answers"))
+    elif _DETAILED.search(t):
+        found.append(Found("preference", "detailed_answers"))
+
+    m = _CYCLE.search(t)
+    if m:
+        days = int(next(g for g in m.groups() if g))
+        if 15 <= days <= 60:
+            found.append(Found("condition", "usual cycle length", detail=f"{days} days"))
+    if not asking and _LMP.search(t):
+        when = _parse_when(t, today)
+        if when is not None and when <= today:
+            found.append(Found("condition", "last period started", event_date=when))
 
     resolved = []
     for name, patterns in memory._SYMPTOM_RX.items():
@@ -314,7 +347,13 @@ async def mark_followed_up(db, fact_id: int, now: datetime) -> None:
 
 # ── reading ──────────────────────────────────────────────────────────────────────────────────────────
 
+# Facts about her cycle change: a last-period date is only useful for about one cycle.
+_STALE_KEYS = {"last period started": 35, "usual cycle length": 365}
+
+
 def is_stale(f: MemoryFact, today: date) -> bool:
+    if f.key in _STALE_KEYS:
+        return (today - (f.event_date or f.last_noted)).days > _STALE_KEYS[f.key]
     if f.kind == "appointment":
         return f.event_date is None and (today - f.last_noted).days > 14
     return (today - f.last_noted).days > STALE_AFTER.get(f.kind, 30)
@@ -329,7 +368,12 @@ def label(f: MemoryFact) -> str:
     if f.kind == "concern":
         return CONCERN_WORDS.get(f.key, f.key.replace("_", " "))
     if f.kind == "preference":
-        return {"preferred_name": f"likes to be called {f.detail}", "short_answers": "prefers short answers"}.get(f.key, f.key.replace("_", " "))
+        return {"preferred_name": f"likes to be called {f.detail}", "short_answers": "prefers short answers",
+                "detailed_answers": "likes detailed explanations"}.get(f.key, f.key.replace("_", " "))
+    if f.key == "usual cycle length" and f.detail:
+        return f"usual cycle is about {f.detail}"
+    if f.key == "last period started" and f.event_date:
+        return f"last period started {f.event_date:%d %b %Y}"
     return f.key
 
 

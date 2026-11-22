@@ -30,6 +30,7 @@ RULE_WORDS = {
     "severe_headache": "severe headache", "vision_changes": "vision changes", "sudden_swelling": "sudden swelling",
     "fall_or_trauma": "fall or blow to the belly", "pph_signs": "signs of postpartum haemorrhage",
     "newborn_not_breathing": "newborn not breathing", "newborn_danger_signs": "newborn danger signs", "severe_low_mood": "severe low mood",
+    "overdose_or_poison": "possible overdose or poisoning",
 }
 _RANK = {"emergency": 3, "urgent": 2, "routine": 1, "educational": 0}
 MAX_QUOTE = 240

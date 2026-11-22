@@ -11,7 +11,9 @@ message ─► save ─► triage (rules, deterministic) ─► [classifier: can
                                                                                             │
    emergency ─► fixed message from messages.py, model NOT called ──────────────────────────┤
    urgent    ─► fixed "get checked today" line ─► model (urgent directive, no reassurance) ┤
-   other     ─► model (system prompt + her stage + answer pattern for the question type) ──┤
+   other     ─► [symptom she reports? investigation: what's known / still missing] ─►      │
+                model (system prompt + her stage + memory + answer pattern + investigation) ┤
+                (greetings / small talk go to the fast, cheaper model) ─────────────────────┤
                                                                                             ▼
                                        safety.validate (appends corrections) ─► save ─► audit event (no message text)
 ```
@@ -21,7 +23,9 @@ message ─► save ─► triage (rules, deterministic) ─► [classifier: can
 | `triage.py` | Danger-sign rules, urgency levels, question types, the app actions to offer |
 | `classifier.py` | Small model call that can only raise urgency; fails open to the rules |
 | `messages.py` | The fixed emergency / urgent messages (the only text a mother sees without the model) |
-| `prompts.py` | System prompt, per-turn directives |
+| `prompts.py` | System prompt (companion behaviour: understand → investigate → explain → escalate only when warranted), per-turn directives |
+| `investigation.py` | Symptom investigation pathways (bleeding, belly/pelvic pain, headache, nausea, discharge, urinary, breast, tiredness, missed period, fever, back pain, swelling, menopause). Per turn: what is already known (from her words and profile), what is still missing (warning signs first), and when to stop asking and answer. Carries across turns via the assistant message's `meta.investigation`. Never changes urgency |
+| `signals.py` | Implicit quality signals per turn (correction, clarification, repeat, thanks, wants detail/shorter), stored as labels on `ai_safety_events`, never text |
 | `lookup.py` | Finds a facility's hours, address and phone (Google Places, optional web search); detects the question; builds the source line |
 | `context.py` | Name + stage handed to the model (nothing else from her profile) |
 | `safety.py` | Post-checks on the model's answer: reassurance on a red flag, doses, "stop your medicine", invented bookings, and the short "not medical advice" reminder every health answer must carry |
@@ -32,6 +36,20 @@ message ─► save ─► triage (rules, deterministic) ─► [classifier: can
 | `../knowledge/` | Curated knowledge base: draft → approved (named reviewer + expiry) → retired; any edit returns it to draft. Only approved, unexpired, stage-matched docs reach the model |
 | `tests/triage_cases.py` | The gold set. Add a line whenever a real message is mis-triaged |
 | `tests/test_loni_scenarios.py` | The spec's 10 scenarios (deterministic; fake model). `tests/live/` = LLM-graded tone eval (`LONI_LIVE_EVAL=1`) |
+
+## Feedback and learning (no model training)
+
+Loni does not train a model on her chats. It improves through reviewed, structured data:
+- Explicit: `POST /api/v1/ai-chat/sessions/{id}/messages/{message_id}/feedback` `{helpful, reason}` (fixed reason codes) → Mongo `ai_feedback`
+  with the answer's urgency, question type and investigation pathway, never the text.
+- Implicit: `signals` on each `ai_safety_events` record.
+- Use both to find weak pathways, prompts or knowledge gaps; changes to clinical rules still go through clinician review.
+
+## Model routing
+
+`service.choose_model`: greetings / small talk with no health content → the provider's fast model (`GEMINI_FAST_MODEL`);
+everything with a symptom, medicine, test, emotion or any urgency → the main model. Switch off with `AI_ROUTE_SMALL_TALK=false`.
+Emergencies never reach a model at all.
 
 ## Human review
 
@@ -47,6 +65,10 @@ mark them reviewed at `POST .../{id}/review`. Opening a conversation is an admin
 4. `tests/triage_cases.py`: expected urgency for each case.
 5. The `serious_infection` emergency rule (fever + confusion / fast breathing / fainting / foul postpartum discharge).
 6. `nigerian.py` meanings (native speaker) and the handoff summary format (a LONI nurse).
+7. Every pathway in `investigation.py`: the questions, which ones are warning signs, the "what a good answer covers" text,
+   and `MAX_TURNS`. Bump `PATHWAY_VERSION` on any change.
+8. The change that general education questions no longer show a Talk to a Nurse button, and that the "general information"
+   reminder is shown at most once every few routine answers (always on urgent ones).
 
 ## Known limits (be honest about these)
 

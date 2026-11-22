@@ -58,7 +58,7 @@ export default function LoniMemoryScreen() {
   const [editing, setEditing] = useState<{ fact?: MemoryFact; kind: MemoryFact['kind']; text: string } | null>(null);
 
   const fail = (e: any, what: string) =>
-    Toast.show({ type: 'error', text1: what, text2: e?.response?.data?.detail || e?.message });
+    Toast.show({ type: 'error', text1: what, text2: e?.response?.data?.message || e?.response?.data?.detail || e?.message });
 
   const confirmDelete = (f: MemoryFact) =>
     Alert.alert('Forget this?', `Loni will forget "${f.label}". This can't be undone.`, [
@@ -166,7 +166,7 @@ export default function LoniMemoryScreen() {
           >
             <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
-          <HelixaText className="text-[18px]" weight="bold">What Loni Remembers</HelixaText>
+          <HelixaText className="text-[18px]" weight="bold">Loni's Understanding</HelixaText>
         </View>
       </Reveal>
 
@@ -177,7 +177,7 @@ export default function LoniMemoryScreen() {
             <HelixaText className="flex-1 text-[14px] leading-5" style={{ color: colors.textSecondary }}>
               {memoryOff
                 ? "Memory is switched off, so Loni isn't learning anything new. You can still review or delete what's here."
-                : 'Loni keeps short notes so your chats feel continuous. Fix anything that is wrong, mark things as better, or delete them. A nurse only sees these if you choose to share them.'}
+                : "Here's what Loni AI has understood about your journey so far, so you don't have to repeat yourself. Fix anything that is wrong, mark things as better, or delete them. A nurse only sees these if you choose to share them."}
             </HelixaText>
           </View>
         </Reveal>

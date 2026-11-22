@@ -6,7 +6,7 @@ import { HelixaText } from '../../components/HelixaText';
 import { KeyboardAvoid } from '../../components/KeyboardAvoid';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LumaIcon } from '../../components/icons/LumaIcon';
+import { LoniAiIcon } from '../../components/icons/LoniAiIcon';
 import { SafetyActions } from '../../components/chat/SafetyActions';
 import { QuickReplies } from '../../components/chat/QuickReplies';
 import { chatTopicsFor } from '../../lib/chatTopics';
@@ -216,7 +216,7 @@ export default function ConversationScreen() {
         <RevealList key={msg.id || index} index={index}>
         <View className="flex-row items-end mb-8">
           <View className="relative top-11 z-10 -mr-1 w-12 h-12 rounded-full items-center justify-center shadow-sm" style={{ backgroundColor: colors.elevated }}>
-            <LumaIcon size={24} />
+            <LoniAiIcon size={24} />
           </View>
           <View
             className="rounded-[24px] rounded-bl-none px-5 py-4 shadow-sm max-w-[80%]"
@@ -366,7 +366,7 @@ export default function ConversationScreen() {
               <TextInput
                 className="flex-1 text-[15px] py-3"
                 style={{ color: colors.text }}
-                placeholder="Tell Luma How You Feel..."
+                placeholder="Tell Loni AI How You Feel..."
                 placeholderTextColor={colors.textMuted}
                 value={inputText}
                 onChangeText={setInputText}

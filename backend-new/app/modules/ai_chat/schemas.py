@@ -26,3 +26,12 @@ class StandardChatResponse(BaseModel):
     success: bool = True
     message: Optional[str] = None
     data: Optional[dict] = None
+
+
+FEEDBACK_REASONS = ("helpful", "not_helpful", "misunderstood", "too_long", "too_short", "unclear", "felt_supported", "not_supported")
+
+
+class MessageFeedback(BaseModel):
+    """Her rating of one Loni answer. A fixed reason code, never free text, so no health detail lands in analytics."""
+    helpful: bool
+    reason: Optional[str] = Field(None, description="One of: " + ", ".join(FEEDBACK_REASONS))

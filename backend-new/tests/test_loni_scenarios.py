@@ -371,3 +371,66 @@ async def test_pause_api_used_by_the_app_pauses_through_the_right_day_and_resume
     assert week["paused_until"] == (today + timedelta(days=6)).isoformat() and week["enabled"] is True
     assert (await c.put("/api/v1/checkins/preferences", json={"pause_days": 0})).json()["data"]["paused_until"] is None
     assert (await c.put("/api/v1/checkins/preferences", json={"pause_days": 91})).status_code == 400
+
+
+# ── audit 2026-11-19: holes found by probing with Pidgin, overdoses and "someone else's" history ─────────────
+
+from app.modules.ai_chat import safety as _safety  # noqa: E402
+from app.modules.ai_chat.triage import StageContext as _Stage, Urgency as _U, triage as _triage  # noqa: E402
+
+_PREG = _Stage(kind="pregnancy", week=24)
+
+
+@pytest.mark.parametrize("text,urgency,rule", [
+    ("I no wan live again", _U.emergency, "self_harm"),
+    ("I took 20 paracetamol", _U.emergency, "overdose_or_poison"),
+    ("I drank sniper", _U.emergency, "self_harm"),
+    ("my pikin swallowed some tablets", _U.emergency, "overdose_or_poison"),
+    ("my husband dey beat me", _U.urgent, "abuse"),
+    ("e be like say water dey commot for my body", _U.emergency, "waters_break"),   # 24 weeks: preterm escalates
+    ("my pikin no dey move since morning", _U.urgent, "reduced_movement"),
+    ("my eye dey see double and my head dey bang me", _U.emergency, "headache_vision"),
+])
+def test_pidgin_and_overdose_danger_signs_are_caught_without_the_model(text, urgency, rule):
+    r = _triage(text, _PREG)
+    assert r.urgency == urgency and rule in r.rule_ids, (r.urgency, r.rule_ids)
+
+
+@pytest.mark.parametrize("text", ["I took 2 paracetamol for my headache", "I took my iron tablets today", "I took 20mg nifedipine as prescribed"])
+def test_normal_doses_are_not_overdoses(text):
+    assert "overdose_or_poison" not in _triage(text, _PREG).rule_ids
+
+
+@pytest.mark.parametrize("reply,flagged", [
+    ("The nurse has been notified.", True),
+    ("I've let the nurse know about this.", True),
+    ("I'll pass this on to the nurse.", True),
+    ("I've alerted a nurse for you.", True),
+    ("A nurse has reviewed your messages.", True),
+    ("Your nurse will call you shortly.", True),
+    ("Our nurses have seen this many times, it's very common.", False),
+    ("Please tell your midwife at your next visit.", False),
+    ("Your doctor should contact you with the results.", False),
+])
+def test_never_claims_a_clinician_was_told_or_has_seen_the_chat(reply, flagged):
+    notes = _safety.validate(_U.routine, reply, "symptom_guidance")
+    assert any("no nurse or doctor has seen" in n for n in notes) is flagged
+
+
+@pytest.mark.parametrize("text", ["family history of high blood pressure", "my sister had pre-eclampsia", "my friend had a miscarriage",
+                                  "no history of diabetes", "my sister was diagnosed with asthma", "my husband is hiv positive",
+                                  "do I have high blood pressure?"])
+def test_other_peoples_conditions_and_questions_are_not_stored_as_hers(text):
+    found, _ = facts.extract(text, date(2026, 11, 19))
+    assert [f for f in found if f.kind == "condition"] == []
+
+
+def test_medicines_she_asks_about_are_not_stored_as_medicines_she_takes():
+    found, _ = facts.extract("I'm taking folic acid. can I take paracetamol?", date(2026, 11, 19))
+    assert [f.key for f in found if f.kind == "medication"] == ["folic acid"]
+
+
+@pytest.mark.parametrize("text", ["can the nurse call me Monday", "call me immediately please", "I'm allergic to nothing"])
+def test_requests_and_non_answers_are_not_stored_as_names_or_allergies(text):
+    found, _ = facts.extract(text, date(2026, 11, 19))
+    assert [f for f in found if f.kind in ("preference", "allergy")] == []
