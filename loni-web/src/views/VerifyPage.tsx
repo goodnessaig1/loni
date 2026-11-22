@@ -1,14 +1,16 @@
+'use client';
+
 import { useState, useRef, type KeyboardEvent, type ChangeEvent } from 'react';
-import { useSearchParams } from 'react-router';
+import { useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, CheckCircle2, ChevronLeft } from 'lucide-react';
-import { Link } from 'react-router';
+import Link from 'next/link';
 import { apiRequest } from '../utils/api';
 import { SITE } from '../config/site';
 
 type Phase = 'setup' | 'verify' | 'success';
 
 export default function VerifyPage() {
-  const [searchParams] = useSearchParams();
+  const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
 
   const [phase, setPhase] = useState<Phase>('setup');
@@ -50,8 +52,8 @@ export default function VerifyPage() {
       });
 
       setPhase('verify');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +62,7 @@ export default function VerifyPage() {
   const handlePhoneChange = (e: ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value;
     const hasPlus = input.startsWith('+');
-    let digits = input.replace(/\D/g, '');
+    const digits = input.replace(/\D/g, '');
     let newPhone = '';
     
     if (hasPlus) {
@@ -120,8 +122,8 @@ export default function VerifyPage() {
       });
 
       setPhase('success');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
@@ -136,8 +138,8 @@ export default function VerifyPage() {
         body: { email, type: 'phone_verification' }
       });
       // Optionally show a success toast here
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);
     }
@@ -153,9 +155,9 @@ export default function VerifyPage() {
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 mb-2">
             <CheckCircle2 size={32} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Account Ready!</h2>
+          <h1 className="text-2xl font-bold text-gray-900">Account Ready!</h1>
           <p className="text-gray-600">
-            You are now successfully connected to your partner's support circle!
+            You are now successfully connected to your partner&apos;s support circle!
           </p>
           <div className="bg-pink-50 text-pink-700 p-4 rounded-xl text-sm border border-pink-100 mt-6">
             Please download the <strong>Loni App</strong> from the App Store or Google Play to receive updates and stay connected.
@@ -179,9 +181,9 @@ export default function VerifyPage() {
             <button onClick={() => setPhase('setup')} className="text-gray-800 mb-6 hover:text-gray-600 transition-colors">
               <ChevronLeft size={28} />
             </button>
-            <h2 className="text-[28px] font-bold text-gray-900 tracking-tight leading-tight mb-2">
+            <h1 className="text-[28px] font-bold text-gray-900 tracking-tight leading-tight mb-2">
               Enter Verification Code
-            </h2>
+            </h1>
             <p className="text-[16px] text-[#6B7280] leading-relaxed">
               We sent a 4-digit code to {email}
             </p>
@@ -251,9 +253,9 @@ export default function VerifyPage() {
           <div className="flex justify-center mb-6">
             <img src="https://ik.imagekit.io/eqh0cjetc/amazon-image/Group%2013%201.png" alt="Loni Logo" className="h-10" />
           </div>
-          <h2 className="text-[28px] font-bold text-gray-900 tracking-tight leading-tight">Complete Setup</h2>
+          <h1 className="text-[28px] font-bold text-gray-900 tracking-tight leading-tight">Complete Setup</h1>
           <p className="mt-3 text-[16px] text-[#6B7280]">
-            You've been invited to Loni. Let's finish setting up your partner account.
+            You&apos;ve been invited to Loni. Let&apos;s finish setting up your partner account.
           </p>
         </div>
 
@@ -347,8 +349,8 @@ export default function VerifyPage() {
             />
             <span>
               I agree to the{' '}
-              <Link to="/terms" className="text-[#D62D88] underline">Terms of Service</Link> and{' '}
-              <Link to="/privacy" className="text-[#D62D88] underline">Privacy Policy</Link>
+              <Link href="/terms" className="text-[#D62D88] underline">Terms of Service</Link> and{' '}
+              <Link href="/privacy" className="text-[#D62D88] underline">Privacy Policy</Link>
             </span>
           </label>
 

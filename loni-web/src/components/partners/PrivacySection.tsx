@@ -21,7 +21,7 @@ export function PrivacySection() {
         { title: 'Partners only see what she actively chooses to share.' },
       ]}
       card={{
-        src: privacyCard,
+        src: privacyCard.src,
         alt: "The LONI app's Emergency Contacts screen with an \"Add Support Partners\" button and a connected partner",
       }}
       canvas={{

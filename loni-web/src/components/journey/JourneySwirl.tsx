@@ -1,3 +1,5 @@
+'use client';
+
 import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import { useRef } from 'react';
 import swirl from '../../assets/journey/swirl.webp';
@@ -22,7 +24,7 @@ export function JourneySwirl({ className = '' }: { className?: string }) {
         transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
       >
         <motion.img
-          src={swirl}
+          src={swirl.src}
           alt=""
           width={605}
           height={474}

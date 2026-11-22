@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
@@ -157,7 +159,7 @@ function DesktopMission() {
       </Title>
       <DownloadLink style={at(42, 142, { fontSize: px(12.5) })} />
       <Photo
-        src={missionPhoto}
+        src={missionPhoto.src}
         alt="An expectant mother in a blue patterned dress shows her partner something on her phone as they relax at home"
         from="left"
         position="48% center"
@@ -175,7 +177,7 @@ function DesktopVision() {
         Our Vision
       </Title>
       <Photo
-        src={visionPhoto}
+        src={visionPhoto.src}
         alt="A grandmother and her pregnant daughter smile at a phone together at an outdoor farmers' market"
         from="right"
         position="40% center"
@@ -199,7 +201,7 @@ function StackedLayout() {
           <DownloadLink className="text-[0.8rem]" />
         </div>
         <Photo
-          src={missionPhoto}
+          src={missionPhoto.src}
           alt="An expectant mother in a blue patterned dress shows her partner something on her phone as they relax at home"
           from="left"
           position="50% center"
@@ -213,7 +215,7 @@ function StackedLayout() {
         </Title>
         <Copy paragraphs={VISION} className="mt-6 text-[0.92rem] leading-[1.6]" />
         <Photo
-          src={visionPhoto}
+          src={visionPhoto.src}
           alt="A grandmother and her pregnant daughter smile at a phone together at an outdoor farmers' market"
           from="right"
           position="42% center"

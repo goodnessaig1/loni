@@ -1,8 +1,11 @@
+'use client';
+
 import { useEffect, useId, useRef, useState } from 'react';
+import { archivoNarrow } from '../../lib/fonts';
 import { motion, useAnimationFrame, useInView, useReducedMotion } from 'framer-motion';
 
 const PHRASE = 'Connecting you to a caring human voice...    ';
-const FONT = '"Archivo Narrow", "Arial Narrow", sans-serif';
+const FONT = `${archivoNarrow.style.fontFamily}, "Arial Narrow", sans-serif`;
 
 interface Props {
   /** Centre line of the ribbon (SVG path data, in `viewBox` units). */
@@ -40,7 +43,7 @@ export function TextRibbon({ d, viewBox, strokeWidth, fontSize, speed = 70, colo
       if (!cancelled && period && length) setLayout({ period, repeats: Math.ceil(length / period) + 2 });
     };
     const fonts = document.fonts;
-    if (fonts?.load) fonts.load(`700 ${fontSize}px "Archivo Narrow"`).then(measure, measure);
+    if (fonts?.load) fonts.load(`700 ${fontSize}px ${archivoNarrow.style.fontFamily}`).then(measure, measure);
     else measure();
     return () => {
       cancelled = true;

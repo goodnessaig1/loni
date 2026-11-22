@@ -41,7 +41,7 @@ export function PartnerHowItWorksSection() {
       ]}
       topics={TOPICS}
       photo={{
-        src: motherResting,
+        src: motherResting.src,
         alt: 'An expectant mother resting a hand on her belly in a warmly lit room',
         width: 445,
         height: 302,

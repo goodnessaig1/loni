@@ -1,6 +1,8 @@
+'use client';
+
 import type { CSSProperties } from 'react';
 import { motion } from 'framer-motion';
-import { Link } from 'react-router';
+import Link from 'next/link';
 
 const EASE = [0.22, 1, 0.36, 1] as const;
 
@@ -69,7 +71,7 @@ export function FooterInfoCard({ className = '', style }: { className?: string; 
               {group.links.map((link) => (
                 <li key={link.label}>
                   {link.to ? (
-                    <Link to={link.to} className={LINK_CLASS}>
+                    <Link href={link.to} className={LINK_CLASS}>
                       {link.label}
                     </Link>
                   ) : (

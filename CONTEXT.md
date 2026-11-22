@@ -35,7 +35,7 @@ Monorepo `https://github.com/goodnessaig1/loni.git`. Current branch `ft-communit
 | `backend-new/` | **FastAPI** backend (Python). The live API, WebSocket and AI. | **Active, the real backend** |
 | `mobile-app/` | **Expo / React Native app for mothers/women** ("Loni", `com.loni.app`). | **Active** |
 | `loni-server-app/` | **Expo / React Native app for nurses, drivers and support partners** ("Loni Server", `com.loni.server`). | **Active** |
-| `loni-web/` | **React + Vite marketing website** (home, drivers, nurses, partners, about, legal) + a partner verify page. | **Active** |
+| `loni-web/` | **Next.js 16 (App Router) marketing website** (home, drivers, nurses, partners, about, legal) + a partner verify page. | **Active** |
 | `livekit/` | Docker stack for self-hosted **LiveKit** (voice), Redis, coturn (TURN), Caddy (TLS). | Active infra |
 | `loni-admin/` | **Next.js 16 admin portal** for LONI staff (separate git repo `goodnessaig1/loni-admin`). Login + 2FA, RBAC, staff & roles, overview dashboard. See `loni-admin/README.md`. | **Active, new** |
 | `backend/` | The **original Node/Express + Drizzle** backend (auth + health only). | **Legacy, superseded by `backend-new`** |
@@ -297,11 +297,12 @@ State: zustand `callStore`/`rideStore`, React Query, contexts for auth/notificat
 
 ## 9. Website (`loni-web/`)
 
-React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. Deployed on **Vercel** (`vercel.json` rewrites everything to `index.html`). Scripts: `npm run dev | build | lint | preview`.
+Next.js 16 (App Router, all pages statically prerendered) + React 19 + Tailwind 4 + framer-motion + lucide-react. Migrated from Vite + react-router on 2026-11-22 for SEO. Deployed on **Vercel**. Scripts: `npm run dev | build | start | lint`. See `loni-web/README.md`.
 
-- **Routes** (`src/App.tsx`): `/` home, `/drivers`, `/nurses`, `/partners`, `/about`, `/privacy`, `/terms`, `/disclaimer`, `/verify` (partner account setup: password + phone → OTP via `POST /auth/setup-partner` + `/auth/verify-partner-setup`; uses `src/utils/api.ts`, base URL `VITE_API_BASE_URL` or `http://localhost:8000`).
+- **Routes** (`src/app/*/page.tsx`, bodies in `src/views/`): `/` home, `/drivers`, `/nurses`, `/partners`, `/about`, `/privacy`, `/terms`, `/disclaimer`, `/verify` (noindex; partner account setup: password + phone → OTP via `POST /auth/setup-partner` + `/auth/verify-partner-setup`; uses `src/utils/api.ts`, base URL `NEXT_PUBLIC_API_BASE_URL` (falls back to `VITE_API_BASE_URL`) or `http://localhost:8000`).
+- **SEO:** `src/lib/seo/routes.ts` is the single source for per-page titles, descriptions, keywords, `lastModified` and sitemap priority; `sitemap.ts`, `robots.ts`, `manifest.ts`, per-page `opengraph-image.tsx`, JSON-LD (Organization, WebSite, WebPage/AboutPage, BreadcrumbList). Canonical origin `NEXT_PUBLIC_SITE_URL` (default `https://lonimum.com`).
 - **Home sections:** Hero → Intro → RoadsShowcase → Problem → Emergency → LoniBot → Nurse → Community → Partner → Journey → Pricing (Free vs LONI Plus, 7-day trial) → Footer.
-- **Design approach:** built from Figma with a custom **"Figma-canvas unit"** system (`components/showcase/designUnits.ts`): desktop compositions are absolutely positioned on a fixed canvas and scaled with container query units; stacked layouts below the `lg` breakpoint. Scroll-triggered animations use framer-motion (`once: false`). Brand token `--color-brand: #d62d88` in `src/index.css`.
+- **Design approach:** built from Figma with a custom **"Figma-canvas unit"** system (`components/showcase/designUnits.ts`): desktop compositions are absolutely positioned on a fixed canvas and scaled with container query units; stacked layouts below the `lg` breakpoint. Scroll-triggered animations use framer-motion (`once: false`). Brand token `--color-brand: #d62d88` in `src/app/globals.css`; fonts self-hosted via `next/font` (`src/lib/fonts.ts`).
 - `src/config/site.ts` holds all CTA/social links; most are **placeholders** (`#download`, `#drivers`, `https://www.instagram.com/`). Store/social URLs still need to be added.
 
 ---
@@ -326,7 +327,7 @@ React 19 + Vite + Tailwind 4 + framer-motion + react-router 8 + lucide-react. De
 2. `backend-new/`: venv, `.env`, `alembic upgrade head`, `uvicorn app.main:app --reload --port 8000`. Local MongoDB on `27017`. Seed (run from `backend-new/` with the venv active): `python app/scripts/seed_admin.py` (admin account) and `python app/scripts/seed_aptitude_questions.py`.
 3. Find your LAN IP (`ipconfig getifaddr en0`) and run `scripts/update-lan-ip.sh <ip>` so devices can reach the API.
 4. `mobile-app/` and `loni-server-app/`: `npm install`, `npx expo prebuild`, `npx expo run:ios|android` (dev builds; Firebase config files are present).
-5. `loni-web/`: `npm install && npm run dev` (set `VITE_API_BASE_URL`).
+5. `loni-web/`: `npm install && npm run dev` (set `NEXT_PUBLIC_API_BASE_URL`).
 6. To test check-ins safely: leave `CHECKINS_ENABLED=false`, then `GET /api/v1/checkins/admin/preview` as an admin.
 
 ---

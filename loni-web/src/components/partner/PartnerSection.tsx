@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { BellIcon } from '../icons/BellIcon';
@@ -113,7 +115,7 @@ function Cta({ className = '', style }: { className?: string; style?: CSSPropert
 function Phone({ className = '', style }: { className?: string; style?: CSSProperties }) {
   return (
     <motion.img
-      src={connected}
+      src={connected.src}
       alt="The LONI invite screen: “Always Stay Connected!” with a partner email field and a Send Invite button"
       width={309}
       height={629}

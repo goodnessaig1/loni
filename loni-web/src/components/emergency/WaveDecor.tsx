@@ -1,3 +1,5 @@
+'use client';
+
 import type { RefObject } from 'react';
 import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
 import wave from '../../assets/emergency/wave.webp';
@@ -20,7 +22,7 @@ export function WaveDecor({ sectionRef }: { sectionRef: RefObject<HTMLElement | 
       className="pointer-events-none absolute left-[52.5%] top-[40.5%] hidden w-[47.5%] select-none lg:block"
     >
       <motion.img
-        src={wave}
+        src={wave.src}
         alt=""
         width={684}
         height={597}

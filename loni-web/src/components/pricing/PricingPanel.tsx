@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import { Star } from 'lucide-react';
 import { SITE } from '../../config/site';
@@ -26,7 +28,7 @@ function PlanLogo({ src }: { src: string }) {
 function FreePlan() {
   return (
     <div className="flex flex-col lg:absolute lg:bottom-[4.67em] lg:left-[4.87em] lg:top-[4.67em] lg:w-[30.6em]">
-      <PlanLogo src={logoLight} />
+      <PlanLogo src={logoLight.src} />
       <h3 className="mt-[1.15em] text-[1.6em] font-semibold leading-[1.3]">Free</h3>
       <p className="mt-[0.9em] leading-[1.4] text-white/90 lg:max-w-[17.4em]">Everything you need to begin your journey.</p>
 
@@ -66,7 +68,7 @@ function PlusPlan() {
       className="mt-5 flex flex-col rounded-[1.4rem] bg-white px-5 pb-6 pt-5 text-black lg:absolute lg:bottom-[1.73em] lg:right-[1.67em] lg:top-[1.8em] lg:mt-0 lg:w-[36.9em] lg:rounded-[4.2em] lg:px-[3.2em] lg:pb-[2.9em] lg:pt-[2.87em]"
     >
       <div className="flex items-start justify-between">
-        <PlanLogo src={logoDark} />
+        <PlanLogo src={logoDark.src} />
         <motion.span
           initial={{ opacity: 0, scale: 0.6 }}
           whileInView={{ opacity: 1, scale: 1 }}

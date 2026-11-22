@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useInView, useReducedMotion, type PanInfo } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -6,9 +8,9 @@ import slide2 from '../../assets/footer/slide-2.webp';
 import slide3 from '../../assets/footer/slide-3.webp';
 
 const SLIDES = [
-  { src: slide1, alt: 'A smiling expectant mother looking at her phone' },
-  { src: slide2, alt: 'An expectant couple relaxing together on a bed' },
-  { src: slide3, alt: 'An expectant couple smiling together on a tropical beach' },
+  { src: slide1.src, alt: 'A smiling expectant mother looking at her phone' },
+  { src: slide2.src, alt: 'An expectant couple relaxing together on a bed' },
+  { src: slide3.src, alt: 'An expectant couple smiling together on a tropical beach' },
 ];
 
 const AUTOPLAY_MS = 5000;

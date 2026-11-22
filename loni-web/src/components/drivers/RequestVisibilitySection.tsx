@@ -21,7 +21,7 @@ export function RequestVisibilitySection() {
         { title: 'Driver payout', text: 'See your earnings for the trip before you accept.' },
       ]}
       card={{
-        src: requestCard,
+        src: requestCard.src,
         alt: "The LONI driver app's Emergency Request screen showing the mother, pickup, destination, distance and payout",
       }}
       canvas={{

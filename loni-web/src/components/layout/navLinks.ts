@@ -1,6 +1,6 @@
 export interface NavLinkItem {
   label: string;
-  /** In-app route (rendered with react-router). */
+  /** In-app route (rendered with next/link). */
   to?: string;
   /** In-page anchor / external link. */
   href?: string;

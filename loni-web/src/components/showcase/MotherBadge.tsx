@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import mother from '../../assets/showcase/mother.webp';
 import { badgeVariants } from './motionPresets';
@@ -26,7 +28,7 @@ export function MotherBadge({ style }: { style?: React.CSSProperties }) {
         }}
       >
         <img
-          src={mother}
+          src={mother.src}
           alt=""
           draggable={false}
           className="absolute max-w-none"

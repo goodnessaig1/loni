@@ -1,3 +1,5 @@
+'use client';
+
 import { motion, type MotionValue } from 'framer-motion';
 import phone from '../../assets/showcase/phone1.webp';
 import { MotherBadge } from './MotherBadge';
@@ -13,7 +15,7 @@ export function PhoneMockup({ parallaxY }: { parallaxY?: MotionValue<number> }) 
     <motion.div className="absolute" style={{ ...box(537.15, 111, 391.373, 796), y: parallaxY }}>
       <motion.div className="relative size-full" variants={phoneVariants}>
         <img
-          src={phone}
+          src={phone.src}
           alt="The LONI app home screen showing a mother's pregnancy week, today's tip and quick actions"
           width={785}
           height={1600}

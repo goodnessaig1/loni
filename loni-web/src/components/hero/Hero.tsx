@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import { ConnectedCard } from './ConnectedCard';
 import { HeroArt } from './HeroArt';

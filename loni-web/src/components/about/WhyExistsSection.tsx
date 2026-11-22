@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties, ReactNode } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
 import { CarFront, HeartHandshake, UsersRound } from 'lucide-react';

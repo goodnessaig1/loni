@@ -1,6 +1,8 @@
+'use client';
+
 import type { CSSProperties } from 'react';
 import { MotionConfig, motion } from 'framer-motion';
-import { Link } from 'react-router';
+import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import aboutPhoto from '../../assets/about/hero.webp';
 import { SITE } from '../../config/site';
@@ -69,7 +71,7 @@ function Intro({ className = '', style }: { className?: string; style?: CSSPrope
     >
       <p className="text-justify text-black">{INTRO}</p>
       <Link
-        to={SITE.exploreLoniHref}
+        href={SITE.exploreLoniHref}
         className="group mt-6 inline-flex items-center text-[0.8em] lg:mt-[1.9em]"
       >
         <span className="inline-flex h-[2.4em] items-center rounded-full bg-black px-[1.5em] font-semibold text-white transition-colors group-hover:bg-neutral-800">
@@ -106,7 +108,7 @@ function Photo({ className = '', style }: { className?: string; style?: CSSPrope
         }}
       >
         <motion.img
-          src={aboutPhoto}
+          src={aboutPhoto.src}
           alt="A smiling expectant mother in a blue patterned dress relaxing in an armchair and looking at her phone"
           width={722}
           height={568}

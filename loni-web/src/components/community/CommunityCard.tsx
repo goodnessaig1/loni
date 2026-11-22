@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import community from '../../assets/community/community.webp';
 
@@ -24,7 +26,7 @@ export function CommunityCard({ className = '' }: { className?: string }) {
       style={{ borderRadius: '7.8% / 7.07%' }}
     >
       <motion.img
-        src={community}
+        src={community.src}
         alt="The LONI Community feed: a warm space to share, ask, and encourage one another"
         width={664}
         height={733}

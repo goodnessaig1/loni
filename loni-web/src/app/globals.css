@@ -1,11 +1,14 @@
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Public Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+@theme inline {
+  /* The faces are self-hosted by next/font (see src/lib/fonts.ts), which sets these variables on <html>. */
+  --font-sans: var(--font-public-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   /* Used by the hero, as in the design. */
-  --font-inter: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-dm: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-inter: var(--font-inter-face), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-dm: var(--font-dm-sans), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
 
+@theme {
   --color-brand: #d62d88;
   --color-hero-base: #f7389d;
   /* The hero's soft blush panel and its deeper accent pink (headline, tag, buttons, stars). */

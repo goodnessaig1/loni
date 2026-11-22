@@ -1,6 +1,8 @@
+'use client';
+
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Link } from 'react-router';
+import Link from 'next/link';
 import { NAV_LINKS, type NavLinkItem } from '../layout/navLinks';
 import footerLogo from '../../assets/footer/logo.webp';
 
@@ -9,15 +11,15 @@ const FOOTER_NAV = NAV_LINKS.filter((l) => ['Home', 'About Us', 'Pricing'].inclu
 
 export function FooterLogo({ className = '' }: { className?: string }) {
   return (
-    <Link to="/" aria-label="LONI home" className={`inline-flex ${className}`}>
-      <img src={footerLogo} alt="LONI" width={55} height={33} draggable={false} className="h-full w-auto select-none" />
+    <Link href="/" aria-label="LONI home" className={`inline-flex ${className}`}>
+      <img src={footerLogo.src} alt="LONI" width={55} height={33} draggable={false} className="h-full w-auto select-none" />
     </Link>
   );
 }
 
 function NavAnchor({ item, className = '' }: { item: NavLinkItem; className?: string }) {
   return item.to ? (
-    <Link to={item.to} className={className}>
+    <Link href={item.to} className={className}>
       {item.label}
     </Link>
   ) : (

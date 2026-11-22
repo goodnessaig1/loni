@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import nurse from '../../assets/nurse/nurse.webp';
 
@@ -47,7 +49,7 @@ export function NurseCardStack() {
         }}
       >
         <motion.img
-          src={nurse}
+          src={nurse.src}
           alt="A smiling LONI nurse on a phone call"
           width={393}
           height={727}

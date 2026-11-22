@@ -1,3 +1,5 @@
+'use client';
+
 import type { CSSProperties, ElementType } from 'react';
 import { motion } from 'framer-motion';
 

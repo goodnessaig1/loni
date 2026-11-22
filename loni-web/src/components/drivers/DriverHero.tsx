@@ -11,7 +11,7 @@ export function DriverHero() {
       tag="For Drivers"
       heading={['Help a mother get', 'where she needs to be.']}
       intro={['Help LONI mums get to the hospital safe, fast and happy.']}
-      photo={heroPhoto}
+      photo={heroPhoto.src}
       primary={{ label: 'Join LONI as a Driver', href: SITE.driverSignupHref }}
       secondary={{ label: 'How it works', href: SITE.driverHowItWorksHref }}
       layout="top"

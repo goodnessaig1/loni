@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import { ChevronRight, Clock, MapPin } from 'lucide-react';
 
